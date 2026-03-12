@@ -1,0 +1,158 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python packaging
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Logs
+*.log
+logs/
+*.out
+*.err
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Type checker / linters
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# FastAPI / Uvicorn
+*.pid
+uvicorn.log
+
+# Database / local DB files
+*.sqlite3
+*.db
+
+# PostgreSQL dumps / backups
+*.sql
+*.dump
+*.backup
+
+# ML / Data Science artifacts
+artifacts/
+model_artifacts/
+mlruns/
+wandb/
+outputs/
+reports/
+figures/
+plots/
+checkpoints/
+*.pkl
+*.joblib
+*.h5
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Large raw / intermediate data
+data/raw/
+data/interim/
+data/processed/
+data/external/
+
+# Keep folder structure if needed
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+!data/external/.gitkeep
+
+# Airflow
+airflow.db
+airflow-webserver.pid
+airflow.cfg
+logs/
+dags/__pycache__/
+airflow_home/
+
+# Kafka / streaming temp
+*.snap
+kafka-logs/
+zookeeper-logs/
+
+# Monitoring
+.prometheus/
+grafana_data/
+
+# Docker
+*.tar
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Kubernetes
+*.secret.yaml
+secrets.yaml
+
+
+# Mac / Linux hidden files
+.AppleDouble
+.LSOverride
