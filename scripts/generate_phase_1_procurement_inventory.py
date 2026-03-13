@@ -231,7 +231,6 @@ def generate_purchase_orders(dims: Dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     return po_df
 
-
 def generate_inbound_shipments(po_df: pd.DataFrame, dims: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     calendar = dims["calendar"].copy()
     date_lookup = dict(zip(calendar["date_id"], calendar["full_date"]))
@@ -241,11 +240,15 @@ def generate_inbound_shipments(po_df: pd.DataFrame, dims: Dict[str, pd.DataFrame
     inbound_shipment_id = 200000
     inbound_line_id = 200000000
 
+    min_calendar_date = min(reverse_lookup.keys())
+    max_calendar_date = max(reverse_lookup.keys())
+
     for _, row in po_df.iterrows():
         po_date = pd.Timestamp(date_lookup[int(row["po_date_id"])])
         expected_arrival_date = pd.Timestamp(date_lookup[int(row["expected_receipt_date_id"])])
 
         shipped_qty = int(row["ordered_qty"])
+
         delay_days = max(
             0,
             int(
@@ -255,20 +258,29 @@ def generate_inbound_shipments(po_df: pd.DataFrame, dims: Dict[str, pd.DataFrame
                 )
             ),
         )
+
         actual_arrival_date = expected_arrival_date + pd.Timedelta(days=delay_days)
 
+        # Keep actual arrival date inside calendar range
         if actual_arrival_date not in reverse_lookup:
-            actual_arrival_date = max(
-                min(actual_arrival_date, max(reverse_lookup.keys())),
-                min(reverse_lookup.keys()),
-            )
+            actual_arrival_date = min(max(actual_arrival_date, min_calendar_date), max_calendar_date)
 
         shipped_date = min(po_date + pd.Timedelta(days=random.randint(1, 4)), actual_arrival_date)
+
+        # Keep shipped date inside calendar lookup
         if shipped_date not in reverse_lookup:
             shipped_date = po_date
+            if shipped_date not in reverse_lookup:
+                shipped_date = min(max(shipped_date, min_calendar_date), max_calendar_date)
 
-        reject_rate = np.random.choice([0.00, 0.00, 0.01, 0.02, 0.03], p=[0.45, 0.25, 0.15, 0.10, 0.05])
-        damage_rate = np.random.choice([0.00, 0.00, 0.01, 0.02], p=[0.60, 0.20, 0.15, 0.05])
+        reject_rate = np.random.choice(
+            [0.00, 0.00, 0.01, 0.02, 0.03],
+            p=[0.45, 0.25, 0.15, 0.10, 0.05],
+        )
+        damage_rate = np.random.choice(
+            [0.00, 0.00, 0.01, 0.02],
+            p=[0.60, 0.20, 0.15, 0.05],
+        )
 
         rejected_qty = min(shipped_qty, int(round(shipped_qty * reject_rate)))
         damaged_qty = min(shipped_qty - rejected_qty, int(round(shipped_qty * damage_rate)))
@@ -307,7 +319,9 @@ def generate_inbound_shipments(po_df: pd.DataFrame, dims: Dict[str, pd.DataFrame
                 "damaged_qty": damaged_qty,
                 "shipment_status": shipment_status,
                 "delay_days": delay_days,
-                "carrier_name": random.choice(["DHL Supply", "Maersk Logistics", "UPS Freight", "FedEx Trade"]),
+                "carrier_name": random.choice(
+                    ["DHL Supply", "Maersk Logistics", "UPS Freight", "FedEx Trade"]
+                ),
                 "transport_mode": random.choice(["road", "sea", "air"]),
                 "qc_pass_flag": qc_pass_flag,
                 "created_timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -315,12 +329,13 @@ def generate_inbound_shipments(po_df: pd.DataFrame, dims: Dict[str, pd.DataFrame
         )
 
         inbound_line_id += 1
-        if random.random() < 0.70:
-            inbound_shipment_id += 1
+        inbound_shipment_id += 1
 
-    inbound_df = pd.DataFrame(inbound_rows).sort_values(
-        ["expected_arrival_date_id", "inbound_shipment_line_id"]
-    ).reset_index(drop=True)
+    inbound_df = (
+        pd.DataFrame(inbound_rows)
+        .sort_values(["expected_arrival_date_id", "inbound_shipment_line_id"])
+        .reset_index(drop=True)
+    )
 
     inbound_df = cast_required_int_columns(
         inbound_df,
@@ -345,7 +360,6 @@ def generate_inbound_shipments(po_df: pd.DataFrame, dims: Dict[str, pd.DataFrame
     )
 
     return inbound_df
-
 
 def generate_stock_movements(
     inbound_df: pd.DataFrame,
