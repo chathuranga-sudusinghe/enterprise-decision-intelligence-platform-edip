@@ -1,16 +1,21 @@
-
+# =========================================================
 # Python
+# =========================================================
 __pycache__/
 *.py[cod]
 *$py.class
 
+# =========================================================
 # Virtual environments
+# =========================================================
 venv/
 .venv/
 env/
 ENV/
 
+# =========================================================
 # Python packaging
+# =========================================================
 build/
 dist/
 downloads/
@@ -28,13 +33,17 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# =========================================================
 # Logs
+# =========================================================
 *.log
 logs/
 *.out
 *.err
 
+# =========================================================
 # Test / coverage
+# =========================================================
 .pytest_cache/
 .coverage
 .coverage.*
@@ -47,47 +56,68 @@ coverage.xml
 *.cover
 *.py,cover
 
+# =========================================================
 # Type checker / linters
+# =========================================================
 .mypy_cache/
 .dmypy.json
 dmypy.json
 .pyre/
 .ruff_cache/
 
+# =========================================================
 # Jupyter
+# =========================================================
 .ipynb_checkpoints/
 
+# =========================================================
 # Environment variables / secrets
+# =========================================================
 .env
 .env.*
 !.env.example
 
+# =========================================================
 # IDE / Editor
+# =========================================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
+# =========================================================
 # OS files
+# =========================================================
 .DS_Store
 Thumbs.db
 desktop.ini
+.AppleDouble
+.LSOverride
 
+# =========================================================
 # FastAPI / Uvicorn
+# =========================================================
 *.pid
 uvicorn.log
 
-# Database / local DB files
+# =========================================================
+# Local database files only
+# Keep SQL source files tracked
+# =========================================================
 *.sqlite3
 *.db
 
-# PostgreSQL dumps / backups
-*.sql
+# =========================================================
+# Database dumps / backups
+# Keep .sql files tracked because they are source code here
+# =========================================================
 *.dump
 *.backup
 
-# ML / Data Science artifacts
+# =========================================================
+# ML / Data Science runtime artifacts
+# =========================================================
 artifacts/
 model_artifacts/
 mlruns/
@@ -105,39 +135,54 @@ checkpoints/
 *.pth
 *.ckpt
 
-# Large raw / intermediate data
-data/raw/
-data/interim/
-data/processed/
-data/external/
-
-# Keep folder structure if needed
+# =========================================================
+# Generated data
+# Keep folder structure with .gitkeep
+# =========================================================
+data/raw/*
 !data/raw/.gitkeep
+
+data/interim/*
 !data/interim/.gitkeep
+
+data/processed/*
 !data/processed/.gitkeep
+
+data/external/*
 !data/external/.gitkeep
 
+data/synthetic/*
+!data/synthetic/.gitkeep
+
+# =========================================================
 # Airflow
+# =========================================================
 airflow.db
 airflow-webserver.pid
 airflow.cfg
-logs/
-dags/__pycache__/
 airflow_home/
 
+# =========================================================
 # Kafka / streaming temp
+# =========================================================
 *.snap
 kafka-logs/
 zookeeper-logs/
 
-# Monitoring
+# =========================================================
+# Monitoring runtime data
+# =========================================================
 .prometheus/
 grafana_data/
 
+# =========================================================
 # Docker
+# =========================================================
 *.tar
 
+# =========================================================
 # Terraform
+# =========================================================
 .terraform/
 .terraform.lock.hcl
 *.tfstate
@@ -148,11 +193,39 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
-# Kubernetes
+# =========================================================
+# Kubernetes secrets
+# =========================================================
 *.secret.yaml
 secrets.yaml
 
+# =========================================================
+# Temporary folders
+# =========================================================
+tmp/
+temp/
 
-# Mac / Linux hidden files
-.AppleDouble
-.LSOverride
+# =========================================================
+# Keep important project folders visible when empty
+# =========================================================
+!app/.gitkeep
+!configs/.gitkeep
+!data/.gitkeep
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+!data/external/.gitkeep
+!data/synthetic/.gitkeep
+!database/.gitkeep
+!database/ddl/.gitkeep
+!database/dml/.gitkeep
+!database/migrations/.gitkeep
+!database/seeds/.gitkeep
+!docs/.gitkeep
+!infra/.gitkeep
+!monitoring/.gitkeep
+!notebooks/.gitkeep
+!pipelines/.gitkeep
+!scripts/.gitkeep
+!tests/.gitkeep
+!ui/.gitkeep
