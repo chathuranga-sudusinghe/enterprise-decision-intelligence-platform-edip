@@ -116,19 +116,23 @@ SELECT 'fo.order_status', COUNT(*) FROM analytics.fact_orders WHERE order_status
 UNION ALL
 SELECT 'fo.payment_status', COUNT(*) FROM analytics.fact_orders WHERE payment_status IS NULL
 UNION ALL
-SELECT 'fo.gross_amount', COUNT(*) FROM analytics.fact_orders WHERE gross_amount IS NULL
+SELECT 'fo.fulfillment_type', COUNT(*) FROM analytics.fact_orders WHERE fulfillment_type IS NULL
+UNION ALL
+SELECT 'fo.item_count', COUNT(*) FROM analytics.fact_orders WHERE item_count IS NULL
+UNION ALL
+SELECT 'fo.total_units', COUNT(*) FROM analytics.fact_orders WHERE total_units IS NULL
+UNION ALL
+SELECT 'fo.gross_order_amount', COUNT(*) FROM analytics.fact_orders WHERE gross_order_amount IS NULL
 UNION ALL
 SELECT 'fo.discount_amount', COUNT(*) FROM analytics.fact_orders WHERE discount_amount IS NULL
-UNION ALL
-SELECT 'fo.net_amount', COUNT(*) FROM analytics.fact_orders WHERE net_amount IS NULL
 UNION ALL
 SELECT 'fo.shipping_fee', COUNT(*) FROM analytics.fact_orders WHERE shipping_fee IS NULL
 UNION ALL
 SELECT 'fo.tax_amount', COUNT(*) FROM analytics.fact_orders WHERE tax_amount IS NULL
 UNION ALL
-SELECT 'fo.total_units', COUNT(*) FROM analytics.fact_orders WHERE total_units IS NULL
+SELECT 'fo.net_order_amount', COUNT(*) FROM analytics.fact_orders WHERE net_order_amount IS NULL
 UNION ALL
-SELECT 'fo.order_item_count', COUNT(*) FROM analytics.fact_orders WHERE order_item_count IS NULL
+SELECT 'fo.currency_code', COUNT(*) FROM analytics.fact_orders WHERE currency_code IS NULL
 
 UNION ALL
 SELECT 'foi.order_id', COUNT(*) FROM analytics.fact_order_items WHERE order_id IS NULL
@@ -194,9 +198,13 @@ SELECT 'fs.discount_amount', COUNT(*) FROM analytics.fact_sales WHERE discount_a
 UNION ALL
 SELECT 'fs.net_sales_amount', COUNT(*) FROM analytics.fact_sales WHERE net_sales_amount IS NULL
 UNION ALL
+SELECT 'fs.unit_cost', COUNT(*) FROM analytics.fact_sales WHERE unit_cost IS NULL
+UNION ALL
 SELECT 'fs.gross_margin_amount', COUNT(*) FROM analytics.fact_sales WHERE gross_margin_amount IS NULL
 UNION ALL
-SELECT 'fs.return_flag', COUNT(*) FROM analytics.fact_sales WHERE return_flag IS NULL
+SELECT 'fs.fulfillment_type', COUNT(*) FROM analytics.fact_sales WHERE fulfillment_type IS NULL
+UNION ALL
+SELECT 'fs.sale_status', COUNT(*) FROM analytics.fact_sales WHERE sale_status IS NULL
 
 UNION ALL
 SELECT 'fr.sale_id', COUNT(*) FROM analytics.fact_returns WHERE sale_id IS NULL
@@ -215,15 +223,19 @@ SELECT 'fr.region_id', COUNT(*) FROM analytics.fact_returns WHERE region_id IS N
 UNION ALL
 SELECT 'fr.product_id', COUNT(*) FROM analytics.fact_returns WHERE product_id IS NULL
 UNION ALL
-SELECT 'fr.return_qty', COUNT(*) FROM analytics.fact_returns WHERE return_qty IS NULL
+SELECT 'fr.returned_qty', COUNT(*) FROM analytics.fact_returns WHERE returned_qty IS NULL
 UNION ALL
 SELECT 'fr.return_reason', COUNT(*) FROM analytics.fact_returns WHERE return_reason IS NULL
+UNION ALL
+SELECT 'fr.return_status', COUNT(*) FROM analytics.fact_returns WHERE return_status IS NULL
 UNION ALL
 SELECT 'fr.refund_amount', COUNT(*) FROM analytics.fact_returns WHERE refund_amount IS NULL
 UNION ALL
 SELECT 'fr.restockable_flag', COUNT(*) FROM analytics.fact_returns WHERE restockable_flag IS NULL
 UNION ALL
 SELECT 'fr.damaged_flag', COUNT(*) FROM analytics.fact_returns WHERE damaged_flag IS NULL
+UNION ALL
+SELECT 'fr.inventory_disposition', COUNT(*) FROM analytics.fact_returns WHERE inventory_disposition IS NULL
 ORDER BY check_name;
 
 
@@ -411,14 +423,14 @@ ORDER BY check_name;
 -- 6) Business-rule checks
 -- Expected: all 0
 -- ---------------------------------------------------------
-SELECT 'fo gross_amount < 0' AS check_name, COUNT(*) AS bad_rows
+SELECT 'fo gross_order_amount < 0' AS check_name, COUNT(*) AS bad_rows
 FROM analytics.fact_orders
-WHERE gross_amount < 0
+WHERE gross_order_amount < 0
 
 UNION ALL
 SELECT 'fo discount_amount < 0', COUNT(*) FROM analytics.fact_orders WHERE discount_amount < 0
 UNION ALL
-SELECT 'fo net_amount < 0', COUNT(*) FROM analytics.fact_orders WHERE net_amount < 0
+SELECT 'fo net_order_amount < 0', COUNT(*) FROM analytics.fact_orders WHERE net_order_amount < 0
 UNION ALL
 SELECT 'fo shipping_fee < 0', COUNT(*) FROM analytics.fact_orders WHERE shipping_fee < 0
 UNION ALL
@@ -426,7 +438,7 @@ SELECT 'fo tax_amount < 0', COUNT(*) FROM analytics.fact_orders WHERE tax_amount
 UNION ALL
 SELECT 'fo total_units <= 0', COUNT(*) FROM analytics.fact_orders WHERE total_units <= 0
 UNION ALL
-SELECT 'fo order_item_count <= 0', COUNT(*) FROM analytics.fact_orders WHERE order_item_count <= 0
+SELECT 'fo item_count <= 0', COUNT(*) FROM analytics.fact_orders WHERE item_count <= 0
 
 UNION ALL
 SELECT 'foi ordered_qty <= 0', COUNT(*) FROM analytics.fact_order_items WHERE ordered_qty <= 0
@@ -479,7 +491,7 @@ UNION ALL
 SELECT 'fs net_sales_amount < 0', COUNT(*) FROM analytics.fact_sales WHERE net_sales_amount < 0
 
 UNION ALL
-SELECT 'fr return_qty <= 0', COUNT(*) FROM analytics.fact_returns WHERE return_qty <= 0
+SELECT 'fr returned_qty <= 0', COUNT(*) FROM analytics.fact_returns WHERE returned_qty <= 0
 UNION ALL
 SELECT 'fr refund_amount < 0', COUNT(*) FROM analytics.fact_returns WHERE refund_amount < 0
 ORDER BY check_name;
@@ -491,36 +503,36 @@ ORDER BY check_name;
 -- ---------------------------------------------------------
 
 -- 7A) order header totals vs line totals
+-- Note:
+-- gross_order_amount and total_units are based on ordered quantities,
+-- while line discount/net are based on fulfilled quantities.
+-- So compare only the fields that are truly aggregated at header level.
 SELECT COUNT(*) AS order_header_amount_mismatch
 FROM (
     SELECT
         o.order_id,
-        o.gross_amount,
+        o.gross_order_amount,
         o.discount_amount,
-        o.net_amount,
+        o.item_count,
         o.total_units,
-        o.order_item_count,
-        ROUND(COALESCE(SUM(i.gross_line_amount), 0), 2) AS calc_gross_amount,
+        ROUND(COALESCE(SUM(i.gross_line_amount), 0), 2) AS calc_gross_order_amount,
         ROUND(COALESCE(SUM(i.line_discount_amount), 0), 2) AS calc_discount_amount,
-        ROUND(COALESCE(SUM(i.net_line_amount), 0), 2) AS calc_net_amount,
-        COALESCE(SUM(i.ordered_qty), 0) AS calc_total_units,
-        COUNT(i.order_item_id) AS calc_order_item_count
+        COUNT(i.order_item_id) AS calc_item_count,
+        COALESCE(SUM(i.ordered_qty), 0) AS calc_total_units
     FROM analytics.fact_orders o
     LEFT JOIN analytics.fact_order_items i
         ON o.order_id = i.order_id
     GROUP BY
         o.order_id,
-        o.gross_amount,
+        o.gross_order_amount,
         o.discount_amount,
-        o.net_amount,
-        o.total_units,
-        o.order_item_count
+        o.item_count,
+        o.total_units
 ) t
-WHERE ABS(gross_amount - calc_gross_amount) > 0.01
+WHERE ABS(gross_order_amount - calc_gross_order_amount) > 0.01
    OR ABS(discount_amount - calc_discount_amount) > 0.01
-   OR ABS(net_amount - calc_net_amount) > 0.01
-   OR total_units <> calc_total_units
-   OR order_item_count <> calc_order_item_count;
+   OR item_count <> calc_item_count
+   OR total_units <> calc_total_units;
 
 -- 7B) payment failed orders should not have sales
 SELECT COUNT(*) AS failed_payment_with_sales
@@ -556,7 +568,7 @@ FROM analytics.fact_sales
 WHERE ABS(gross_sales_amount - ROUND(units_sold * unit_list_price, 2)) > 0.01
    OR ABS(net_sales_amount - ROUND(gross_sales_amount - discount_amount, 2)) > 0.01;
 
--- 7G) order-item amounts must match qty * price
+-- 7G) order-item amounts must match qty / price logic
 SELECT COUNT(*) AS order_item_amount_mismatch
 FROM analytics.fact_order_items
 WHERE ABS(gross_line_amount - ROUND(ordered_qty * unit_list_price, 2)) > 0.01
@@ -567,17 +579,9 @@ SELECT COUNT(*) AS return_qty_gt_units_sold
 FROM analytics.fact_returns r
 JOIN analytics.fact_sales s
     ON r.sale_id = s.sale_id
-WHERE r.return_qty > s.units_sold;
+WHERE r.returned_qty > s.units_sold;
 
--- 7I) return flag in sales should match existence of returns
-SELECT COUNT(*) AS return_flag_mismatch
-FROM analytics.fact_sales s
-LEFT JOIN analytics.fact_returns r
-    ON s.sale_id = r.sale_id
-WHERE (s.return_flag = TRUE AND r.return_id IS NULL)
-   OR (s.return_flag = FALSE AND r.return_id IS NOT NULL);
-
--- 7J) return records must match product/order/customer of sale
+-- 7I) return records must match product/order/customer of sale
 SELECT COUNT(*) AS return_sale_key_mismatch
 FROM analytics.fact_returns r
 JOIN analytics.fact_sales s
@@ -589,45 +593,47 @@ WHERE r.order_id <> s.order_id
    OR r.channel_id <> s.channel_id
    OR r.region_id <> s.region_id;
 
--- 7K) return date should be on or after sale date
+-- 7J) return date should be on or after sale date
 SELECT COUNT(*) AS return_before_sale
 FROM analytics.fact_returns r
 JOIN analytics.fact_sales s
     ON r.sale_id = s.sale_id
 WHERE r.return_date_id < s.sale_date_id;
 
--- 7L) returns should exist only for fulfilled / sold lines
+-- 7K) returns should exist only for fulfilled / sold lines
 SELECT COUNT(*) AS return_without_fulfilled_line
 FROM analytics.fact_returns r
 JOIN analytics.fact_order_items i
     ON r.order_item_id = i.order_item_id
 WHERE i.fulfilled_qty <= 0;
 
--- 7M) order header payment/order status logic
+-- 7L) order header payment / status logic
 SELECT COUNT(*) AS invalid_order_status_logic
 FROM analytics.fact_orders
-WHERE (LOWER(payment_status) = 'failed' AND LOWER(order_status) NOT IN ('cancelled', 'pending'))
-   OR (LOWER(payment_status) = 'paid' AND LOWER(order_status) = 'cancelled' AND net_amount > 0);
+WHERE (LOWER(payment_status) = 'failed' AND LOWER(order_status) NOT IN ('cancelled', 'confirmed'))
+   OR (LOWER(payment_status) = 'paid' AND LOWER(order_status) = 'cancelled' AND net_order_amount > 0);
 
--- 7N) online/offline location logic on order header
+-- 7M) order header location logic
+-- pickup_in_store should have a store_id;
+-- non-pickup flows should not force a store_id.
 SELECT COUNT(*) AS invalid_order_location_logic
 FROM analytics.fact_orders
-WHERE (store_id IS NULL AND warehouse_id IS NULL)
-   OR (store_id IS NOT NULL AND warehouse_id IS NOT NULL);
+WHERE (LOWER(fulfillment_type) = 'pickup_in_store' AND store_id IS NULL)
+   OR (LOWER(fulfillment_type) <> 'pickup_in_store' AND store_id IS NOT NULL);
 
--- 7O) line-level location logic
+-- 7N) line-level location logic
 SELECT COUNT(*) AS invalid_order_item_location_logic
 FROM analytics.fact_order_items
 WHERE (store_id IS NULL AND warehouse_id IS NULL)
    OR (store_id IS NOT NULL AND warehouse_id IS NOT NULL);
 
--- 7P) sales-level location logic
+-- 7O) sales-level location logic
 SELECT COUNT(*) AS invalid_sales_location_logic
 FROM analytics.fact_sales
 WHERE (store_id IS NULL AND warehouse_id IS NULL)
    OR (store_id IS NOT NULL AND warehouse_id IS NOT NULL);
 
--- 7Q) returns-level location logic
+-- 7P) returns-level location logic
 SELECT COUNT(*) AS invalid_returns_location_logic
 FROM analytics.fact_returns
 WHERE (store_id IS NULL AND warehouse_id IS NULL)
@@ -666,10 +672,6 @@ SELECT
     ROUND(100.0 * SUM(CASE WHEN stockout_flag THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) AS stockout_line_pct
 FROM analytics.fact_order_items;
 
-SELECT
-    ROUND(100.0 * SUM(CASE WHEN return_flag THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) AS return_sale_pct
-FROM analytics.fact_sales;
-
 
 -- ---------------------------------------------------------
 -- 9) Date range sanity checks
@@ -699,7 +701,7 @@ FROM analytics.fact_returns;
 -- 10) Ready-for-next-phase summary
 -- ---------------------------------------------------------
 SELECT
-    (SELECT COUNT(*) FROM analytics.fact_orders)       AS fact_orders_rows,
-    (SELECT COUNT(*) FROM analytics.fact_order_items)  AS fact_order_items_rows,
-    (SELECT COUNT(*) FROM analytics.fact_sales)        AS fact_sales_rows,
-    (SELECT COUNT(*) FROM analytics.fact_returns)      AS fact_returns_rows;
+    (SELECT COUNT(*) FROM analytics.fact_orders)      AS fact_orders_rows,
+    (SELECT COUNT(*) FROM analytics.fact_order_items) AS fact_order_items_rows,
+    (SELECT COUNT(*) FROM analytics.fact_sales)       AS fact_sales_rows,
+    (SELECT COUNT(*) FROM analytics.fact_returns)     AS fact_returns_rows;
