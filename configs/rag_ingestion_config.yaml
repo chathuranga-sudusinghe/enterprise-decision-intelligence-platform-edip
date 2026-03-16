@@ -1,3 +1,9 @@
+# =========================================================
+# EDIP Phase 6 RAG ingestion configuration
+# Main config for metadata extraction, chunking, embeddings,
+# vector loading, and retrieval evaluation.
+# =========================================================
+
 config_name: edip_rag_ingestion_config
 config_version: "1.0"
 description: >
@@ -6,6 +12,9 @@ description: >
   embedding generation, vector loading, and retrieval validation
   for NorthStar Retail & Distribution business knowledge assets.
 
+# ---------------------------------------------------------
+# Project identity and environment context
+# ---------------------------------------------------------
 project:
   project_name: "Enterprise Decision Intelligence Platform"
   project_code: "EDIP"
@@ -13,6 +22,11 @@ project:
   environment: "local"
   phase: "phase_6_rag_ingestion"
 
+# ---------------------------------------------------------
+# Global ingestion rules
+# These rules define strict validation and formatting behavior
+# across the whole RAG pipeline.
+# ---------------------------------------------------------
 global_rules:
   document_scope_company_only: true
   only_markdown_sources: true
@@ -25,6 +39,10 @@ global_rules:
   remove_trailing_spaces: true
   preserve_heading_hierarchy: true
 
+# ---------------------------------------------------------
+# Source and output paths
+# Source folders, schema path, and all generated artifact paths.
+# ---------------------------------------------------------
 paths:
   source_directories:
     - "docs/policies"
@@ -44,6 +62,10 @@ paths:
   ingestion_manifest_output: "artifacts/reports/rag_ingestion_manifest.json"
   retrieval_eval_output: "artifacts/reports/rag_retrieval_eval.json"
 
+# ---------------------------------------------------------
+# Document filters
+# Controls which files are allowed, ignored, and required.
+# ---------------------------------------------------------
 document_filters:
   allowed_extensions:
     - ".md"
@@ -59,12 +81,21 @@ document_filters:
   require_frontmatter: true
   company_name_must_equal: "NorthStar Retail & Distribution"
 
+# ---------------------------------------------------------
+# Folder-to-document-type mapping
+# Used to infer/validate document types by folder category.
+# ---------------------------------------------------------
 document_type_mapping:
   policies: "policy"
   sops: "sop"
   reviews: "review"
   rag_source: "playbook"
 
+# ---------------------------------------------------------
+# Metadata extraction rules
+# Controls frontmatter parsing, required fields, optional fields,
+# auto-generated fields, and schema validation.
+# ---------------------------------------------------------
 metadata_extraction:
   frontmatter_format: "yaml"
   required_document_fields:
@@ -95,6 +126,11 @@ metadata_extraction:
     ingestion_timestamp: true
   validate_against_schema: true
 
+# ---------------------------------------------------------
+# Chunking configuration
+# Defines chunk size, overlap, section-preservation rules,
+# tracked heading levels, and hard limits.
+# ---------------------------------------------------------
 chunking:
   strategy: "markdown_semantic"
   unit: "words"
@@ -126,6 +162,10 @@ chunking:
   max_chunk_word_count_hard: 950
   drop_empty_chunks: true
 
+# ---------------------------------------------------------
+# Chunk-level metadata
+# Inherited metadata from the parent document plus derived fields.
+# ---------------------------------------------------------
 chunk_metadata:
   inherit_from_document:
     - document_id
@@ -153,15 +193,24 @@ chunk_metadata:
     - source_document_id
   chunk_id_format: "<document_id>-chunk-<4_digit_index>"
 
+# ---------------------------------------------------------
+# Topic derivation rules
+# Used to create chunk topic labels for retrieval.
+# ---------------------------------------------------------
 topic_derivation:
   enabled: true
   method: "heading_plus_keywords"
   fallback_topic: "general_business_policy"
 
+# ---------------------------------------------------------
+# Embedding configuration
+# Controls provider, model, batching, retries, timeout,
+# and embedding storage behavior.
+# ---------------------------------------------------------
 embedding:
   provider: "openai"
   task_type: "document_embedding"
-  model_name: "text-embedding-3-large"
+  model_name: "text-embedding-3-small"
   batch_size: 100
   max_retries: 3
   request_timeout_seconds: 60
@@ -170,6 +219,11 @@ embedding:
   store_embedding_vector: true
   store_embedding_dimension: true
 
+# ---------------------------------------------------------
+# Vector database configuration
+# Defines Pinecone target index, namespace, upsert settings,
+# and metadata fields to store with vectors.
+# ---------------------------------------------------------
 vector_database:
   provider: "pinecone"
   index_name: "edip-rag-phase6"
@@ -199,6 +253,11 @@ vector_database:
     - source_system
     - company_name
 
+# ---------------------------------------------------------
+# Retrieval filter support
+# Defines allowed filter fields for documents and chunks,
+# plus the default company filter.
+# ---------------------------------------------------------
 retrieval_filters:
   supported_document_filters:
     - document_type
@@ -222,6 +281,10 @@ retrieval_filters:
   default_filter:
     company_name: "NorthStar Retail & Distribution"
 
+# ---------------------------------------------------------
+# Ingestion validation rules
+# Validation rules for document, chunk, embedding, and vector stages.
+# ---------------------------------------------------------
 ingestion_validation:
   document_checks:
     unique_document_id_required: true
@@ -246,6 +309,10 @@ ingestion_validation:
     chunk_id_must_match_vector_id: true
     metadata_must_be_present_in_vector_store: true
 
+# ---------------------------------------------------------
+# Retrieval evaluation settings
+# Defines quality thresholds and test queries for retrieval checks.
+# ---------------------------------------------------------
 retrieval_evaluation:
   enabled: true
   test_top_k: 5
@@ -304,6 +371,10 @@ retrieval_evaluation:
         - playbook
         - sop
 
+# ---------------------------------------------------------
+# Logging configuration
+# Defines what the pipeline should log during execution.
+# ---------------------------------------------------------
 logging:
   log_level: "INFO"
   use_logger: true
@@ -313,6 +384,10 @@ logging:
   log_embedding_failures: true
   log_vector_upsert_summary: true
 
+# ---------------------------------------------------------
+# Artifact persistence rules
+# Controls which generated outputs should be saved.
+# ---------------------------------------------------------
 artifacts:
   save_document_metadata: true
   save_chunks: true
@@ -320,6 +395,10 @@ artifacts:
   save_manifest: true
   save_retrieval_eval: true
 
+# ---------------------------------------------------------
+# Future pipeline readiness flags
+# Marks intended compatibility with orchestration and deployment.
+# ---------------------------------------------------------
 future_pipeline_alignment:
   airflow_ready: true
   embedding_refresh_job_ready: true
