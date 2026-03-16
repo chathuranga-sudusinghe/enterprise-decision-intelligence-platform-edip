@@ -1,3 +1,36 @@
+---
+document_id: "DOC-NRD-GDE-010"
+document_title: "Post-Promotion Inventory Recovery Guide"
+document_type: "guide"
+department: "commercial"
+business_domain: "inventory"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Commercial Recovery and Inventory Optimization Office"
+confidentiality_level: "internal"
+tags:
+  - post_promotion_inventory_recovery
+  - residual_stock_assessment
+  - replenishment_adjustment
+  - inbound_adjustment
+  - transfer_support
+  - markdown_support
+  - escalation_support
+  - auditability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_promotions
+  - fact_price_history
+  - fact_replenishment_recommendation
+source_path: "docs/rag_source/post_promotion_inventory_recovery_guide.md"
+---
+
 # Post-Promotion Inventory Recovery Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
@@ -7,8 +40,6 @@
 ## Review Cycle: Annual
 ## Owner: Commercial Recovery and Inventory Optimization Office
 ## Approved By: Director, Commercial Planning and Inventory Recovery
-
----
 
 ## 1. Purpose
 

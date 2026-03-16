@@ -1,14 +1,44 @@
+---
+document_id: "DOC-NRD-GDE-014"
+document_title: "Seasonal Inventory Exit Strategy Guide"
+document_type: "guide"
+department: "commercial"
+business_domain: "inventory"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Seasonal Commercial Strategy and Inventory Recovery Office"
+confidentiality_level: "internal"
+tags:
+  - seasonal_inventory_exit
+  - end_of_season_recovery
+  - markdown_support
+  - transfer_support
+  - inbound_wind_down
+  - commercial_recovery
+  - escalation_support
+  - auditability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_promotions
+  - fact_price_history
+  - fact_replenishment_recommendation
+source_path: "docs/rag_source/seasonal_inventory_exit_strategy_guide.md"
+---
+
 # Seasonal Inventory Exit Strategy Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-SEASONAL-EXIT-001
 ## Version: 1.0
 ## Effective Date: 2025-01-01
 ## Review Cycle: Annual
 ## Owner: Seasonal Commercial Strategy and Inventory Recovery Office
 ## Approved By: Director, Seasonal Planning and Inventory Optimization
-
----
 
 ## 1. Purpose
 

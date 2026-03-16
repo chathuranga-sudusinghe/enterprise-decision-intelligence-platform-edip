@@ -1,26 +1,40 @@
+---
+document_id: "DOC-NRD-GDE-011"
+document_title: "Promotion Impact Review Guide"
+document_type: "guide"
+department: "commercial"
+business_domain: "promotions"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Commercial Analytics"
+confidentiality_level: "internal"
+tags:
+  - promotion_impact
+  - campaign_review
+  - demand_uplift
+  - price_effect
+  - sell_through
+  - forecast_review
+  - replenishment_risk
+  - commercial_analysis
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_promotions
+  - fact_price_history
+  - fact_sales
+source_path: "docs/rag_source/promotion_impact_review_guide.md"
+---
+
 # Promotion Impact Review Guide
 ## NorthStar Retail & Distribution
 ## File: docs/rag_source/promotion_impact_review_guide.md
 
----
-
-document_id: DOC-NRD-PLAY-005  
-document_title: Promotion Impact Review Guide  
-document_type: guide  
-department: commercial_analytics  
-business_domain: promotion_impact_review  
-region_scope: enterprise  
-audience: commercial_analysts_demand_planners_inventory_planners_category_managers_pricing_managers_supply_chain_review  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Commercial Analytics  
-confidentiality_level: internal  
-tags: promotion, campaign_impact, demand_uplift, price_effect, sell_through, forecast_review, replenishment_risk, commercial_analysis  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

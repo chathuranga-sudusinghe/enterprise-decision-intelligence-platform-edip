@@ -1,14 +1,34 @@
+---
+document_id: "DOC-NRD-GDE-007"
+document_title: "Low Confidence Forecast Handling Guide"
+document_type: "guide"
+department: "supply_chain_planning"
+business_domain: "forecast"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director, Forecasting and Demand Risk Management"
+confidentiality_level: "internal"
+tags:
+  - low_confidence_forecast
+  - forecast_uncertainty
+  - risk_based_planning
+  - replenishment_caution
+  - allocation_caution
+  - escalation
+  - approval_support
+  - decision_traceability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/low_confidence_forecast_handling_guide.md"
+---
+
 # Low Confidence Forecast Handling Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-LOW-CONF-FORECAST-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Demand Planning Governance Office
-## Approved By: Director, Forecasting and Demand Risk Management
-
----
+## File: docs/rag_source/low_confidence_forecast_handling_guide.md
 
 ## 1. Purpose
 

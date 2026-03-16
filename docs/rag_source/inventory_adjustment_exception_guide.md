@@ -1,14 +1,34 @@
+---
+document_id: "DOC-NRD-GDE-006"
+document_title: "Inventory Adjustment Exception Guide"
+document_type: "guide"
+department: "inventory_control"
+business_domain: "inventory"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director, Inventory Integrity and Store Operations"
+confidentiality_level: "internal"
+tags:
+  - inventory_adjustment
+  - inventory_discrepancy
+  - exception_classification
+  - store_adjustment
+  - warehouse_adjustment
+  - root_cause_investigation
+  - planner_follow_up
+  - audit_support
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/inventory_adjustment_exception_guide.md"
+---
+
 # Inventory Adjustment Exception Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-INV-ADJ-EXC-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Inventory Control and Operations Governance
-## Approved By: Director, Inventory Integrity and Store Operations
-
----
+## File: docs/rag_source/inventory_adjustment_exception_guide.md
 
 ## 1. Purpose
 

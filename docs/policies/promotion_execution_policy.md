@@ -1,26 +1,33 @@
+---
+document_id: "DOC-NRD-POL-004"
+document_title: "Promotion Execution Policy"
+document_type: "policy"
+department: "commercial"
+business_domain: "promotions"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Commercial Operations"
+confidentiality_level: "internal"
+tags:
+  - promotion
+  - campaign_execution
+  - discount_governance
+  - demand_uplift
+  - inventory_readiness
+  - service_level
+  - pricing_alignment
+  - operational_control
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/policies/promotion_execution_policy.md"
+---
+
 # Promotion Execution Policy
 ## NorthStar Retail & Distribution
 ## File: docs/policies/promotion_execution_policy.md
-
----
-
-document_id: DOC-NRD-POL-004  
-document_title: Promotion Execution Policy  
-document_type: policy  
-department: commercial_operations  
-business_domain: promotion_execution  
-region_scope: enterprise  
-audience: category_managers_pricing_managers_commercial_analysts_inventory_planners_supply_chain_managers_store_operations_leadership  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Commercial Operations  
-confidentiality_level: internal  
-tags: promotion, campaign_execution, discount_governance, demand_uplift, inventory_readiness, service_level, pricing_alignment, operational_control  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

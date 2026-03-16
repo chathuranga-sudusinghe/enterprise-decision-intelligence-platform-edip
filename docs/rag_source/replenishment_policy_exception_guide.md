@@ -1,3 +1,35 @@
+---
+document_id: "DOC-NRD-GDE-013"
+document_title: "Replenishment Policy Exception Guide"
+document_type: "guide"
+department: "supply_chain_planning"
+business_domain: "replenishment"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Supply Chain Planning Governance Office"
+confidentiality_level: "internal"
+tags:
+  - replenishment_policy_exception
+  - override_exception_review
+  - temporary_planning_deviation
+  - escalation_support
+  - approval_support
+  - cross_functional_coordination
+  - auditability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "executive"
+related_structured_domains:
+  - fact_replenishment_recommendation
+  - fact_planner_override
+  - fact_decision_log
+source_path: "docs/rag_source/replenishment_policy_exception_guide.md"
+---
+
 # Replenishment Policy Exception Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
@@ -7,8 +39,6 @@
 ## Review Cycle: Annual
 ## Owner: Supply Chain Planning Governance Office
 ## Approved By: VP, Supply Chain Planning and Inventory Governance
-
----
 
 ## 1. Purpose
 

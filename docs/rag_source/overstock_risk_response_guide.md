@@ -1,14 +1,34 @@
+---
+document_id: "DOC-NRD-GDE-019"
+document_title: "Overstock Risk Response Guide"
+document_type: "guide"
+department: "inventory_control"
+business_domain: "inventory"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "VP, Inventory Strategy and Supply Chain Planning"
+confidentiality_level: "internal"
+tags:
+  - overstock_risk
+  - inventory_excess
+  - replenishment_adjustment
+  - inbound_adjustment
+  - transfer_decisions
+  - markdown_support
+  - warehouse_capacity
+  - decision_traceability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/overstock_risk_response_guide.md"
+---
+
 # Overstock Risk Response Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-OVERSTOCK-RISK-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Inventory Strategy and Planning Governance Office
-## Approved By: VP, Inventory Strategy and Supply Chain Planning
-
----
+## File: docs/rag_source/overstock_risk_response_guide.md
 
 ## 1. Purpose
 

@@ -1,3 +1,36 @@
+---
+document_id: "DOC-NRD-GDE-012"
+document_title: "Promotion Underperformance Response Guide"
+document_type: "guide"
+department: "commercial"
+business_domain: "promotions"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Commercial Planning and Promotion Governance Office"
+confidentiality_level: "internal"
+tags:
+  - promotion_underperformance
+  - campaign_recovery
+  - residual_inventory_risk
+  - pricing_follow_up
+  - replenishment_adjustment
+  - inbound_adjustment
+  - escalation_support
+  - auditability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_promotions
+  - fact_price_history
+  - fact_replenishment_recommendation
+source_path: "docs/rag_source/promotion_underperformance_response_guide.md"
+---
+
 # Promotion Underperformance Response Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
@@ -7,8 +40,6 @@
 ## Review Cycle: Annual
 ## Owner: Commercial Planning and Promotion Governance Office
 ## Approved By: Director, Commercial Planning and Retail Performance
-
----
 
 ## 1. Purpose
 

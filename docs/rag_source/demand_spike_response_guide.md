@@ -1,14 +1,40 @@
+---
+document_id: "DOC-NRD-GDE-001"
+document_title: "Demand Spike Response Guide"
+document_type: "guide"
+department: "supply_chain_planning"
+business_domain: "forecast"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director, Demand Planning and Retail Availability"
+confidentiality_level: "internal"
+tags:
+  - demand_spike
+  - demand_review
+  - replenishment_adjustment
+  - transfer_response
+  - allocation_response
+  - escalation
+  - approval_support
+  - operational_reasoning
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_demand_forecast
+  - fact_replenishment_recommendation
+  - fact_inventory_snapshot
+source_path: "docs/rag_source/demand_spike_response_guide.md"
+---
+
 # Demand Spike Response Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-DEMAND-SPIKE-RESP-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Demand Planning and Availability Response Office
-## Approved By: Director, Demand Planning and Retail Availability
-
----
+## File: docs/rag_source/demand_spike_response_guide.md
 
 ## 1. Purpose
 

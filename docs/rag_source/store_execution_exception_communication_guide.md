@@ -1,14 +1,44 @@
+---
+document_id: "DOC-NRD-GDE-015"
+document_title: "Store Execution Exception Communication Guide"
+document_type: "guide"
+department: "store_operations"
+business_domain: "communication"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Retail Operations Excellence Office"
+confidentiality_level: "internal"
+tags:
+  - store_execution_exception
+  - communication
+  - shelf_availability
+  - promotional_execution
+  - pricing_consistency
+  - replenishment_effectiveness
+  - customer_impact
+  - traceability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_inventory_snapshot
+  - fact_replenishment_recommendation
+  - fact_decision_log
+source_path: "docs/rag_source/store_execution_exception_communication_guide.md"
+---
+
 # Store Execution Exception Communication Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-STORE-EXC-COMM-001
 ## Version: 1.0
 ## Effective Date: 2025-01-01
 ## Review Cycle: Annual
 ## Owner: Retail Operations Excellence Office
 ## Approved By: Director, Store Operations
-
----
 
 ## 1. Purpose
 

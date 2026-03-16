@@ -1,14 +1,39 @@
+---
+document_id: "DOC-NRD-REV-001"
+document_title: "Planner Review of Repeated Override Patterns"
+document_type: "review"
+department: "supply_chain_planning"
+business_domain: "overrides"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Planning Governance and Decision Quality Office"
+confidentiality_level: "internal"
+tags:
+  - planner_override
+  - override_patterns
+  - repeated_overrides
+  - decision_governance
+  - replenishment_review
+  - exception_analysis
+  - auditability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_planner_override
+  - fact_decision_log
+  - fact_replenishment_recommendation
+source_path: "docs/rag_source/planner_review_of_repeated_override_patterns.md"
+---
+
 # Planner Review of Repeated Override Patterns
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-PLANNER-OVERRIDE-REVIEW-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Planning Governance and Decision Quality Office
-## Approved By: Director, Supply Chain Planning Governance
-
----
+## File: docs/rag_source/planner_review_of_repeated_override_patterns.md
 
 ## 1. Purpose
 

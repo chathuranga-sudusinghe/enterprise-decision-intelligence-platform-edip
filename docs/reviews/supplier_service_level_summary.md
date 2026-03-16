@@ -1,26 +1,39 @@
+---
+document_id: "DOC-NRD-REV-002"
+document_title: "Supplier Service Level Summary"
+document_type: "review"
+department: "procurement"
+business_domain: "supplier"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Procurement"
+confidentiality_level: "internal"
+tags:
+  - supplier
+  - sla
+  - lead_time
+  - inbound
+  - service_level
+  - discrepancy
+  - shortage
+  - procurement_performance
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_purchase_orders
+  - fact_inbound_shipments
+  - fact_replenishment_recommendation
+source_path: "docs/reviews/supplier_service_level_summary.md"
+---
+
 # Supplier Service Level Summary
 ## NorthStar Retail & Distribution
 ## File: docs/reviews/supplier_service_level_summary.md
-
----
-
-document_id: DOC-NRD-REV-001  
-document_title: Supplier Service Level Summary  
-document_type: review  
-department: procurement  
-business_domain: supplier_performance  
-region_scope: enterprise  
-audience: procurement_managers_supply_chain_managers_inventory_planners_analysts_executive_review  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Procurement  
-confidentiality_level: internal  
-tags: supplier, sla, lead_time, inbound, service_level, discrepancy, shortage, procurement_performance  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

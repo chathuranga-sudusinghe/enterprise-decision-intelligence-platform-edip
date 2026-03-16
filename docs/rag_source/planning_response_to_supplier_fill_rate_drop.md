@@ -1,13 +1,33 @@
-# Planning Response to Supplier Fill Rate Drop
-## NorthStar Retail & Distribution (NRD)
-## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-SUP-FILL-RATE-RESP-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Supply Planning and Supplier Performance Governance Office
-## Approved By: Director, Supply Planning and Supplier Performance
-
+---
+document_id: "DOC-NRD-GDE-009"
+document_title: "Planning Response to Supplier Fill Rate Drop"
+document_type: "guide"
+department: "supply_chain_planning"
+business_domain: "supplier"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Supply Planning and Supplier Performance Governance Office"
+confidentiality_level: "internal"
+tags:
+  - supplier_fill_rate
+  - supplier_performance
+  - shortfall_response
+  - replenishment_adjustment
+  - allocation_adjustment
+  - escalation_support
+  - auditability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_purchase_orders
+  - fact_inbound_shipments
+  - fact_replenishment_recommendation
+source_path: "docs/rag_source/planning_response_to_supplier_fill_rate_drop.md"
 ---
 
 ## 1. Purpose

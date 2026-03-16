@@ -1,26 +1,40 @@
+---
+document_id: "DOC-NRD-SOP-002"
+document_title: "Warehouse Receiving SOP"
+document_type: "sop"
+department: "warehouse_operations"
+business_domain: "warehouse"
+region_scope: "enterprise"
+audience: "operations_staff"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Warehouse Operations"
+confidentiality_level: "internal"
+tags:
+  - warehouse_receiving
+  - inbound_receipt
+  - goods_receipt
+  - receiving_check
+  - putaway
+  - discrepancy_handling
+  - operational_control
+  - auditability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_inbound_shipments
+  - fact_purchase_orders
+  - fact_inventory_snapshot
+source_path: "docs/sops/warehouse_receiving_sop.md"
+---
+
 # Warehouse Receiving SOP
-## NorthStar Retail & Distribution
+## NorthStar Retail & Distribution (NRD)
+## EDIP / Phase 5 RAG Knowledge Layer
 ## File: docs/sops/warehouse_receiving_sop.md
-
----
-
-document_id: DOC-NRD-SOP-001  
-document_title: Warehouse Receiving SOP  
-document_type: sop  
-department: warehouse_operations  
-business_domain: inbound_receiving  
-region_scope: enterprise  
-audience: warehouse_staff_supervisors_inventory_analysts_procurement  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Warehouse Operations  
-confidentiality_level: internal  
-tags: warehouse, receiving, inbound, putaway, supplier_delivery, discrepancy, inventory_control  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

@@ -1,14 +1,34 @@
+---
+document_id: "DOC-NRD-POL-006"
+document_title: "Audit Logging and Decision Trace Policy"
+document_type: "policy"
+department: "risk_governance"
+business_domain: "audit_logging"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "VP, Supply Chain Planning and Enterprise Controls"
+confidentiality_level: "internal"
+tags:
+  - audit_logging
+  - decision_traceability
+  - explainability
+  - governance
+  - compliance
+  - replenishment_decisions
+  - override_decisions
+  - exception_handling
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/audit_logging_and_decision_trace_policy.md"
+---
+
 # Audit Logging and Decision Trace Policy
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-AUD-TRACE-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Enterprise Planning Governance Office
-## Approved By: VP, Supply Chain Planning and Enterprise Controls
-
----
+## File: docs/rag_source/audit_logging_and_decision_trace_policy.md
 
 ## 1. Purpose
 

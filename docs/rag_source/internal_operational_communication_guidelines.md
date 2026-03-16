@@ -1,14 +1,34 @@
+---
+document_id: "DOC-NRD-GDE-005"
+document_title: "Internal Operational Communication Guidelines"
+document_type: "guide"
+department: "store_operations"
+business_domain: "communication"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director, Supply Chain Operations"
+confidentiality_level: "internal"
+tags:
+  - internal_communication
+  - operational_coordination
+  - forecast_review
+  - replenishment
+  - warehouse_operations
+  - store_operations
+  - procurement
+  - escalation_workflow
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/internal_operational_communication_guidelines.md"
+---
+
 # Internal Operational Communication Guidelines
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-COMMS-OPS-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Operations Excellence Office
-## Approved By: Director, Supply Chain Operations
-
----
+## File: docs/rag_source/internal_operational_communication_guidelines.md
 
 ## 1. Purpose
 

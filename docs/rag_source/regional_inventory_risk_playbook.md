@@ -1,26 +1,39 @@
+---
+document_id: "DOC-NRD-PLB-004"
+document_title: "Regional Inventory Risk Playbook"
+document_type: "playbook"
+department: "supply_chain_planning"
+business_domain: "inventory"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Regional Inventory Planning"
+confidentiality_level: "internal"
+tags:
+  - regional_inventory_risk
+  - stock_risk
+  - service_risk
+  - regional_planning
+  - coverage_days
+  - supplier_risk
+  - allocation
+  - escalation
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_inventory_snapshot
+  - fact_replenishment_recommendation
+  - fact_stock_movements
+source_path: "docs/rag_source/regional_inventory_risk_playbook.md"
+---
+
 # Regional Inventory Risk Playbook
 ## NorthStar Retail & Distribution
 ## File: docs/rag_source/regional_inventory_risk_playbook.md
-
----
-
-document_id: DOC-NRD-PLAY-004  
-document_title: Regional Inventory Risk Playbook  
-document_type: playbook  
-department: regional_inventory_planning  
-business_domain: regional_inventory_risk  
-region_scope: enterprise  
-audience: inventory_planners_regional_managers_supply_chain_managers_inventory_analysts_operations_review  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Regional Inventory Planning  
-confidentiality_level: internal  
-tags: regional_inventory_risk, stock_risk, service_risk, regional_planning, coverage_days, supplier_risk, allocation, escalation  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 
