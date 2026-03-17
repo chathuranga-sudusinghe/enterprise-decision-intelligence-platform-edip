@@ -226,6 +226,8 @@ def build_metadata(record: Dict[str, Any]) -> Dict[str, Any]:
         "source_path",
         "document_title",
         "related_structured_domains",
+        "text",
+        "chunk_text",
     ]
 
     metadata: Dict[str, Any] = {}

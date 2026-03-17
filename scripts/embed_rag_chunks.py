@@ -12,13 +12,12 @@ from typing import Any, Dict, Iterable, List, Tuple
 import pandas as pd
 import yaml
 from openai import OpenAI
-
+from dotenv import load_dotenv
 
 # =========================================================
 # Logging
 # =========================================================
 logger = logging.getLogger("embed_rag_chunks")
-
 
 def setup_logging() -> None:
     logging.basicConfig(
@@ -34,6 +33,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "rag_ingestion_config.yaml"
 DEFAULT_CHUNKS_JSONL = PROJECT_ROOT / "data" / "processed" / "rag" / "document_chunks.jsonl"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data" / "processed" / "rag"
+
+ENV_PATH = PROJECT_ROOT / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
 
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 DEFAULT_BATCH_SIZE = 50
@@ -208,6 +210,8 @@ def validate_chunk_records(records: List[Dict[str, Any]]) -> None:
 # OpenAI embeddings
 # =========================================================
 def build_openai_client() -> OpenAI:
+    load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise EnvironmentError(
@@ -295,6 +299,7 @@ def build_embedding_record(
         "company_name": chunk_record.get("company_name"),
         "source_path": chunk_record.get("source_path"),
         "related_structured_domains": chunk_record.get("related_structured_domains", []),
+        "chunk_text": chunk_record["chunk_text"],
     }
 
     record = {
