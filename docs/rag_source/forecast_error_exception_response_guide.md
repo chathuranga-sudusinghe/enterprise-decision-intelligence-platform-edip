@@ -1,14 +1,34 @@
+---
+document_id: "DOC-NRD-GDE-002"
+document_title: "Forecast Error Exception Response Guide"
+document_type: "guide"
+department: "supply_chain_planning"
+business_domain: "forecast"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director, Forecasting and Inventory Strategy"
+confidentiality_level: "internal"
+tags:
+  - forecast_error
+  - exception_classification
+  - forecast_review
+  - replenishment_impact
+  - planner_follow_up
+  - operations_follow_up
+  - escalation
+  - operational_reasoning
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/forecast_error_exception_response_guide.md"
+---
+
 # Forecast Error Exception Response Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-FORECAST-ERR-RESP-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Demand Planning Governance Office
-## Approved By: Director, Forecasting and Inventory Strategy
-
----
+## File: docs/rag_source/forecast_error_exception_response_guide.md
 
 ## 1. Purpose
 

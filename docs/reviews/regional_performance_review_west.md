@@ -1,26 +1,39 @@
+---
+document_id: "DOC-NRD-REV-003"
+document_title: "Regional Performance Review — West"
+document_type: "review"
+department: "store_operations"
+business_domain: "inventory"
+region_scope: "west"
+audience: "cross_functional"
+effective_date: "2025-02-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Regional Operations Director — West"
+confidentiality_level: "internal"
+tags:
+  - west_region
+  - regional_review
+  - demand_performance
+  - stock_risk
+  - replenishment
+  - supplier_impact
+  - service_level
+  - operational_variation
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "executive"
+related_structured_domains:
+  - fact_sales
+  - fact_inventory_snapshot
+  - fact_replenishment_recommendation
+source_path: "docs/reviews/regional_performance_review_west.md"
+---
+
 # Regional Performance Review — West
 ## NorthStar Retail & Distribution
 ## File: docs/reviews/regional_performance_review_west.md
-
----
-
-document_id: DOC-NRD-REV-003  
-document_title: Regional Performance Review — West  
-document_type: review  
-department: regional_operations  
-business_domain: regional_performance  
-region_scope: west  
-audience: regional_managers_inventory_planners_supply_chain_managers_commercial_analysts_operations_leadership_executive_review  
-effective_date: 2025-02-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Regional Operations Director — West  
-confidentiality_level: internal  
-tags: west_region, regional_review, demand_performance, stock_risk, replenishment, supplier_impact, service_level, operational_variation  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

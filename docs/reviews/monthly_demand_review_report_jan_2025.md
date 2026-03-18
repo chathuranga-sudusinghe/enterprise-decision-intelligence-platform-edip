@@ -1,26 +1,39 @@
+---
+document_id: "DOC-NRD-REV-012"
+document_title: "Monthly Demand Review Report — January 2025"
+document_type: "review"
+department: "supply_chain_planning"
+business_domain: "forecast"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-02-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Demand Planning"
+confidentiality_level: "internal"
+tags:
+  - demand
+  - forecast
+  - sales_trend
+  - seasonality
+  - stockout_risk
+  - promotion_impact
+  - inventory_planning
+  - january_review
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_demand_forecast
+  - fact_sales
+  - fact_replenishment_recommendation
+source_path: "docs/reviews/monthly_demand_review_report_jan_2025.md"
+---
+
 # Monthly Demand Review Report — January 2025
 ## NorthStar Retail & Distribution
 ## File: docs/reviews/monthly_demand_review_report_jan_2025.md
-
----
-
-document_id: DOC-NRD-REV-002  
-document_title: Monthly Demand Review Report — January 2025  
-document_type: review  
-department: demand_planning  
-business_domain: demand_review  
-region_scope: enterprise  
-audience: demand_planners_inventory_planners_supply_chain_managers_commercial_analysts_executive_review  
-effective_date: 2025-02-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Demand Planning  
-confidentiality_level: internal  
-tags: demand, forecast, sales_trend, seasonality, stockout_risk, promotion_impact, inventory_planning, january_review  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

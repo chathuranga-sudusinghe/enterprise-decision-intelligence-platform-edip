@@ -1,26 +1,32 @@
+---
+document_id: "DOC-NRD-POL-002"
+document_title: "Pricing and Discount Policy"
+document_type: "policy"
+department: "commercial"
+business_domain: "pricing"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Commercial Strategy"
+confidentiality_level: "internal"
+tags:
+  - pricing
+  - discount
+  - promotion
+  - margin
+  - markdown
+  - commercial_governance
+  - price_history
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/policies/pricing_and_discount_policy.md"
+---
+
 # Pricing and Discount Policy
 ## NorthStar Retail & Distribution
 ## File: docs/policies/pricing_and_discount_policy.md
-
----
-
-document_id: DOC-NRD-POL-002  
-document_title: Pricing and Discount Policy  
-document_type: policy  
-department: commercial_strategy  
-business_domain: pricing_discounting  
-region_scope: enterprise  
-audience: pricing_managers_category_managers_analysts_planners_commercial_leadership  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Commercial Strategy  
-confidentiality_level: internal  
-tags: pricing, discount, promotion, margin, markdown, commercial_governance, price_history  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

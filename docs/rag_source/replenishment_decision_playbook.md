@@ -1,26 +1,39 @@
+---
+document_id: "DOC-NRD-PLB-003"
+document_title: "Replenishment Decision Playbook"
+document_type: "playbook"
+department: "supply_chain_planning"
+business_domain: "replenishment"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Supply Chain Planning"
+confidentiality_level: "internal"
+tags:
+  - replenishment
+  - decision_playbook
+  - stock_risk
+  - safety_stock
+  - service_level
+  - lead_time
+  - planner_review
+  - inventory_balance
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_demand_forecast
+  - fact_replenishment_recommendation
+  - fact_planner_override
+source_path: "docs/rag_source/replenishment_decision_playbook.md"
+---
+
 # Replenishment Decision Playbook
 ## NorthStar Retail & Distribution
 ## File: docs/rag_source/replenishment_decision_playbook.md
-
----
-
-document_id: DOC-NRD-PLAY-003  
-document_title: Replenishment Decision Playbook  
-document_type: playbook  
-department: supply_chain_planning  
-business_domain: replenishment_decisioning  
-region_scope: enterprise  
-audience: inventory_planners_supply_chain_managers_inventory_analysts_procurement_ops_review  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Supply Chain Planning  
-confidentiality_level: internal  
-tags: replenishment, decision_playbook, stock_risk, safety_stock, service_level, lead_time, planner_review, inventory_balance  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

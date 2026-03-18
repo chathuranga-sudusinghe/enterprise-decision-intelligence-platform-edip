@@ -1,14 +1,43 @@
+---
+document_id: "DOC-NRD-GDE-017"
+document_title: "Transfer Execution Failure Response Guide"
+document_type: "guide"
+department: "supply_chain_planning"
+business_domain: "inventory"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Supply Chain Execution and Inventory Flow Office"
+confidentiality_level: "internal"
+tags:
+  - transfer_execution_failure
+  - inventory_flow_disruption
+  - store_availability
+  - inter_location_exception
+  - mitigation_planning
+  - escalation_support
+  - auditability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_stock_movements
+  - fact_inventory_snapshot
+  - fact_replenishment_recommendation
+source_path: "docs/rag_source/transfer_execution_failure_response_guide.md"
+---
+
 # Transfer Execution Failure Response Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-TRANSFER-FAIL-RESP-001
 ## Version: 1.0
 ## Effective Date: 2025-01-01
 ## Review Cycle: Annual
 ## Owner: Supply Chain Execution and Inventory Flow Office
 ## Approved By: Director, Supply Chain Execution and Store Availability
-
----
 
 ## 1. Purpose
 

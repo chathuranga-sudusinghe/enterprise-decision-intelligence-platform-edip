@@ -1,26 +1,32 @@
+---
+document_id: "DOC-NRD-PLB-001"
+document_title: "Planner Override Playbook"
+document_type: "playbook"
+department: "supply_chain_planning"
+business_domain: "overrides"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Supply Chain Planning"
+confidentiality_level: "internal"
+tags:
+  - planner_override
+  - decision_governance
+  - replenishment
+  - escalation
+  - exception_handling
+  - auditability
+  - decision_log
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/planner_override_playbook.md"
+---
+
 # Planner Override Playbook
 ## NorthStar Retail & Distribution
-## File: docs/rag_source/planner_override_playbook.md
-
----
-
-document_id: DOC-NRD-PLAY-001  
-document_title: Planner Override Playbook  
-document_type: playbook  
-department: supply_chain_planning  
-business_domain: planner_override_decisioning  
-region_scope: enterprise  
-audience: inventory_planners_supply_chain_managers_inventory_analysts_executive_review  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Supply Chain Planning  
-confidentiality_level: internal  
-tags: planner_override, decision_governance, replenishment, escalation, exception_handling, auditability, decision_log  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
+## File: "docs/rag_source/planner_override_playbook.md"
 
 ## 1. Purpose
 

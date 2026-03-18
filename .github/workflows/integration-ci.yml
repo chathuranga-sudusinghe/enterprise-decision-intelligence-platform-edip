@@ -1,0 +1,66 @@
+name: EDIP CI Tests
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run unit and integration tests
+    runs-on: ubuntu-latest
+
+    env:
+      PYTHONUNBUFFERED: "1"
+      OPENAI_API_KEY: "test-openai-key"
+      PINECONE_API_KEY: "test-pinecone-key"
+      PINECONE_INDEX_NAME: "test-index"
+      PINECONE_NAMESPACE: "test-namespace"
+      OPENAI_EMBED_MODEL: "text-embedding-3-small"
+      OPENAI_CHAT_MODEL: "gpt-4.1-mini"
+      RAG_TOP_K: "5"
+      RAG_MAX_CONTEXT_CHARS: "12000"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          pip install pytest pytest-cov httpx fastapi uvicorn python-dotenv
+
+      - name: Verify project structure
+        run: |
+          test -d app
+          test -d tests
+          test -d tests/unit
+          test -d tests/integration
+
+      - name: Run unit tests
+        run: pytest tests/unit -v
+
+      - name: Run integration tests
+        run: pytest tests/integration -v
+
+      - name: Run full suite summary
+        run: pytest tests/unit tests/integration -v

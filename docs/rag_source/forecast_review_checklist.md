@@ -1,26 +1,32 @@
+---
+document_id: "DOC-NRD-GDE-003"
+document_title: "Forecast Review Checklist"
+document_type: "guide"
+department: "supply_chain_planning"
+business_domain: "forecast"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Demand Planning"
+confidentiality_level: "internal"
+tags:
+  - forecast
+  - demand_planning
+  - forecast_review
+  - checklist
+  - forecast_exception
+  - demand_variance
+  - planning_governance
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/forecast_review_checklist.md"
+---
+
 # Forecast Review Checklist
 ## NorthStar Retail & Distribution
 ## File: docs/rag_source/forecast_review_checklist.md
-
----
-
-document_id: DOC-NRD-PLAY-002  
-document_title: Forecast Review Checklist  
-document_type: checklist  
-department: demand_planning  
-business_domain: forecast_review  
-region_scope: enterprise  
-audience: demand_planners_inventory_planners_analysts_supply_chain_managers_commercial_review  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Demand Planning  
-confidentiality_level: internal  
-tags: forecast, demand_planning, forecast_review, checklist, forecast_exception, demand_variance, planning_governance  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

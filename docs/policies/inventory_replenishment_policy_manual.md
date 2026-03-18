@@ -1,26 +1,32 @@
+---
+document_id: "DOC-NRD-POL-001"
+document_title: "Inventory Replenishment Policy Manual"
+document_type: "policy"
+department: "supply_chain_planning"
+business_domain: "replenishment"
+region_scope: "enterprise"
+audience: "planners_managers_analysts"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Supply Chain Planning"
+confidentiality_level: "internal"
+tags:
+  - replenishment
+  - inventory
+  - stockout
+  - safety_stock
+  - service_level
+  - purchase_planning
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/policies/inventory_replenishment_policy_manual.md"
+---
+
 # Inventory Replenishment Policy Manual
 ## NorthStar Retail & Distribution
 ## File: docs/policies/inventory_replenishment_policy_manual.md
 
----
-
-document_id: DOC-NRD-POL-001  
-document_title: Inventory Replenishment Policy Manual  
-document_type: policy  
-department: supply_chain_planning  
-business_domain: replenishment  
-region_scope: enterprise  
-audience: planners_managers_analysts  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Supply Chain Planning  
-confidentiality_level: internal  
-tags: replenishment, inventory, stockout, safety_stock, service_level, purchase_planning  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

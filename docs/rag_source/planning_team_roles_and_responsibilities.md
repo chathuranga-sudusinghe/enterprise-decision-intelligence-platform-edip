@@ -1,26 +1,40 @@
+---
+document_id: "DOC-NRD-GOV-001"
+document_title: "Planning Team Roles and Responsibilities"
+document_type: "governance"
+department: "supply_chain_planning"
+business_domain: "decision_governance"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Supply Chain Planning"
+confidentiality_level: "internal"
+tags:
+  - planning_team
+  - roles_and_responsibilities
+  - governance
+  - accountability
+  - replenishment
+  - forecast_review
+  - override_control
+  - escalation
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_demand_forecast
+  - fact_replenishment_recommendation
+  - fact_planner_override
+source_path: "docs/rag_source/planning_team_roles_and_responsibilities.md"
+---
+
 # Planning Team Roles and Responsibilities
 ## NorthStar Retail & Distribution
 ## File: docs/rag_source/planning_team_roles_and_responsibilities.md
 
----
-
-document_id: DOC-NRD-GOV-001  
-document_title: Planning Team Roles and Responsibilities  
-document_type: governance  
-department: supply_chain_planning  
-business_domain: planning_team_governance  
-region_scope: enterprise  
-audience: inventory_planners_demand_planners_inventory_analysts_supply_chain_managers_procurement_commercial_ops_review  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Supply Chain Planning  
-confidentiality_level: internal  
-tags: planning_team, roles, responsibilities, governance, accountability, replenishment, forecast_review, override_control, escalation  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

@@ -1,26 +1,33 @@
+---
+document_id: "DOC-NRD-MTX-002"
+document_title: "Approval Authority Matrix"
+document_type: "matrix"
+department: "executive"
+business_domain: "decision_governance"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Chief Operations Officer"
+confidentiality_level: "internal"
+tags:
+  - approval_authority
+  - governance
+  - decision_rights
+  - escalation
+  - override_approval
+  - replenishment_control
+  - exception_handling
+  - auditability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/approval_authority_matrix.md"
+---
+
 # Approval Authority Matrix
 ## NorthStar Retail & Distribution
 ## File: docs/rag_source/approval_authority_matrix.md
-
----
-
-document_id: DOC-NRD-GOV-002  
-document_title: Approval Authority Matrix  
-document_type: governance  
-department: enterprise_decision_governance  
-business_domain: approval_authority  
-region_scope: enterprise  
-audience: inventory_planners_demand_planners_supply_chain_managers_procurement_leadership_commercial_leadership_operations_managers_executive_review  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Chief Operations Officer  
-confidentiality_level: internal  
-tags: approval_authority, governance, decision_rights, escalation, override_approval, replenishment_control, exception_handling, auditability  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

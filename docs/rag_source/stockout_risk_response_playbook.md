@@ -1,14 +1,44 @@
+---
+document_id: "DOC-NRD-PLB-006"
+document_title: "Stockout Risk Response Playbook"
+document_type: "playbook"
+department: "supply_chain_planning"
+business_domain: "inventory"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Supply Chain Planning and Availability Governance"
+confidentiality_level: "internal"
+tags:
+  - stockout_risk
+  - replenishment_response
+  - transfer_response
+  - regional_risk_escalation
+  - store_availability
+  - mitigation_prioritization
+  - exception_approval
+  - auditability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "executive"
+related_structured_domains:
+  - fact_inventory_snapshot
+  - fact_replenishment_recommendation
+  - fact_stock_movements
+source_path: "docs/rag_source/stockout_risk_response_playbook.md"
+---
+
 # Stockout Risk Response Playbook
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-STOCKOUT-RISK-001
 ## Version: 1.0
 ## Effective Date: 2025-01-01
 ## Review Cycle: Annual
 ## Owner: Supply Chain Planning and Availability Governance
 ## Approved By: VP, Supply Chain Planning and Retail Availability
-
----
 
 ## 1. Purpose
 

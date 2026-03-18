@@ -1,8 +1,39 @@
+---
+document_id: "DOC-NRD-GOV-002"
+document_title: "Phase 5 — RAG Knowledge Scope"
+document_type: "governance"
+department: "risk_governance"
+business_domain: "decision_governance"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "EDIP Knowledge Governance Office"
+confidentiality_level: "internal"
+tags:
+  - rag_knowledge_scope
+  - business_document_layer
+  - retrieval
+  - llm_grounding
+  - agent_reasoning
+  - auditability
+  - policy_aware_decision_support
+  - knowledge_governance
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_demand_forecast
+  - fact_replenishment_recommendation
+  - fact_decision_log
+source_path: "docs/phase_5_rag_knowledge_scope.md"
+---
+
 # Phase 5 — RAG Knowledge Scope
 ## EDIP / NorthStar Retail & Distribution
 ## File: docs/phase_5_rag_knowledge_scope.md
-
----
 
 ## 1. Purpose
 

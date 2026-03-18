@@ -1,26 +1,34 @@
+---
+document_id: "DOC-NRD-POL-003"
+document_title: "Executive Exception Escalation Policy"
+document_type: "policy"
+department: "executive"
+business_domain: "escalation"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Chief Operating Officer"
+confidentiality_level: "internal"
+tags:
+  - escalation
+  - exception
+  - executive_review
+  - governance
+  - critical_risk
+  - approval_authority
+  - decision_control
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "executive"
+source_path: "docs/policies/executive_exception_escalation_policy.md"
+---
+
 # Executive Exception Escalation Policy
 ## NorthStar Retail & Distribution
 ## File: docs/policies/executive_exception_escalation_policy.md
-
----
-
-document_id: DOC-NRD-POL-003  
-document_title: Executive Exception Escalation Policy  
-document_type: policy  
-department: enterprise_operations_governance  
-business_domain: exception_escalation  
-region_scope: enterprise  
-audience: supply_chain_managers_inventory_planners_procurement_leadership_commercial_leadership_operations_executives  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Chief Operations Officer  
-confidentiality_level: internal  
-tags: escalation, exception, executive_review, governance, critical_risk, approval_authority, decision_control  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

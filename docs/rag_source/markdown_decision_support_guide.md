@@ -1,14 +1,34 @@
+---
+document_id: "DOC-NRD-GDE-008"
+document_title: "Markdown Decision Support Guide"
+document_type: "guide"
+department: "commercial"
+business_domain: "pricing"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director, Pricing Strategy and Commercial Recovery"
+confidentiality_level: "internal"
+tags:
+  - markdown_decision_support
+  - excess_inventory_recovery
+  - post_promotion_stock_recovery
+  - aging_inventory
+  - pricing_action_evaluation
+  - escalation
+  - approval_support
+  - decision_traceability
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/markdown_decision_support_guide.md"
+---
+
 # Markdown Decision Support Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-MARKDOWN-SUPPORT-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Commercial Pricing and Inventory Recovery Office
-## Approved By: Director, Pricing Strategy and Commercial Recovery
-
----
+## File: docs/rag_source/markdown_decision_support_guide.md
 
 ## 1. Purpose
 

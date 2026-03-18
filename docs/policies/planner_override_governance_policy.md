@@ -1,26 +1,33 @@
+---
+document_id: "DOC-NRD-POL-005"
+document_title: "Planner Override Governance Policy"
+document_type: "policy"
+department: "supply_chain_planning"
+business_domain: "decision_governance"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director of Supply Chain Planning"
+confidentiality_level: "internal"
+tags:
+  - planner_override
+  - governance
+  - decision_control
+  - replenishment
+  - exception_handling
+  - auditability
+  - decision_log
+  - escalation
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/policies/planner_override_governance_policy.md"
+---
+
 # Planner Override Governance Policy
 ## NorthStar Retail & Distribution
 ## File: docs/policies/planner_override_governance_policy.md
-
----
-
-document_id: DOC-NRD-POL-005  
-document_title: Planner Override Governance Policy  
-document_type: policy  
-department: supply_chain_planning_governance  
-business_domain: planner_override_governance  
-region_scope: enterprise  
-audience: inventory_planners_supply_chain_managers_inventory_analysts_procurement_leadership_operations_governance_executive_review  
-effective_date: 2025-01-01  
-review_date: 2025-12-31  
-version: 1.0  
-owner_role: Director of Supply Chain Planning  
-confidentiality_level: internal  
-tags: planner_override, governance, decision_control, replenishment, exception_handling, auditability, decision_log, escalation  
-source_system: edip_phase_5_docs  
-company_name: NorthStar Retail & Distribution  
-
----
 
 ## 1. Purpose
 

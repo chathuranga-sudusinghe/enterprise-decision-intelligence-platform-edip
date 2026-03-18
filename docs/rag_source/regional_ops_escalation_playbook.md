@@ -1,14 +1,44 @@
+---
+document_id: "DOC-NRD-PLB-005"
+document_title: "Regional Operations Escalation Playbook"
+document_type: "playbook"
+department: "store_operations"
+business_domain: "escalation"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Regional Operations Excellence Office"
+confidentiality_level: "internal"
+tags:
+  - regional_operations
+  - escalation
+  - exception_handling
+  - cross_store_response
+  - replenishment_risk
+  - promotion_execution
+  - warehouse_disruption
+  - executive_support
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "executive"
+related_structured_domains:
+  - fact_inventory_snapshot
+  - fact_replenishment_recommendation
+  - fact_decision_log
+source_path: "docs/rag_source/regional_ops_escalation_playbook.md"
+---
+
 # Regional Operations Escalation Playbook
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-REG-ESC-001
 ## Version: 1.0
 ## Effective Date: 2025-01-01
 ## Review Cycle: Annual
 ## Owner: Regional Operations Excellence Office
 ## Approved By: VP, Retail and Supply Chain Operations
-
----
 
 ## 1. Purpose
 

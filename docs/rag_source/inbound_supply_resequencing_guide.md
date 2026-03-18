@@ -1,14 +1,34 @@
+---
+document_id: "DOC-NRD-GDE-004"
+document_title: "Inbound Supply Resequencing Guide"
+document_type: "guide"
+department: "procurement"
+business_domain: "supplier"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Director, Inbound Planning and Inventory Flow Strategy"
+confidentiality_level: "internal"
+tags:
+  - inbound_supply
+  - resequencing
+  - prioritization
+  - deprioritization
+  - service_risk
+  - overstock_risk
+  - warehouse_flow
+  - approval_support
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+source_path: "docs/rag_source/inbound_supply_resequencing_guide.md"
+---
+
 # Inbound Supply Resequencing Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-INBOUND-RESEQ-001
-## Version: 1.0
-## Effective Date: 2025-01-01
-## Review Cycle: Annual
-## Owner: Supply Continuity and Inbound Flow Governance Office
-## Approved By: Director, Inbound Planning and Inventory Flow Strategy
-
----
+## File: docs/rag_source/inbound_supply_resequencing_guide.md
 
 ## 1. Purpose
 

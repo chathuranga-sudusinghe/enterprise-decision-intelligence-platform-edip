@@ -1,14 +1,44 @@
+---
+document_id: "DOC-NRD-GDE-018"
+document_title: "Warehouse Capacity Constraint Response Guide"
+document_type: "guide"
+department: "warehouse_operations"
+business_domain: "warehouse"
+region_scope: "enterprise"
+audience: "cross_functional"
+effective_date: "2025-01-01"
+review_date: "2025-12-31"
+version: "1.0"
+owner_role: "Warehouse Operations Excellence Office"
+confidentiality_level: "internal"
+tags:
+  - warehouse_capacity_constraint
+  - warehouse_congestion
+  - inbound_prioritization
+  - outbound_prioritization
+  - storage_capacity_risk
+  - receiving_backlog
+  - replenishment_impact
+  - escalation_support
+source_system: "edip_phase_5_docs"
+company_name: "NorthStar Retail & Distribution"
+document_status: "active"
+approval_level: "director"
+related_structured_domains:
+  - fact_inventory_snapshot
+  - fact_inbound_shipments
+  - fact_replenishment_recommendation
+source_path: "docs/rag_source/warehouse_capacity_constraint_response_guide.md"
+---
+
 # Warehouse Capacity Constraint Response Guide
 ## NorthStar Retail & Distribution (NRD)
 ## EDIP / Phase 5 RAG Knowledge Layer
-## Document ID: NRD-WH-CAP-RESP-001
 ## Version: 1.0
 ## Effective Date: 2025-01-01
 ## Review Cycle: Annual
 ## Owner: Warehouse Operations Excellence Office
 ## Approved By: Director, Distribution and Fulfillment Operations
-
----
 
 ## 1. Purpose
 
