@@ -1,24 +1,32 @@
 name: EDIP CI Tests
 
 on:
+  # Run the workflow automatically on push events
   push:
     branches:
       - main
       - master
       - develop
       - "feature/**"
+
+  # Run the workflow automatically for pull requests
   pull_request:
     branches:
       - main
       - master
       - develop
+
+  # Allow manual execution from the GitHub Actions tab
   workflow_dispatch:
 
 jobs:
   test:
+    # Job name shown in GitHub Actions UI
     name: Run unit and integration tests
     runs-on: ubuntu-latest
 
+    # Environment variables used during CI test execution
+    # These are dummy values for CI only, not real production secrets
     env:
       PYTHONUNBUFFERED: "1"
       OPENAI_API_KEY: "test-openai-key"
@@ -31,36 +39,66 @@ jobs:
       RAG_MAX_CONTEXT_CHARS: "12000"
 
     steps:
+      # Step 1: Download repository code into the runner
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Step 2: Install the required Python version
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
+      # Step 3: Upgrade pip before installing packages
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
+      # Step 4: Install project dependencies
       - name: Install dependencies
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
           pip install pytest pytest-cov httpx fastapi uvicorn python-dotenv
 
-      - name: Verify project structure
+      # Step 5: Print repository structure for debugging
+      - name: Debug repository structure
         run: |
-          test -d app
-          test -d tests
-          test -d tests/unit
-          test -d tests/integration
+          echo "Current working directory:"
+          pwd
+          echo ""
+          echo "Repository root contents:"
+          ls -la
+          echo ""
+          echo "Tests directory contents:"
+          ls -la tests || true
+          echo ""
+          echo "Unit tests directory contents:"
+          ls -la tests/unit || true
+          echo ""
+          echo "Integration tests directory contents:"
+          ls -la tests/integration || true
 
+      # Step 6: Run unit tests only if folder exists
       - name: Run unit tests
-        run: pytest tests/unit -v
+        run: |
+          if [ -d tests/unit ]; then
+            pytest tests/unit -v
+          else
+            echo "tests/unit not found"
+            exit 1
+          fi
 
+      # Step 7: Run integration tests only if folder exists
       - name: Run integration tests
-        run: pytest tests/integration -v
+        run: |
+          if [ -d tests/integration ]; then
+            pytest tests/integration -v
+          else
+            echo "tests/integration not found"
+            exit 1
+          fi
 
+      # Step 8: Run full suite for final combined validation
       - name: Run full suite summary
         run: pytest tests/unit tests/integration -v
