@@ -1,32 +1,34 @@
 name: EDIP CI Tests
 
 on:
-  # Run the workflow automatically on push events
+  # Run automatically on pushes to important branches
   push:
     branches:
       - main
       - master
       - develop
+      - dev
       - "feature/**"
 
-  # Run the workflow automatically for pull requests
+  # Run automatically on pull requests into important branches
   pull_request:
     branches:
       - main
       - master
       - develop
+      - dev
 
-  # Allow manual execution from the GitHub Actions tab
+  # Allow manual run from GitHub Actions tab
   workflow_dispatch:
 
 jobs:
   test:
-    # Job name shown in GitHub Actions UI
+    # Main CI job for automated test validation
     name: Run unit and integration tests
     runs-on: ubuntu-latest
 
-    # Environment variables used during CI test execution
-    # These are dummy values for CI only, not real production secrets
+    # Dummy CI environment values for tests
+    # Do not put real production secrets here
     env:
       PYTHONUNBUFFERED: "1"
       OPENAI_API_KEY: "test-openai-key"
@@ -39,29 +41,30 @@ jobs:
       RAG_MAX_CONTEXT_CHARS: "12000"
 
     steps:
-      # Step 1: Download repository code into the runner
+      # Step 1: Check out repository code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Install the required Python version
+      # Step 2: Set up Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
-      # Step 3: Upgrade pip before installing packages
+      # Step 3: Upgrade pip
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
       # Step 4: Install project dependencies
+      # First install from requirements files if they exist
+      # Then install core packages required by current tests/services
       - name: Install dependencies
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install pytest pytest-cov httpx fastapi uvicorn python-dotenv
 
-      # Step 5: Print repository structure for debugging
+      # Step 5: Debug repository structure
       - name: Debug repository structure
         run: |
           echo "Current working directory:"
@@ -79,7 +82,7 @@ jobs:
           echo "Integration tests directory contents:"
           ls -la tests/integration || true
 
-      # Step 6: Run unit tests only if folder exists
+      # Step 6: Run unit tests
       - name: Run unit tests
         run: |
           if [ -d tests/unit ]; then
@@ -89,7 +92,7 @@ jobs:
             exit 1
           fi
 
-      # Step 7: Run integration tests only if folder exists
+      # Step 7: Run integration tests
       - name: Run integration tests
         run: |
           if [ -d tests/integration ]; then
@@ -99,6 +102,6 @@ jobs:
             exit 1
           fi
 
-      # Step 8: Run full suite for final combined validation
+      # Step 8: Run full suite
       - name: Run full suite summary
         run: pytest tests/unit tests/integration -v
