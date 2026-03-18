@@ -63,7 +63,7 @@ jobs:
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install pytest pytest-cov httpx fastapi uvicorn python-dotenv pandas openai
+          pip install pytest pytest-cov httpx fastapi uvicorn python-dotenv pandas openai pinecone
 
       # Step 5: Debug repository structure
       - name: Debug repository structure
