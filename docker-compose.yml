@@ -1,0 +1,77 @@
+services:
+  kafka: # Kafka broker
+    image: apache/kafka:4.2.0
+    container_name: edip-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+
+      # Internal Docker listener + host listener + controller listener
+      KAFKA_LISTENERS: "INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka:29092,EXTERNAL://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9092'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  kafka-topic-init: # Service to initialize Kafka topics
+    image: python:3.12-slim
+    container_name: edip-kafka-topic-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    working_dir: /app
+    environment:
+      PYTHONPATH: /app
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_ADMIN_CLIENT_ID: edip-kafka-topic-init
+    volumes:
+      - ./:/app
+    command: >
+      sh -c "pip install --no-cache-dir kafka-python &&
+             python scripts/init_kafka_topics.py"
+    restart: "no"
+
+  api:   # FastAPI application
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edip-api
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-topic-init:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    volumes:
+      - ./:/app
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+
+volumes:
+  kafka_data:

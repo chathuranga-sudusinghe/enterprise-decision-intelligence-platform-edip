@@ -1,0 +1,359 @@
+schema_name: edip_rag_metadata_schema
+schema_version: "1.0"
+description: >
+  Metadata schema for Phase 6 RAG ingestion and indexing in EDIP.
+  This schema standardizes document-level and chunk-level metadata
+  for NorthStar Retail & Distribution business knowledge assets.
+
+global_rules:
+  company_name_fixed: "NorthStar Retail & Distribution"
+  source_system_default: "edip_phase_5_docs"
+  document_format_supported:
+    - md
+  required_frontmatter: true
+  metadata_must_match_document_content: true
+  metadata_must_match_structured_data_logic: true
+
+document_level_metadata:
+  required_fields:
+    document_id:
+      type: string
+      description: Unique document identifier
+      example: "DOC-NRD-POL-001"
+      pattern: "^DOC-NRD-[A-Z]{3}-[0-9]{3}$"
+
+    document_title:
+      type: string
+      description: Human-readable document title
+      example: "Inventory Replenishment Policy Manual"
+
+    document_type:
+      type: string
+      description: High-level document category
+      allowed_values:
+        - policy
+        - sop
+        - review
+        - playbook
+        - guide
+        - governance
+        - memo
+        - report
+        - matrix
+
+    department:
+      type: string
+      description: Owning business department
+      allowed_values:
+        - supply_chain_planning
+        - procurement
+        - warehouse_operations
+        - store_operations
+        - commercial
+        - finance
+        - executive
+        - risk_governance
+        - inventory_control
+
+    business_domain:
+      type: string
+      description: Main business domain covered by the document
+      allowed_values:
+        - replenishment
+        - forecast
+        - inventory
+        - supplier
+        - procurement
+        - promotions
+        - pricing
+        - warehouse
+        - store_operations
+        - overrides
+        - decision_governance
+        - escalation
+        - service_level
+        - audit_logging
+        - communication
+
+    region_scope:
+      type: string
+      description: Business region applicability
+      allowed_values:
+        - enterprise
+        - north
+        - south
+        - east
+        - west
+        - central
+        - global
+
+    audience:
+      type: string
+      description: Intended document audience
+      allowed_values:
+        - planners
+        - managers
+        - analysts
+        - planners_managers
+        - planners_managers_analysts
+        - operations_staff
+        - executives
+        - cross_functional
+
+    effective_date:
+      type: date
+      description: Date from which the document is effective
+      example: "2025-01-01"
+
+    review_date:
+      type: date
+      description: Scheduled review date
+      example: "2025-12-31"
+
+    version:
+      type: string
+      description: Document version
+      example: "1.0"
+
+    owner_role:
+      type: string
+      description: Business owner role
+      example: "Director of Supply Chain Planning"
+
+    confidentiality_level:
+      type: string
+      description: Information sensitivity level
+      allowed_values:
+        - internal
+        - confidential
+        - restricted
+
+    tags:
+      type: list[string]
+      description: Retrieval support tags
+      min_items: 1
+      example:
+        - replenishment
+        - stockout
+        - service_level
+        - safety_stock
+
+    source_system:
+      type: string
+      description: Originating source label
+      default: "edip_phase_5_docs"
+
+    company_name:
+      type: string
+      description: Fixed company name for EDIP document consistency
+      expected_value: "NorthStar Retail & Distribution"
+
+  optional_fields:
+    document_status:
+      type: string
+      allowed_values:
+        - draft
+        - approved
+        - active
+        - archived
+
+    approval_level:
+      type: string
+      allowed_values:
+        - analyst
+        - manager
+        - director
+        - executive
+
+    related_structured_domains:
+      type: list[string]
+      description: Structured data domains linked to this document
+      example:
+        - fact_demand_forecast
+        - fact_replenishment_recommendation
+        - fact_planner_override
+
+    source_path:
+      type: string
+      description: Relative path of the source markdown file
+      example: "docs/policies/inventory_replenishment_policy_manual.md"
+
+chunk_level_metadata:
+  required_fields:
+    chunk_id:
+      type: string
+      description: Unique chunk identifier
+      example: "DOC-NRD-POL-001-chunk-0001"
+
+    source_document_id:
+      type: string
+      description: Parent document ID
+      example: "DOC-NRD-POL-001"
+
+    chunk_index:
+      type: integer
+      description: Sequential chunk number
+      example: 1
+
+    chunk_text:
+      type: string
+      description: Final text content to embed
+
+    document_type:
+      type: string
+      description: Inherited from parent document
+
+    business_domain:
+      type: string
+      description: Inherited from parent document
+
+    region_scope:
+      type: string
+      description: Inherited from parent document
+
+    owner_role:
+      type: string
+      description: Inherited from parent document
+
+    topic:
+      type: string
+      description: Derived topic label for retrieval
+      example: "safety_stock_policy"
+
+  optional_fields:
+    heading_path:
+      type: string
+      description: Markdown heading hierarchy for the chunk
+      example: "3. Policy Rules > 3.2 Safety Stock Exceptions"
+
+    section_title:
+      type: string
+      description: Immediate section title
+      example: "Safety Stock Exceptions"
+
+    chunk_word_count:
+      type: integer
+      description: Number of words in the chunk
+
+    keyword_tags:
+      type: list[string]
+      description: Additional derived retrieval tags
+      example:
+        - urgent_replenishment
+        - stockout_risk
+        - supplier_delay
+
+    effective_date:
+      type: date
+      description: Inherited for stale-policy filtering
+
+    version:
+      type: string
+      description: Inherited version for retrieval filtering
+
+    confidentiality_level:
+      type: string
+      description: Inherited confidentiality label
+
+validation_rules:
+  document_rules:
+    - "document_id must be unique across all documents"
+    - "company_name must always equal NorthStar Retail & Distribution"
+    - "source_system should default to edip_phase_5_docs unless explicitly overridden"
+    - "document_type must match the file's actual business nature"
+    - "business_domain must align with document content and EDIP structured data logic"
+    - "effective_date must be earlier than or equal to review_date"
+    - "tags must not be empty"
+    - "metadata must be present before chunking begins"
+
+  chunk_rules:
+    - "every chunk must reference exactly one source_document_id"
+    - "chunk_id must be unique across the full corpus"
+    - "chunk_index must start at 1 and increase sequentially within a document"
+    - "topic should reflect business meaning, not random keywords"
+    - "chunk metadata must inherit core retrieval fields from the parent document"
+    - "chunk text should not be empty"
+
+retrieval_filter_fields:
+  document_level:
+    - document_type
+    - department
+    - business_domain
+    - region_scope
+    - effective_date
+    - version
+    - owner_role
+    - confidentiality_level
+    - company_name
+
+  chunk_level:
+    - source_document_id
+    - document_type
+    - business_domain
+    - region_scope
+    - owner_role
+    - topic
+    - version
+    - confidentiality_level
+
+naming_conventions:
+  document_id_format: "DOC-NRD-<TYPE>-<3_DIGIT_NUMBER>"
+  chunk_id_format: "<document_id>-chunk-<4_DIGIT_NUMBER>"
+  type_code_map:
+    policy: POL
+    sop: SOP
+    review: REV
+    playbook: PLB
+    guide: GDE
+    governance: GOV
+    memo: MEM
+    report: RPT
+    matrix: MTX
+
+example_document_metadata:
+  document_id: "DOC-NRD-POL-001"
+  document_title: "Inventory Replenishment Policy Manual"
+  document_type: "policy"
+  department: "supply_chain_planning"
+  business_domain: "replenishment"
+  region_scope: "enterprise"
+  audience: "planners_managers_analysts"
+  effective_date: "2025-01-01"
+  review_date: "2025-12-31"
+  version: "1.0"
+  owner_role: "Director of Supply Chain Planning"
+  confidentiality_level: "internal"
+  tags:
+    - replenishment
+    - stockout
+    - service_level
+    - safety_stock
+  source_system: "edip_phase_5_docs"
+  company_name: "NorthStar Retail & Distribution"
+  document_status: "active"
+  approval_level: "director"
+  related_structured_domains:
+    - fact_demand_forecast
+    - fact_replenishment_recommendation
+  source_path: "docs/policies/inventory_replenishment_policy_manual.md"
+
+example_chunk_metadata:
+  chunk_id: "DOC-NRD-POL-001-chunk-0001"
+  source_document_id: "DOC-NRD-POL-001"
+  chunk_index: 1
+  chunk_text: "NorthStar Retail & Distribution requires all category A replenishment decisions to preserve service-level protection..."
+  document_type: "policy"
+  business_domain: "replenishment"
+  region_scope: "enterprise"
+  owner_role: "Director of Supply Chain Planning"
+  topic: "service_level_replenishment_policy"
+  heading_path: "1. Purpose > 2. Replenishment Principles"
+  section_title: "Replenishment Principles"
+  chunk_word_count: 146
+  keyword_tags:
+    - service_level
+    - replenishment
+    - category_a
+  effective_date: "2025-01-01"
+  version: "1.0"
+  confidentiality_level: "internal"

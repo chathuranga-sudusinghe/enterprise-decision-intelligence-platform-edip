@@ -1,0 +1,48 @@
+schema_name: edip_kafka_event_schema
+schema_version: "1.0"
+company_name: "NorthStar Retail & Distribution"
+source_system_default: "edip_phase_6_streaming_simulation"
+
+required_envelope_fields:
+  - event_id
+  - event_type
+  - event_timestamp
+  - source_system
+  - entity_type
+  - entity_id
+  - region_id
+  - payload_json
+  - schema_version
+
+topics:
+  sales.order.created:
+    entity_type: "order"
+    source_table: "analytics.fact_orders"
+
+  sales.order.completed:
+    entity_type: "sale"
+    source_table: "analytics.fact_sales"
+
+  inventory.stock.updated:
+    entity_type: "stock_movement"
+    source_table: "analytics.fact_stock_movements"
+
+  inventory.low_stock.alert:
+    entity_type: "inventory_alert"
+    source_table: "analytics.fact_inventory_snapshot"
+
+  logistics.shipment.delayed:
+    entity_type: "shipment"
+    source_table: "analytics.fact_inbound_shipments"
+
+  returns.return.created:
+    entity_type: "return"
+    source_table: "analytics.fact_returns"
+
+  planning.forecast.generated:
+    entity_type: "forecast"
+    source_table: "analytics.fact_demand_forecast"
+
+  planning.replenishment.approved:
+    entity_type: "replenishment_recommendation"
+    source_table: "analytics.fact_replenishment_recommendation"

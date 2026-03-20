@@ -1,0 +1,406 @@
+# =========================================================
+# EDIP Phase 6 RAG ingestion configuration
+# Main config for metadata extraction, chunking, embeddings,
+# vector loading, and retrieval evaluation.
+# =========================================================
+
+config_name: edip_rag_ingestion_config
+config_version: "1.0"
+description: >
+  Phase 6 RAG ingestion and indexing configuration for EDIP.
+  Controls source discovery, metadata extraction, markdown chunking,
+  embedding generation, vector loading, and retrieval validation
+  for NorthStar Retail & Distribution business knowledge assets.
+
+# ---------------------------------------------------------
+# Project identity and environment context
+# ---------------------------------------------------------
+project:
+  project_name: "Enterprise Decision Intelligence Platform"
+  project_code: "EDIP"
+  company_name: "NorthStar Retail & Distribution"
+  environment: "local"
+  phase: "phase_6_rag_ingestion"
+
+# ---------------------------------------------------------
+# Global ingestion rules
+# These rules define strict validation and formatting behavior
+# across the whole RAG pipeline.
+# ---------------------------------------------------------
+global_rules:
+  document_scope_company_only: true
+  only_markdown_sources: true
+  metadata_required_before_chunking: true
+  metadata_must_match_document_content: true
+  metadata_must_match_structured_data_logic: true
+  fail_on_missing_required_metadata: true
+  fail_on_empty_chunk_text: true
+  normalize_whitespace: true
+  remove_trailing_spaces: true
+  preserve_heading_hierarchy: true
+
+# ---------------------------------------------------------
+# Source and output paths
+# Source folders, schema path, and all generated artifact paths.
+# ---------------------------------------------------------
+paths:
+  source_directories:
+    - "docs/policies"
+    - "docs/sops"
+    - "docs/reviews"
+    - "docs/rag_source"
+  source_file_pattern: "*.md"
+
+  metadata_schema_path: "configs/rag_metadata_schema.yaml"
+
+  output_base_dir: "data/processed/rag"
+  extracted_metadata_output: "data/processed/rag/document_metadata.jsonl"
+  chunk_output_jsonl: "data/processed/rag/rag_chunks.jsonl"
+  chunk_output_parquet: "data/processed/rag/rag_chunks.parquet"
+  embedding_output_jsonl: "data/processed/rag/rag_embeddings.jsonl"
+  embedding_output_parquet: "data/processed/rag/rag_embeddings.parquet"
+  ingestion_manifest_output: "artifacts/reports/rag_ingestion_manifest.json"
+  retrieval_eval_output: "artifacts/reports/rag_retrieval_eval.json"
+
+# ---------------------------------------------------------
+# Document filters
+# Controls which files are allowed, ignored, and required.
+# ---------------------------------------------------------
+document_filters:
+  allowed_extensions:
+    - ".md"
+  ignored_filenames:
+    - ".gitkeep"
+    - "README.md"
+  ignored_directories:
+    - "tmp"
+    - "__pycache__"
+    - ".git"
+    - ".github"
+    - ".vscode"
+  require_frontmatter: true
+  company_name_must_equal: "NorthStar Retail & Distribution"
+
+# ---------------------------------------------------------
+# Folder-to-document-type mapping
+# Used to infer/validate document types by folder category.
+# ---------------------------------------------------------
+document_type_mapping:
+  policies: "policy"
+  sops: "sop"
+  reviews: "review"
+  rag_source: "playbook"
+
+# ---------------------------------------------------------
+# Metadata extraction rules
+# Controls frontmatter parsing, required fields, optional fields,
+# auto-generated fields, and schema validation.
+# ---------------------------------------------------------
+metadata_extraction:
+  frontmatter_format: "yaml"
+  required_document_fields:
+    - document_id
+    - document_title
+    - document_type
+    - department
+    - business_domain
+    - region_scope
+    - audience
+    - effective_date
+    - review_date
+    - version
+    - owner_role
+    - confidentiality_level
+    - tags
+    - source_system
+    - company_name
+  optional_document_fields:
+    - document_status
+    - approval_level
+    - related_structured_domains
+    - source_path
+  auto_add_fields:
+    source_path: true
+    source_filename: true
+    source_directory: true
+    ingestion_timestamp: true
+  validate_against_schema: true
+
+# ---------------------------------------------------------
+# Chunking configuration
+# Defines chunk size, overlap, section-preservation rules,
+# tracked heading levels, and hard limits.
+# ---------------------------------------------------------
+chunking:
+  strategy: "markdown_semantic"
+  unit: "words"
+  target_chunk_size_min: 400
+  target_chunk_size_max: 800
+  overlap_min: 50
+  overlap_max: 100
+  preferred_target_chunk_size: 600
+  preferred_overlap: 75
+
+  rules:
+    keep_heading_with_body: true
+    keep_policy_clauses_together: true
+    keep_sop_steps_together: true
+    keep_decision_rules_together: true
+    keep_escalation_sections_together: true
+    keep_bullet_groups_together: true
+    keep_tables_together: true
+    avoid_random_sentence_fragments: true
+    avoid_mixing_unrelated_sections: true
+
+  heading_levels_to_track:
+    - h1
+    - h2
+    - h3
+    - h4
+
+  min_chunk_word_count: 120
+  max_chunk_word_count_hard: 950
+  drop_empty_chunks: true
+
+# ---------------------------------------------------------
+# Chunk-level metadata
+# Inherited metadata from the parent document plus derived fields.
+# ---------------------------------------------------------
+chunk_metadata:
+  inherit_from_document:
+    - document_id
+    - document_title
+    - document_type
+    - department
+    - business_domain
+    - region_scope
+    - audience
+    - effective_date
+    - review_date
+    - version
+    - owner_role
+    - confidentiality_level
+    - source_system
+    - company_name
+  derived_fields:
+    - chunk_id
+    - chunk_index
+    - chunk_word_count
+    - heading_path
+    - section_title
+    - topic
+    - keyword_tags
+    - source_document_id
+  chunk_id_format: "<document_id>-chunk-<4_digit_index>"
+
+# ---------------------------------------------------------
+# Topic derivation rules
+# Used to create chunk topic labels for retrieval.
+# ---------------------------------------------------------
+topic_derivation:
+  enabled: true
+  method: "heading_plus_keywords"
+  fallback_topic: "general_business_policy"
+
+# ---------------------------------------------------------
+# Embedding configuration
+# Controls provider, model, batching, retries, timeout,
+# and embedding storage behavior.
+# ---------------------------------------------------------
+embedding:
+  provider: "openai"
+  task_type: "document_embedding"
+  model_name: "text-embedding-3-small"
+  batch_size: 100
+  max_retries: 3
+  request_timeout_seconds: 60
+  truncate_overlong_text: true
+  text_field_for_embedding: "chunk_text"
+  store_embedding_vector: true
+  store_embedding_dimension: true
+
+# ---------------------------------------------------------
+# Vector database configuration
+# Defines Pinecone target index, namespace, upsert settings,
+# and metadata fields to store with vectors.
+# ---------------------------------------------------------
+vector_database:
+  provider: "pinecone"
+  index_name: "edip-rag-phase6"
+  namespace: "northstar-retail-v1"
+  metric: "cosine"
+  upsert_batch_size: 100
+  id_field: "chunk_id"
+  text_field: "chunk_text"
+  metadata_fields:
+    - source_document_id
+    - document_id
+    - document_title
+    - document_type
+    - department
+    - business_domain
+    - region_scope
+    - audience
+    - effective_date
+    - review_date
+    - version
+    - owner_role
+    - confidentiality_level
+    - topic
+    - keyword_tags
+    - heading_path
+    - section_title
+    - source_system
+    - company_name
+
+# ---------------------------------------------------------
+# Retrieval filter support
+# Defines allowed filter fields for documents and chunks,
+# plus the default company filter.
+# ---------------------------------------------------------
+retrieval_filters:
+  supported_document_filters:
+    - document_type
+    - department
+    - business_domain
+    - region_scope
+    - effective_date
+    - version
+    - owner_role
+    - confidentiality_level
+    - company_name
+  supported_chunk_filters:
+    - source_document_id
+    - document_type
+    - business_domain
+    - region_scope
+    - owner_role
+    - topic
+    - version
+    - confidentiality_level
+  default_filter:
+    company_name: "NorthStar Retail & Distribution"
+
+# ---------------------------------------------------------
+# Ingestion validation rules
+# Validation rules for document, chunk, embedding, and vector stages.
+# ---------------------------------------------------------
+ingestion_validation:
+  document_checks:
+    unique_document_id_required: true
+    review_date_must_be_on_or_after_effective_date: true
+    tags_must_not_be_empty: true
+    company_name_must_match: true
+    source_system_default_if_missing: "edip_phase_5_docs"
+
+  chunk_checks:
+    unique_chunk_id_required: true
+    chunk_index_must_start_at_1: true
+    chunk_index_must_be_sequential: true
+    heading_path_preferred: true
+    topic_must_not_be_empty: true
+    inherited_metadata_must_exist: true
+
+  embedding_checks:
+    embedding_vector_required: true
+    embedding_dimension_must_be_consistent: true
+
+  vector_checks:
+    chunk_id_must_match_vector_id: true
+    metadata_must_be_present_in_vector_store: true
+
+# ---------------------------------------------------------
+# Retrieval evaluation settings
+# Defines quality thresholds and test queries for retrieval checks.
+# ---------------------------------------------------------
+retrieval_evaluation:
+  enabled: true
+  test_top_k: 5
+  minimum_expected_hit_rate: 0.80
+  minimum_expected_relevance_score: 0.75
+  evaluation_queries:
+    - query_id: "Q001"
+      question: "Why did the system recommend urgent replenishment for this SKU?"
+      expected_domains:
+        - replenishment
+        - service_level
+        - inventory
+      expected_document_types:
+        - policy
+        - sop
+        - playbook
+    - query_id: "Q002"
+      question: "Why was this recommendation overridden by the planner?"
+      expected_domains:
+        - overrides
+        - decision_governance
+        - escalation
+      expected_document_types:
+        - policy
+        - playbook
+        - matrix
+    - query_id: "Q003"
+      question: "Why is this supplier causing risk in Region West?"
+      expected_domains:
+        - supplier
+        - procurement
+        - service_level
+      expected_document_types:
+        - review
+        - sop
+        - guide
+    - query_id: "Q004"
+      question: "Why did demand increase during this campaign period?"
+      expected_domains:
+        - promotions
+        - pricing
+        - forecast
+      expected_document_types:
+        - policy
+        - memo
+        - review
+    - query_id: "Q005"
+      question: "Which policy applies when forecast risk is high but stock is low and supplier lead time is long?"
+      expected_domains:
+        - forecast
+        - replenishment
+        - escalation
+        - supplier
+      expected_document_types:
+        - policy
+        - playbook
+        - sop
+
+# ---------------------------------------------------------
+# Logging configuration
+# Defines what the pipeline should log during execution.
+# ---------------------------------------------------------
+logging:
+  log_level: "INFO"
+  use_logger: true
+  log_ingestion_summary: true
+  log_failed_documents: true
+  log_failed_chunks: true
+  log_embedding_failures: true
+  log_vector_upsert_summary: true
+
+# ---------------------------------------------------------
+# Artifact persistence rules
+# Controls which generated outputs should be saved.
+# ---------------------------------------------------------
+artifacts:
+  save_document_metadata: true
+  save_chunks: true
+  save_embeddings: true
+  save_manifest: true
+  save_retrieval_eval: true
+
+# ---------------------------------------------------------
+# Future pipeline readiness flags
+# Marks intended compatibility with orchestration and deployment.
+# ---------------------------------------------------------
+future_pipeline_alignment:
+  airflow_ready: true
+  embedding_refresh_job_ready: true
+  scheduled_reindex_ready: true
+  ci_cd_ready: true
