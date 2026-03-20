@@ -154,8 +154,11 @@ data/external/*
 data/synthetic/*
 !data/synthetic/.gitkeep
 
+<<<<<<< HEAD
 data/exports/kafka_events/
 
+=======
+>>>>>>> a605a2243eaef54cc7311656bafe2c021d961e00
 # =========================================================
 # Airflow
 # =========================================================
@@ -230,6 +233,7 @@ temp/
 !pipelines/.gitkeep
 !scripts/.gitkeep
 !tests/.gitkeep
+<<<<<<< HEAD
 !ui/.gitkeep
 
 # =========================================================
@@ -237,3 +241,6 @@ temp/
 # =========================================================
 
 __init__.py
+=======
+!ui/.gitkeep
+>>>>>>> a605a2243eaef54cc7311656bafe2c021d961e00
