@@ -3,9 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from yaml import warnings
-
-from app.agents.planner_agent import AgentStep, PlannerPlan, TaskType
+from app.agents.planner_agent import PlannerPlan, TaskType
 from app.agents.retrieval_agent import RetrievalAgentResult, RetrievedChunk
 from app.core.logging import get_logger
 
@@ -19,34 +17,23 @@ logger = get_logger(__name__)
 @dataclass(frozen=True)
 class StructuredSignal:
     """
-    Optional structured business signal passed into reasoning.
+    Normalized structured signal used by the Reasoning Agent.
 
-    Example sources:
-    - forecast service output
-    - recommendation service output
-    - event processing output
-    - API-calculated business metrics
+    This can come from analytics, rules, KPIs, or other structured sources.
     """
 
     signal_name: str
     signal_value: Any
-    signal_type: str = "generic"
+    signal_type: str = "business_signal"
+    source: str = "unknown"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
-class ReasoningAgentInput:
-    """Input payload for the Reasoning Agent."""
-
-    question: str
-    plan: PlannerPlan
-    retrieval_result: Optional[RetrievalAgentResult] = None
-    structured_signals: List[StructuredSignal] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
 class EvidenceItem:
-    """Normalized evidence item used inside reasoning output."""
+    """
+    Compact evidence item derived from retrieval output.
+    """
 
     chunk_id: Optional[str]
     document_title: Optional[str]
@@ -58,15 +45,29 @@ class EvidenceItem:
 
 
 @dataclass(frozen=True)
+class ReasoningAgentInput:
+    """
+    Input payload for the Reasoning Agent.
+    """
+
+    question: str
+    plan: PlannerPlan
+    retrieval_result: Optional[RetrievalAgentResult] = None
+    structured_signals: List[StructuredSignal] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class ReasoningAgentResult:
-    """Final structured reasoning output."""
+    """
+    Final structured output from the Reasoning Agent.
+    """
 
     question: str
     task_type: TaskType
     reasoning_summary: str
     rationale_points: List[str]
     risk_flags: List[str]
-    suggested_next_steps: List[AgentStep]
+    suggested_next_steps: List[str]
     evidence: List[EvidenceItem]
     structured_signal_summary: Dict[str, Any]
     warnings: List[str] = field(default_factory=list)
@@ -80,9 +81,11 @@ class ReasoningAgent:
     EDIP Reasoning Agent.
 
     Responsibilities:
-    - interpret grounded retrieval evidence
-    - combine evidence with structured business signals
-    - produce a clean reasoning layer for downstream analytics/execution
+    - interpret planner intent
+    - combine retrieval evidence with structured signals
+    - produce business-facing reasoning
+    - identify risk flags
+    - generate context-aware warnings
     """
 
     def __init__(self) -> None:
@@ -90,10 +93,10 @@ class ReasoningAgent:
 
     def reason(self, payload: ReasoningAgentInput) -> ReasoningAgentResult:
         """
-        Produce grounded reasoning from retrieved context and optional structured signals.
+        Build grounded business reasoning from planner output, retrieval evidence,
+        and structured business signals.
         """
         normalized_question = self._validate_question(payload.question)
-        warnings: List[str] = []
 
         evidence = self._build_evidence_items(payload.retrieval_result)
         signal_summary = self._summarize_structured_signals(payload.structured_signals)
@@ -102,7 +105,7 @@ class ReasoningAgent:
             evidence=evidence,
             signal_summary=signal_summary,
         )
-        risk_flags = self._detect_risk_flags(
+        risk_flags = self._build_risk_flags(
             plan=payload.plan,
             evidence=evidence,
             signal_summary=signal_summary,
@@ -111,7 +114,9 @@ class ReasoningAgent:
             plan=payload.plan,
             evidence=evidence,
             signal_summary=signal_summary,
+            risk_flags=risk_flags,
         )
+
         reasoning_summary = self._build_reasoning_summary(
             plan=payload.plan,
             evidence=evidence,
@@ -119,11 +124,12 @@ class ReasoningAgent:
             risk_flags=risk_flags,
         )
 
-        if not evidence:
-            warnings.append("No retrieval evidence was available for reasoning.")
-
-        if payload.plan.task_type == TaskType.ANALYTICS and not payload.structured_signals:
-            warnings.append("No structured business signals were supplied to reasoning.")
+        warnings = self._build_warnings(
+            plan=payload.plan,
+            retrieval_result=payload.retrieval_result,
+            evidence=evidence,
+            signal_summary=signal_summary,
+        )
 
         result = ReasoningAgentResult(
             question=normalized_question,
@@ -138,10 +144,12 @@ class ReasoningAgent:
         )
 
         logger.info(
-            "ReasoningAgent completed | task_type=%s | evidence_count=%s | risks=%s",
+            "ReasoningAgent completed | task_type=%s | evidence_count=%s | signal_count=%s | risks=%s | warnings=%s",
             result.task_type.value,
             len(result.evidence),
+            len(result.structured_signal_summary),
             result.risk_flags,
+            len(result.warnings),
         )
         return result
 
@@ -162,7 +170,7 @@ class ReasoningAgent:
         retrieval_result: Optional[RetrievalAgentResult],
     ) -> List[EvidenceItem]:
         """
-        Convert retrieval chunks into reasoning evidence items.
+        Convert retrieval chunks into compact evidence items.
         """
         if retrieval_result is None:
             return []
@@ -177,7 +185,7 @@ class ReasoningAgent:
                     document_type=chunk.document_type,
                     business_domain=chunk.business_domain,
                     topic=chunk.topic,
-                    score=chunk.score,
+                    score=float(chunk.score or 0.0),
                     excerpt=self._build_excerpt(chunk),
                 )
             )
@@ -214,7 +222,7 @@ class ReasoningAgent:
         signal_summary: Dict[str, Any],
     ) -> List[str]:
         """
-        Build reasoning rationale points from evidence and signals.
+        Build short business rationale points.
         """
         points: List[str] = []
 
@@ -247,94 +255,84 @@ class ReasoningAgent:
             points.append(
                 "This request mainly requires business-policy interpretation over grounded context."
             )
-
-        if plan.task_type == TaskType.ANALYTICS:
+        elif plan.task_type == TaskType.ANALYTICS:
             points.append(
                 "This request mainly requires analytical interpretation of business signals."
             )
-
-        if plan.task_type == TaskType.HYBRID:
+        elif plan.task_type == TaskType.HYBRID:
             points.append(
-                "This request requires both enterprise document context and analytical signals."
-            )
-
-        if plan.task_type == TaskType.EXECUTION:
-            points.append(
-                "This request may lead to action, so policy and governance consistency matter."
-            )
-
-        if not points:
-            points.append(
-                "Reasoning used default enterprise interpretation because strong evidence patterns were limited."
+                "This request requires both enterprise document context and analytical support."
             )
 
         return points
 
-    def _detect_risk_flags(
+    def _build_risk_flags(
         self,
         plan: PlannerPlan,
         evidence: List[EvidenceItem],
         signal_summary: Dict[str, Any],
     ) -> List[str]:
         """
-        Detect simple risk flags from question context, evidence, and signals.
+        Build risk flags from planner context plus structured signals.
         """
-        risks: List[str] = []
+        risk_flags: List[str] = []
 
-        evidence_text = " ".join(
-            [
-                f"{item.document_title or ''} {item.topic or ''} {item.excerpt}"
-                for item in evidence
-            ]
-        ).lower()
+        # Planner-level approval / governance signal.
+        if getattr(plan, "needs_execution", False) and getattr(plan, "needs_reasoning", False):
+            risk_flags.append("governance_review")
 
-        if "escalation" in evidence_text or "approval" in evidence_text:
-            risks.append("governance_review_needed")
+        # Structured signal heuristics.
+        stockout_risk = self._as_float(signal_summary.get("expected_stockout_risk"))
+        service_level = self._as_float(signal_summary.get("expected_service_level"))
+        confidence_score = self._as_float(signal_summary.get("confidence_score"))
+        priority_level = self._normalize_text(signal_summary.get("priority_level"))
 
-        if "supplier" in evidence_text or "lead time" in evidence_text:
-            risks.append("supplier_dependency_risk")
+        if stockout_risk is not None and stockout_risk >= 0.70:
+            risk_flags.append("stockout_risk")
 
-        if "stockout" in plan.normalized_question or "low stock" in plan.normalized_question:
-            risks.append("service_level_risk")
+        if service_level is not None and service_level < 0.80:
+            risk_flags.append("service_level_risk")
 
-        risk_like_signal_names = {
-            "stockout_risk",
-            "expected_stockout_risk",
-            "forecast_uncertainty",
-            "delay_risk",
-            "supplier_risk",
-        }
+        if confidence_score is not None and confidence_score < 0.20:
+            risk_flags.append("low_forecast_confidence")
 
-        for key, value in signal_summary.items():
-            if key in risk_like_signal_names:
-                risks.append(str(key))
+        if priority_level == "high":
+            risk_flags.append("urgent_priority")
 
-        return sorted(set(risks))
+        # Retrieval/evidence availability.
+        if plan.task_type in {TaskType.RAG_QA, TaskType.HYBRID} and not evidence:
+            risk_flags.append("limited_grounding")
+
+        return sorted(set(risk_flags))
 
     def _build_suggested_next_steps(
         self,
         plan: PlannerPlan,
         evidence: List[EvidenceItem],
         signal_summary: Dict[str, Any],
-    ) -> List[AgentStep]:
+        risk_flags: List[str],
+    ) -> List[str]:
         """
-        Suggest the next workflow steps after reasoning.
+        Suggest short next-step actions.
         """
-        next_steps: List[AgentStep] = []
+        steps: List[str] = []
 
-        if plan.needs_analytics:
-            next_steps.append(AgentStep.ANALYTICS)
+        if "stockout_risk" in risk_flags:
+            steps.append("Review replenishment action immediately.")
 
-        if plan.needs_execution:
-            next_steps.append(AgentStep.EXECUTION)
+        if "service_level_risk" in risk_flags:
+            steps.append("Investigate service-level exposure before final action.")
 
-        if not next_steps and signal_summary:
-            next_steps.append(AgentStep.ANALYTICS)
+        if "limited_grounding" in risk_flags:
+            steps.append("Retrieve stronger enterprise evidence before policy-sensitive action.")
 
-        if not next_steps and evidence:
-            next_steps.append(AgentStep.REASONING)
+        if signal_summary:
+            steps.append("Use structured analytics signals in the final execution decision.")
 
-        return next_steps
+        if plan.task_type == TaskType.HYBRID:
+            steps.append("Combine grounded policy context with analytical output before approval.")
+
+        return steps
 
     def _build_reasoning_summary(
         self,
@@ -344,42 +342,91 @@ class ReasoningAgent:
         risk_flags: List[str],
     ) -> str:
         """
-        Create one clean reasoning summary sentence block.
+        Build a cleaner business-facing reasoning summary.
         """
         evidence_count = len(evidence)
         signal_count = len(signal_summary)
 
-        if plan.task_type == TaskType.RAG_QA:
-            summary = (
-                f"Reasoning used {evidence_count} grounded document evidence items "
-                f"to interpret the business question."
-            )
-        elif plan.task_type == TaskType.ANALYTICS:
-            summary = (
+        if plan.task_type == TaskType.ANALYTICS:
+            base = (
                 f"Reasoning used {signal_count} structured business signals "
                 f"to interpret the analytical request."
             )
-        elif plan.task_type == TaskType.HYBRID:
-            summary = (
+        elif plan.task_type == TaskType.RAG_QA:
+            base = (
+                f"Reasoning used {evidence_count} retrieved evidence items "
+                f"to interpret the grounded business request."
+            )
+        else:
+            base = (
                 f"Reasoning combined {evidence_count} evidence items and "
                 f"{signal_count} structured signals for a hybrid business interpretation."
             )
-        elif plan.task_type == TaskType.EXECUTION:
-            summary = (
-                f"Reasoning evaluated policy context and action implications before execution routing."
-            )
-        else:
-            summary = "Reasoning completed with limited context using default enterprise-safe interpretation."
 
         if risk_flags:
-            summary += " Detected risk areas: " + ", ".join(risk_flags) + "."
+            base += " Detected risk areas: " + ", ".join(risk_flags) + "."
 
-        return summary
+        return base
+
+    def _build_warnings(
+        self,
+        plan: PlannerPlan,
+        retrieval_result: Optional[RetrievalAgentResult],
+        evidence: List[EvidenceItem],
+        signal_summary: Dict[str, Any],
+    ) -> List[str]:
+        """
+        Build context-aware warnings.
+
+        Important rule:
+        - only warn about missing evidence when the task actually requires grounding
+        - only warn about missing structured signals when the task actually requires analytics
+        """
+        warnings: List[str] = []
+
+        needs_grounding = plan.task_type in {TaskType.RAG_QA, TaskType.HYBRID}
+        needs_signals = plan.task_type in {TaskType.ANALYTICS, TaskType.HYBRID}
+
+        retrieval_count = (
+            retrieval_result.retrieval_count if retrieval_result is not None else 0
+        )
+
+        if needs_grounding and retrieval_count == 0 and not evidence:
+            warnings.append("No retrieval evidence was available for reasoning.")
+
+        if needs_signals and not signal_summary:
+            warnings.append("No structured business signals were supplied to reasoning.")
+
+        return warnings
+
+    def _as_float(self, value: Any) -> Optional[float]:
+        """
+        Safely convert numeric-like values to float.
+        """
+        if value is None:
+            return None
+
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _normalize_text(self, value: Any) -> Optional[str]:
+        """
+        Normalize text-like values to lowercase text.
+        """
+        if value is None:
+            return None
+
+        text = " ".join(str(value).strip().split()).lower()
+        return text or None
 
 
 # =========================================================
 # Builder
 # =========================================================
 def build_reasoning_agent() -> ReasoningAgent:
-    """Factory function for consistent agent creation."""
+    """
+    Factory function for consistent ReasoningAgent creation.
+    """
     return ReasoningAgent()

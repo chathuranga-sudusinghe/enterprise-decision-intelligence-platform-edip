@@ -1,5 +1,3 @@
-# app\agents\execution_agent.py
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -124,6 +122,7 @@ class ExecutionAgent:
             risk_flags=risk_flags,
             require_approval=payload.require_approval,
             plan=payload.plan,
+            analytics_result=analytics_result,
         )
 
         output_type = self._resolve_output_type(
@@ -145,11 +144,26 @@ class ExecutionAgent:
             escalation_required=escalation_required,
         )
 
+        if reasoning_result is None:
+            warnings.append("Reasoning result was not supplied to execution.")
+
+        if payload.plan.needs_analytics and analytics_result is None:
+            warnings.append("Planner expected analytics, but analytics result was not supplied.")
+
+        if analytics_result and analytics_result.analytics_used is False:
+            warnings.append("Analytics stage completed without usable analytical output.")
+
+        if self._has_high_operational_risk(analytics_result):
+            warnings.append(
+                "High operational risk was detected, but the recommendation remains actionable."
+            )
+
         status = self._resolve_status(
             output_type=output_type,
             escalation_required=escalation_required,
             require_approval=payload.require_approval,
             actions=actions,
+            warnings=warnings,
         )
 
         final_message = self._build_final_message(
@@ -159,12 +173,6 @@ class ExecutionAgent:
             analytics_result=analytics_result,
             escalation_required=escalation_required,
         )
-
-        if reasoning_result is None:
-            warnings.append("Reasoning result was not supplied to execution.")
-
-        if payload.plan.needs_analytics and analytics_result is None:
-            warnings.append("Planner expected analytics, but analytics result was not supplied.")
 
         audit_record = AuditRecord(
             task_type=payload.plan.task_type.value,
@@ -218,28 +226,36 @@ class ExecutionAgent:
         risk_flags: List[str],
         require_approval: bool,
         plan: PlannerPlan,
+        analytics_result: Optional[AnalyticsAgentResult],
     ) -> bool:
         """
         Decide whether this workflow should escalate.
+
+        Important policy:
+        - governance / approval / hard control issues => escalate
+        - high operational risk alone => warn, but do not automatically escalate
         """
-        escalation_risks = {
+        governance_risks = {
+            "governance_review",
             "governance_review_needed",
             "supplier_dependency_risk",
-            "service_level_risk",
-            "expected_stockout_risk",
             "supplier_risk",
-            "delay_risk",
+            "policy_exception",
+            "approval_required",
+            "compliance_risk",
         }
 
         if require_approval:
             return True
 
-        if any(flag in escalation_risks for flag in risk_flags):
+        if any(flag in governance_risks for flag in risk_flags):
             return True
 
         if plan.task_type == TaskType.EXECUTION:
             return True
 
+        # Do not escalate only because stockout risk or service level risk is high.
+        # Those should usually remain actionable recommendation cases.
         return False
 
     def _resolve_output_type(
@@ -265,6 +281,9 @@ class ExecutionAgent:
             if plan.task_type == TaskType.RAG_QA:
                 return ExecutionOutputType.EXPLANATION
             return ExecutionOutputType.REPORT
+
+        if reasoning_result and reasoning_result.reasoning_summary:
+            return ExecutionOutputType.EXPLANATION
 
         return ExecutionOutputType.NO_ACTION
 
@@ -302,6 +321,7 @@ class ExecutionAgent:
 
         if analytics_result and analytics_result.recommendation_payload:
             recommendation_payload = analytics_result.recommendation_payload
+            priority = self._resolve_priority(recommendation_payload)
 
             recommended_order_qty = recommendation_payload.get("recommended_order_qty")
             if recommended_order_qty is not None:
@@ -310,7 +330,7 @@ class ExecutionAgent:
                         action_type="create_replenishment_recommendation",
                         title="Create replenishment recommendation",
                         description=f"Recommend order quantity of {recommended_order_qty}.",
-                        priority=self._resolve_priority(recommendation_payload),
+                        priority=priority,
                         owner_role="planner",
                         metadata=recommendation_payload,
                     )
@@ -318,16 +338,22 @@ class ExecutionAgent:
 
             recommended_transfer_qty = recommendation_payload.get("recommended_transfer_qty")
             if recommended_transfer_qty is not None:
-                actions.append(
-                    ExecutionAction(
-                        action_type="create_transfer_recommendation",
-                        title="Create stock transfer recommendation",
-                        description=f"Recommend transfer quantity of {recommended_transfer_qty}.",
-                        priority=self._resolve_priority(recommendation_payload),
-                        owner_role="inventory_controller",
-                        metadata=recommendation_payload,
+                try:
+                    transfer_qty_value = float(recommended_transfer_qty)
+                except (TypeError, ValueError):
+                    transfer_qty_value = 0.0
+
+                if transfer_qty_value > 0:
+                    actions.append(
+                        ExecutionAction(
+                            action_type="create_transfer_recommendation",
+                            title="Create stock transfer recommendation",
+                            description=f"Recommend transfer quantity of {recommended_transfer_qty}.",
+                            priority=priority,
+                            owner_role="inventory_controller",
+                            metadata=recommendation_payload,
+                        )
                     )
-                )
 
         if output_type == ExecutionOutputType.EXPLANATION and reasoning_result:
             actions.append(
@@ -361,14 +387,17 @@ class ExecutionAgent:
             for risk_flag in reasoning_result.risk_flags:
                 alerts.append(f"Risk detected: {risk_flag}")
 
-        if analytics_result:
-            for signal in analytics_result.structured_signals:
-                if signal.signal_name in {
-                    "expected_stockout_risk",
-                    "priority_level",
-                    "reason_code",
-                }:
-                    alerts.append(f"{signal.signal_name}: {signal.signal_value}")
+        if analytics_result and analytics_result.recommendation_payload:
+            recommendation_payload = analytics_result.recommendation_payload
+
+            for key in [
+                "priority_level",
+                "reason_code",
+                "expected_stockout_risk",
+                "expected_service_level",
+            ]:
+                if recommendation_payload.get(key) is not None:
+                    alerts.append(f"{key}: {recommendation_payload.get(key)}")
 
         if escalation_required:
             alerts.append("Escalation is required before final action.")
@@ -382,6 +411,7 @@ class ExecutionAgent:
         escalation_required: bool,
         require_approval: bool,
         actions: List[ExecutionAction],
+        warnings: List[str],
     ) -> ExecutionStatus:
         """
         Resolve execution status.
@@ -391,6 +421,18 @@ class ExecutionAgent:
 
         if output_type == ExecutionOutputType.NO_ACTION:
             return ExecutionStatus.SKIPPED
+
+        if not actions and warnings:
+            return ExecutionStatus.BLOCKED
+
+        if output_type == ExecutionOutputType.RECOMMENDATION and actions:
+            return ExecutionStatus.READY
+
+        if output_type == ExecutionOutputType.EXPLANATION and actions:
+            return ExecutionStatus.READY
+
+        if output_type == ExecutionOutputType.REPORT:
+            return ExecutionStatus.READY
 
         if not actions:
             return ExecutionStatus.BLOCKED
@@ -411,11 +453,21 @@ class ExecutionAgent:
         """
         if output_type == ExecutionOutputType.ESCALATION:
             return (
-                "The workflow identified governance or operational risk, so the case "
-                "should be escalated for review before final action."
+                "The workflow identified governance or approval-sensitive risk, "
+                "so the case should be reviewed before final action."
             )
 
         if output_type == ExecutionOutputType.RECOMMENDATION and analytics_result:
+            recommendation_payload = analytics_result.recommendation_payload or {}
+            priority_level = recommendation_payload.get("priority_level")
+            reason_code = recommendation_payload.get("reason_code")
+
+            if priority_level or reason_code:
+                return (
+                    "The system produced a prescriptive recommendation package "
+                    f"with priority '{priority_level}' and reason code '{reason_code}'."
+                )
+
             return (
                 "The system produced a prescriptive recommendation package based on "
                 "analytics and reasoning outputs."
@@ -448,7 +500,7 @@ class ExecutionAgent:
             notes.extend(payload.plan.notes)
 
         if escalation_required:
-            notes.append("Escalation path activated by risk/governance conditions.")
+            notes.append("Escalation path activated by governance/approval conditions.")
 
         if payload.require_approval:
             notes.append("Manual approval is required before downstream action.")
@@ -469,6 +521,57 @@ class ExecutionAgent:
             return priority_text
 
         return "medium"
+
+    def _has_high_operational_risk(
+        self,
+        analytics_result: Optional[AnalyticsAgentResult],
+    ) -> bool:
+        """
+        Detect high operational risk from recommendation payload.
+
+        This should warn, but not automatically escalate.
+        """
+        if analytics_result is None or not analytics_result.recommendation_payload:
+            return False
+
+        recommendation_payload = analytics_result.recommendation_payload
+
+        stockout_risk = self._as_float(recommendation_payload.get("expected_stockout_risk"))
+        service_level = self._as_float(recommendation_payload.get("expected_service_level"))
+        priority_level = self._normalize_text(recommendation_payload.get("priority_level"))
+
+        if stockout_risk is not None and stockout_risk >= 0.90:
+            return True
+
+        if service_level is not None and service_level < 0.20:
+            return True
+
+        if priority_level in {"high", "critical"}:
+            return True
+
+        return False
+
+    def _as_float(self, value: Any) -> Optional[float]:
+        """
+        Safely convert numeric-like values to float.
+        """
+        if value is None:
+            return None
+
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _normalize_text(self, value: Any) -> Optional[str]:
+        """
+        Normalize text-like values.
+        """
+        if value is None:
+            return None
+
+        text = " ".join(str(value).strip().split()).lower()
+        return text or None
 
 
 # =========================================================
