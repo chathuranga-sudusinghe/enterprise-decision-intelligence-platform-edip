@@ -193,3 +193,7 @@ temp/
 # initialization files
 __init__.py
 
+# UI build artifacts
+ui/
+ui/node_modules/
+ui/.next/

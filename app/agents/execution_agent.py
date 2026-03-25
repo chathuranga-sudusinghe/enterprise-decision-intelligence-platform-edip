@@ -324,7 +324,12 @@ class ExecutionAgent:
             priority = self._resolve_priority(recommendation_payload)
 
             recommended_order_qty = recommendation_payload.get("recommended_order_qty")
-            if recommended_order_qty is not None:
+            recommended_transfer_qty = recommendation_payload.get("recommended_transfer_qty")
+
+            order_qty_value = self._as_float(recommended_order_qty) or 0.0
+            transfer_qty_value = self._as_float(recommended_transfer_qty) or 0.0
+
+            if order_qty_value > 0:
                 actions.append(
                     ExecutionAction(
                         action_type="create_replenishment_recommendation",
@@ -335,13 +340,6 @@ class ExecutionAgent:
                         metadata=recommendation_payload,
                     )
                 )
-
-            recommended_transfer_qty = recommendation_payload.get("recommended_transfer_qty")
-            if recommended_transfer_qty is not None:
-                try:
-                    transfer_qty_value = float(recommended_transfer_qty)
-                except (TypeError, ValueError):
-                    transfer_qty_value = 0.0
 
                 if transfer_qty_value > 0:
                     actions.append(
@@ -459,18 +457,38 @@ class ExecutionAgent:
 
         if output_type == ExecutionOutputType.RECOMMENDATION and analytics_result:
             recommendation_payload = analytics_result.recommendation_payload or {}
+
             priority_level = recommendation_payload.get("priority_level")
             reason_code = recommendation_payload.get("reason_code")
 
-            if priority_level or reason_code:
+            order_qty = self._as_float(recommendation_payload.get("recommended_order_qty")) or 0.0
+            transfer_qty = self._as_float(recommendation_payload.get("recommended_transfer_qty")) or 0.0
+
+            if order_qty > 0 and transfer_qty <= 0:
                 return (
-                    "The system produced a prescriptive recommendation package "
+                    "The system recommends reordering stock because the analytical result favors "
+                    f"purchase replenishment over transfer. Recommended order quantity is {int(order_qty) if order_qty.is_integer() else order_qty}, "
+                    f"with priority '{priority_level}' and reason code '{reason_code}'."
+                )
+
+            if transfer_qty > 0 and order_qty <= 0:
+                return (
+                    "The system recommends transferring stock from another location because the analytical result favors "
+                    f"internal redistribution over new purchase. Recommended transfer quantity is {int(transfer_qty) if transfer_qty.is_integer() else transfer_qty}, "
+                    f"with priority '{priority_level}' and reason code '{reason_code}'."
+                )
+
+            if order_qty > 0 and transfer_qty > 0:
+                return (
+                    "The system recommends a mixed replenishment action using both reorder and transfer. "
+                    f"Recommended order quantity is {int(order_qty) if order_qty.is_integer() else order_qty} and "
+                    f"transfer quantity is {int(transfer_qty) if transfer_qty.is_integer() else transfer_qty}, "
                     f"with priority '{priority_level}' and reason code '{reason_code}'."
                 )
 
             return (
-                "The system produced a prescriptive recommendation package based on "
-                "analytics and reasoning outputs."
+                "The system completed the recommendation workflow, but no positive reorder or transfer quantity "
+                "was produced from the analytical result."
             )
 
         if output_type == ExecutionOutputType.EXPLANATION and reasoning_result:
@@ -483,6 +501,7 @@ class ExecutionAgent:
             return "No final business action was required for the current request."
 
         return "Execution completed with limited actionable output."
+
 
     def _build_audit_notes(
         self,

@@ -449,15 +449,46 @@ class ForecastService:
             horizon_days=horizon_days,
         )
 
-        recommendation_payload: Dict[str, Any] = {}
+        recommendation_payload: Dict[str, Any] = {
+            "recommended_order_qty": None,
+            "recommended_transfer_qty": 0,
+            "priority_level": None,
+            "reason_code": None,
+            "reason_text": None,
+            "expected_stockout_risk": None,
+            "expected_service_level": None,
+            "coverage_ratio": None,
+            "days_of_cover_post_replenishment": None,
+            "recommended_action": None,
+        }
+
         if include_recommendations and matched_record is not None:
             recommendation_payload = self._build_recommendation_payload(
                 matched_record=matched_record
             )
 
+        if include_recommendations and matched_record is None:
+            logger.warning(
+                "No matching recommendation record found for product_id=%s, store_id=%s, warehouse_id=%s, region_id=%s",
+                product_id,
+                store_id,
+                warehouse_id,
+                region_id,
+            )
+
         return {
             "forecast": forecast_payload,
             "recommendations": recommendation_payload,
+            "workflow_metadata": {
+                "service": "forecast_service",
+                "mode": "artifact_based",
+                "include_recommendations": include_recommendations,
+                "matched_record_found": matched_record is not None,
+                "row_count_scored": overview.row_count_scored,
+                "row_count_recommendations": overview.row_count_recommendations,
+                "row_count_actionable": overview.row_count_actionable,
+                "warnings": overview.warnings,
+            },
         }
 
     def _select_best_recommendation_record(

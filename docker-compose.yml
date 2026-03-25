@@ -8,23 +8,17 @@ services:
       KAFKA_NODE_ID: "1"
       KAFKA_PROCESS_ROLES: "broker,controller"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
-
-      # Internal Docker listener + host listener + controller listener
       KAFKA_LISTENERS: "INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
       KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka:29092,EXTERNAL://localhost:9092"
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
-
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
       KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
-      
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
-
     volumes:
       - kafka_data:/var/lib/kafka/data
-
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9092'"]
       interval: 10s
@@ -49,7 +43,7 @@ services:
              python scripts/init_kafka_topics.py"
     restart: "no"
 
-  api:   # FastAPI application
+  api: # FastAPI application
     build:
       context: .
       dockerfile: Dockerfile
@@ -72,6 +66,128 @@ services:
       uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
+  
+  postgres: # PostgreSQL for Airflow metadata
+    image: postgres:16
+    container_name: edip-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    
+  airflow-init: # Initialize Airflow metadata DB and admin user
+    image: apache/airflow:3.1.0
+    container_name: edip-airflow-init
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /app/pipelines/airflow_dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    volumes:
+      - ./:/app
+      - airflow_data:/opt/airflow
+    command: >
+      bash -c "
+      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python &&
+      airflow db migrate &&
+      airflow users create
+      --username admin
+      --firstname EDIP
+      --lastname Admin
+      --role Admin
+      --email admin@example.com
+      --password admin || true
+      "
+    restart: "no"
+
+  airflow-webserver: # Airflow UI
+    image: apache/airflow:3.1.0
+    container_name: edip-airflow-webserver
+    working_dir: /app
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /app/pipelines/airflow_dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    volumes:
+      - ./:/app
+      - airflow_data:/opt/airflow
+    command: >
+      bash -c "
+      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python &&
+      airflow api-server --port 8080
+      "
+
+  airflow-scheduler: # Airflow scheduler
+    image: apache/airflow:3.1.0
+    container_name: edip-airflow-scheduler
+    working_dir: /app
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /app/pipelines/airflow_dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    volumes:
+      - ./:/app
+      - airflow_data:/opt/airflow
+    command: >
+      bash -c "
+      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python &&
+      airflow scheduler
+      "
+  airflow-dag-processor: # Airflow DAG processor
+    image: apache/airflow:3.1.0
+    container_name: edip-airflow-dag-processor
+    working_dir: /app
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /app/pipelines/airflow_dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    volumes:
+      - ./:/app
+      - airflow_data:/opt/airflow
+    command: >
+      bash -c "
+      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python &&
+      airflow dag-processor
+      "
+
 
 volumes:
   kafka_data:
+  postgres_data:
+  airflow_data:
