@@ -399,6 +399,180 @@ class ForecastService:
             recommendations=recommendations,
         )
 
+    def run_forecast_workflow(
+        self,
+        *,
+        product_id: Optional[int] = None,
+        store_id: Optional[int] = None,
+        warehouse_id: Optional[int] = None,
+        region_id: Optional[int] = None,
+        horizon_days: int = 7,
+        include_recommendations: bool = True,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Run the forecast + recommendation workflow in the normalized shape
+        expected by the AnalyticsAgent.
+
+        Current implementation note:
+        This service is artifact-based. It reads already-generated forecast and
+        recommendation artifacts, then returns a normalized workflow payload.
+        """
+        _ = horizon_days
+        _ = metadata
+
+        overview = self.get_forecast_overview()
+
+        recommendation_records: List[ForecastRecommendationRecord] = []
+        if include_recommendations:
+            recommendation_records = self.get_recommendations(
+                top_n=100,
+                priority_filter=None,
+                action_only=True,
+            )
+
+        matched_record = self._select_best_recommendation_record(
+            recommendations=recommendation_records,
+            product_id=product_id,
+            store_id=store_id,
+            warehouse_id=warehouse_id,
+            region_id=region_id,
+        )
+
+        forecast_payload = self._build_forecast_payload(
+            overview=overview,
+            matched_record=matched_record,
+            product_id=product_id,
+            store_id=store_id,
+            warehouse_id=warehouse_id,
+            region_id=region_id,
+            horizon_days=horizon_days,
+        )
+
+        recommendation_payload: Dict[str, Any] = {}
+        if include_recommendations and matched_record is not None:
+            recommendation_payload = self._build_recommendation_payload(
+                matched_record=matched_record
+            )
+
+        return {
+            "forecast": forecast_payload,
+            "recommendations": recommendation_payload,
+        }
+
+    def _select_best_recommendation_record(
+        self,
+        *,
+        recommendations: List[ForecastRecommendationRecord],
+        product_id: Optional[int],
+        store_id: Optional[int],
+        warehouse_id: Optional[int],
+        region_id: Optional[int],
+    ) -> Optional[ForecastRecommendationRecord]:
+        """
+        Pick the best matching recommendation row for the requested business scope.
+        """
+        if not recommendations:
+            return None
+
+        scored_matches: List[tuple[int, ForecastRecommendationRecord]] = []
+
+        for record in recommendations:
+            score = 0
+
+            if product_id is not None and record.product_id == product_id:
+                score += 8
+            if store_id is not None and record.store_id == store_id:
+                score += 4
+            if warehouse_id is not None and record.warehouse_id == warehouse_id:
+                score += 4
+            if region_id is not None and record.region_id == region_id:
+                score += 2
+
+            scored_matches.append((score, record))
+
+        scored_matches.sort(key=lambda item: item[0], reverse=True)
+
+        best_score, best_record = scored_matches[0]
+        if best_score == 0:
+            return recommendations[0]
+
+        return best_record
+
+    def _build_forecast_payload(
+        self,
+        *,
+        overview: ForecastOverview,
+        matched_record: Optional[ForecastRecommendationRecord],
+        product_id: Optional[int],
+        store_id: Optional[int],
+        warehouse_id: Optional[int],
+        region_id: Optional[int],
+        horizon_days: int,
+    ) -> Dict[str, Any]:
+        """
+        Build normalized forecast payload for AnalyticsAgent.
+        """
+        forecast_units = (
+            matched_record.predicted_units
+            if matched_record is not None and matched_record.predicted_units is not None
+            else overview.mean_predicted_units
+        )
+
+        lower_bound: Optional[float] = None
+        upper_bound: Optional[float] = None
+
+        if forecast_units is not None:
+            lower_bound = round(float(forecast_units) * 0.90, 2)
+            upper_bound = round(float(forecast_units) * 1.10, 2)
+
+        confidence_score: Optional[float] = None
+        if matched_record is not None and matched_record.expected_service_level is not None:
+            confidence_score = round(float(matched_record.expected_service_level), 4)
+
+        return {
+            "forecast_units": forecast_units,
+            "forecast_lower_bound": lower_bound,
+            "forecast_upper_bound": upper_bound,
+            "confidence_score": confidence_score,
+            "model_name": overview.model_name,
+            "model_version": overview.model_version,
+            "product_id": product_id,
+            "store_id": store_id,
+            "warehouse_id": warehouse_id,
+            "region_id": region_id,
+            "horizon_days": horizon_days,
+            "forecast_output_path": overview.forecast_output_path,
+        }
+
+    def _build_recommendation_payload(
+        self,
+        *,
+        matched_record: ForecastRecommendationRecord,
+    ) -> Dict[str, Any]:
+        """
+        Build normalized recommendation payload for AnalyticsAgent.
+        """
+        return {
+            "recommended_order_qty": matched_record.recommended_order_qty,
+            "recommended_transfer_qty": 0,
+            "priority_level": matched_record.priority,
+            "reason_code": matched_record.reason_code,
+            "reason_text": matched_record.reason_text,
+            "expected_stockout_risk": matched_record.stockout_risk_score,
+            "expected_service_level": matched_record.expected_service_level,
+            "coverage_ratio": matched_record.coverage_ratio,
+            "days_of_cover_post_replenishment": matched_record.days_of_cover_post_replenishment,
+            "recommended_action": matched_record.recommended_action,
+            "product_id": matched_record.product_id,
+            "store_id": matched_record.store_id,
+            "warehouse_id": matched_record.warehouse_id,
+            "region_id": matched_record.region_id,
+            "supplier_id": matched_record.supplier_id,
+            "supplier_name": matched_record.supplier_name,
+            "lead_time_days_avg": matched_record.lead_time_days_avg,
+        }  
+
     def healthcheck(self) -> Dict[str, Any]:
         return {
             "service": "forecast_service",
