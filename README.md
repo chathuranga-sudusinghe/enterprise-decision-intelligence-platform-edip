@@ -268,6 +268,8 @@ ENTERPRISE_DECISION_INTELLIGENCE_PLATFORM_EDIP/
 - TypeScript
 - shadcn/ui
 
+Frontend: `http://localhost:3000`
+
 ### Data / Workflow / Infrastructure
 - Kafka
 - Airflow
@@ -322,6 +324,87 @@ Returns structured business workflow outputs such as:
 - workflow_overview
 - debug
 
+## Testing
+
+The project includes both integration and unit testing coverage.
+
+### Integration Tests
+
+- Workflow API tests
+- Forecast API tests
+- RAG API tests
+- RAG retrieval tests
+- Kafka end-to-end related tests
+- Kafka event generation tests
+
+### Unit Tests
+
+- Event processing service tests
+- Forecast service tests
+- Kafka producer and consumer tests
+- RAG query service tests
+- RAG generation service tests
+
+Example test run:
+
+```bash
+pytest
+```
+## Monitoring and Observability
+
+EDIP includes observability-oriented assets for production readiness.
+
+### Monitoring Stack
+
+- Prometheus configuration
+- Grafana dashboards
+- Alerting configuration
+- Metrics integration in the backend
+
+This supports system visibility, operational monitoring, and enterprise deployment maturity.
+
+---
+
+## Deployment Direction
+
+EDIP is designed with an enterprise deployment path in mind.
+
+### Included Deployment-Oriented Assets
+
+- Dockerfile
+- Docker Compose setup
+- Kubernetes manifests
+- Terraform structure for AWS and local-k8s
+- CI workflow files
+- Monitoring configuration
+
+This project is positioned not only as an AI prototype, but as a production-oriented enterprise AI system.
+
+---
+
+## Why This Project Matters
+
+EDIP demonstrates more than isolated model development. It shows how enterprise AI systems can connect:
+
+- Business problem framing
+- Enterprise knowledge retrieval
+- Grounded reasoning
+- Forecasting and analytics
+- Operational recommendation logic
+- API delivery
+- Frontend interaction
+- Testing
+- Observability
+- Deployment direction
+
+This makes the project highly relevant for roles such as:
+
+- AI/ML Systems Engineer
+- Enterprise AI Engineer
+- Generative AI / RAG Engineer
+- Applied AI Engineer
+- Production ML / MLOps Engineer
+
 ---
 ## Author
 
@@ -330,3 +413,8 @@ AI Systems Engineer | Generative AI & LLM Architect | Production ML & MLOps | De
 
 Linkedin: https://www.linkedin.com/in/chathuranga-sudusinghe
 GutHub: https://github.com/chathuranga-sudusinghe
+
+---
+## Final Project Statement
+
+**Enterprise Decision Intelligence Platform (EDIP)** is a production-oriented enterprise AI decision system that unifies business data, grounds LLM reasoning with retrieval, orchestrates multi-agent workflows, combines predictive analytics with prescriptive decision support, and delivers explainable business outputs through APIs, UI, testing, monitoring, and deployment-oriented engineering.
