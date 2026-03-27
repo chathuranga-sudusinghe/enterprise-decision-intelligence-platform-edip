@@ -1,5 +1,44 @@
 # Enterprise Decision Intelligence Platform (EDIP)
 
+> Full AI Production System: RAG + Multi-Agent Workflow + Forecasting + Replenishment Recommendation + FastAPI + React/Next.js UI + Kafka Event Simulation + Airflow Orchestration + Monitoring + CI/CD + Kubernetes + Terraform
+
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-API-green)
+![XGBoost](https://img.shields.io/badge/XGBoost-Forecasting-orange)
+![RAG](https://img.shields.io/badge/RAG-Grounded%20Reasoning-purple)
+![Agents](https://img.shields.io/badge/Multi--Agent-Workflow-red)
+![Kafka](https://img.shields.io/badge/Kafka-Event%20Simulation-black)
+![Airflow](https://img.shields.io/badge/Airflow-Orchestration-darkred)
+![Docker](https://img.shields.io/badge/Docker-Containerized-blue)
+![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-orange)
+![Grafana](https://img.shields.io/badge/Grafana-Dashboards-yellow)
+![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-brightgreen)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-Deployment-326ce5)
+![Terraform](https://img.shields.io/badge/Terraform-IaC-623ce4)
+
+## Live Endpoints
+
+### Local API Docs
+- Swagger UI: `http://127.0.0.1:8000/docs`
+
+### Core Endpoints
+- Health: `GET /health`
+- Metrics: `GET /metrics`
+
+### RAG
+- Health: `GET /rag/health`
+- Query: `POST /rag/query`
+
+### Forecast
+- Health: `GET /forecast/health`
+- Overview: `GET /forecast/overview`
+- Recommendations: `GET /forecast/recommendations`
+- Forecast Response: `GET /forecast`
+
+### Agent Workflow
+- Health: `GET /agents/workflow/health`
+- Run Workflow: `POST /agents/workflow/run`
+  
 ## Business Problem Solved
 
 Modern enterprises often struggle with fragmented data, slow decision cycles, policy-heavy operations, and weak connections between analytics and action. In many organizations, business teams can access dashboards and reports, but still cannot quickly answer high-value operational questions such as:
@@ -338,3 +377,12 @@ Returns structured business workflow outputs such as:
 - recommendation_summary
 - workflow_overview
 - debug
+
+---
+## Author
+
+Chathuranga Sudusinghe  
+AI Systems Engineer | Generative AI & LLM Architect | Production ML & MLOps | Decision-Centric AI Systems
+
+Linkedin: https://www.linkedin.com/in/chathuranga-sudusinghe
+GutHub: https://github.com/chathuranga-sudusinghe
