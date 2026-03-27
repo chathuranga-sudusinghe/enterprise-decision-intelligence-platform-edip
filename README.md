@@ -2,90 +2,116 @@
 
 ## Business Problem Solved
 
-Enterprises often struggle with fragmented data, slow decision cycles, policy-heavy workflows, and weak links between analytics and action. EDIP solves this by combining grounded enterprise retrieval, AI reasoning, predictive analytics, and business-ready recommendations in one system.
+Modern enterprises often struggle with fragmented data, slow decision cycles, policy-heavy operations, and weak connections between analytics and action. In many organizations, business teams can access dashboards and reports, but still cannot quickly answer high-value operational questions such as:
 
-This project focuses on a practical enterprise use case:
+- Why was urgent replenishment recommended?
+- Is this location at high stockout risk next week?
+- Should the store reorder inventory or transfer stock from another location?
+- Which business policy or operational context supports this recommendation?
+
+The result is delayed action, inconsistent decisions, and limited trust in enterprise analytics systems.
+
+**Enterprise Decision Intelligence Platform (EDIP)** solves this problem by combining enterprise retrieval, grounded AI reasoning, forecasting signals, and decision-oriented recommendations in one production-oriented system.
+
+This project is built around a practical enterprise use case:
 
 **Demand Forecasting + Inventory Decision Support for NorthStar Retail & Distribution**
-
-EDIP helps answer business questions such as:
-- Why was urgent replenishment recommended?
-- Is there a high stockout risk next week?
-- Should a store reorder stock or transfer it from another location?
 
 ---
 
 ## System Overview
 
-EDIP is a production-oriented enterprise AI system that combines:
+EDIP is a production-oriented enterprise AI system designed to support real business decision workflows. It combines:
 
 - **RAG + LLM reasoning** for grounded business explanations
-- **Multi-agent orchestration** for controlled workflow execution
-- **Predictive and prescriptive analytics** for demand and replenishment decisions
-- **Business-facing APIs and UI** for operational use
-- **Testing, governance, and deployment readiness** for enterprise delivery
+- **Multi-agent orchestration** for structured decision workflow execution
+- **Predictive and prescriptive analytics** for forecasting and replenishment support
+- **Business-facing APIs and UI** for operational access
+- **Testing, observability, and deployment readiness** for enterprise delivery
 
-The current decision flow is:
+At a high level, EDIP transforms enterprise data and knowledge into explainable business recommendations.
+
+### Current Decision Flow
 
 **Planner → Retrieval → Reasoning → Analytics → Execution**
 
-### Current workflow behavior
+### Workflow Behavior
 
-1. A business user asks a decision-oriented question.
-2. The **Planner Agent** detects the task type and required workflow path.
-3. The **Retrieval Agent** gathers relevant enterprise knowledge and document context.
-4. The **Reasoning Agent** interprets the request using grounded business evidence.
-5. The **Analytics Agent** runs forecast and recommendation logic when needed.
-6. The **Execution Agent** converts the result into a business-facing recommendation or explanation.
+1. A business user submits a decision-oriented request.
+2. The **Planner Agent** identifies the task type and required workflow path.
+3. The **Retrieval Agent** gathers relevant enterprise documents, policy context, and business knowledge.
+4. The **Reasoning Agent** interprets the request using grounded evidence.
+5. The **Analytics Agent** adds forecast and recommendation logic when numerical support is needed.
+6. The **Execution Agent** converts the result into a business-facing response.
 7. The system returns structured outputs through API and frontend UI.
+
+This design helps bridge the gap between raw enterprise data, knowledge retrieval, analytical reasoning, and operational action.
 
 ---
 
 ## Official Demo Scenarios
 
-### 1. Urgent Replenishment
-**Question:** Why was urgent replenishment recommended for SKU-100245 at store 210?
+The project currently demonstrates three official enterprise decision scenarios.
 
-**Purpose:**  
-Shows the strongest end-to-end scenario with grounded explanation, forecast summary, and prescriptive replenishment recommendation.
+### 1) Urgent Replenishment
 
-### 2. High Stockout Risk
-**Question:** Is there a high stockout risk for SKU-100245 at store 210 next week?
+**Question:**  
+Why was urgent replenishment recommended for SKU-100245 at store 210?
 
-**Purpose:**  
-Shows risk-focused decision support using enterprise context plus analytical signals.
+**What this demonstrates:**  
+This is the strongest end-to-end EDIP scenario. It shows how the system combines retrieval, grounded reasoning, forecast signals, and prescriptive recommendation logic to explain why immediate replenishment is required.
 
-### 3. Reorder vs Transfer
-**Question:** Should store 210 reorder SKU-100245 or transfer stock from another location?
+---
 
-**Purpose:**  
-Shows action-choice decisioning where the system recommends the better operational action.
+### 2) High Stockout Risk
+
+**Question:**  
+Is there a high stockout risk for SKU-100245 at store 210 next week?
+
+**What this demonstrates:**  
+This scenario shows risk-focused decision support using business context, forecast-related signals, and structured explanation output.
+
+---
+
+### 3) Reorder vs Transfer
+
+**Question:**  
+Should store 210 reorder SKU-100245 or transfer stock from another location?
+
+**What this demonstrates:**  
+This scenario shows action-choice decision intelligence, where the system recommends the better operational action based on business context and decision logic.
 
 ---
 
 ## Architecture
 
-### 1. Unified Data Layer
-Enterprise structured and unstructured data is unified for downstream decision intelligence.
+EDIP is designed as a layered enterprise AI system.
 
-**Planned / used components**
-- Snowflake
-- Kafka
-- batch / connector-driven ingestion
-- normalized enterprise data model
+### 1. Unified Data Layer
+
+Structured and semi-structured enterprise data is unified to support downstream decision intelligence.
+
+**Used / planned components**
+- synthetic enterprise data foundation
+- normalized business entities and fact tables
+- forecasting input datasets
+- Kafka event payload exports
+- enterprise document sources
 
 ### 2. RAG + LLM Layer
-Business knowledge is embedded, indexed, retrieved, and used for grounded reasoning.
+
+Enterprise policies, SOPs, reviews, and knowledge assets are embedded, indexed, retrieved, and used for grounded reasoning.
 
 **Core components**
 - OpenAI
 - Pinecone
-- enterprise documents
-- retrieval pipelines
-- embeddings pipeline
+- RAG ingestion pipeline
+- metadata schema and chunking pipeline
+- enterprise markdown document corpus
 
 ### 3. AI Agent Orchestration Layer
-The workflow is controlled through modular enterprise agents.
+
+The decision workflow is controlled through modular agents with clearly separated responsibilities.
 
 **Agents**
 - Planner Agent
@@ -95,24 +121,26 @@ The workflow is controlled through modular enterprise agents.
 - Execution Agent
 
 ### 4. Predictive + Prescriptive Analytics Layer
-This layer adds numerical forecasting and decision support beyond language reasoning.
+
+EDIP goes beyond language generation by adding business analytics and decision logic.
 
 **Core functions**
 - demand forecasting
-- replenishment recommendation
 - stockout risk support
-- decision-oriented structured outputs
+- replenishment recommendation logic
+- structured business outputs for action support
 
 ### 5. API + Frontend Layer
-This is the business-facing surface of EDIP.
+
+This layer provides the business-facing interaction surface.
 
 **Backend**
 - FastAPI
 
 **Frontend**
-- React / Next.js
+- React / Next.js / TypeScript
 
-The frontend currently displays:
+**Current frontend workflow display**
 - Why
 - Decision
 - Forecast Summary
@@ -121,110 +149,95 @@ The frontend currently displays:
 - Debug Payload
 
 ### 6. Workflow Orchestration Layer
-EDIP also includes batch/scheduled workflow capability.
+
+EDIP also includes scheduled and orchestration-ready workflow capability.
 
 **Orchestration**
 - Airflow
 
 ### 7. Production Engineering Layer
-The project is designed with enterprise deployment direction.
 
-**Production stack direction**
-- Docker
-- Kubernetes
-- GitHub Actions
-- Terraform
-- monitoring / logging
-- governance / auditability
+The system is designed with deployment, monitoring, and infrastructure management in mind.
 
----
-
-## Tech Stack
-
-### Core AI / Decision System
-- Python
-- FastAPI
-- OpenAI
-- Pinecone
-- multi-agent workflow design
-
-### Analytics
-- Python forecasting / recommendation workflow
-- scikit-learn style ML layer
-- predictive + prescriptive decision logic
-
-### Frontend
-- React
-- Next.js
-- TypeScript
-- shadcn/ui
-- Framer Motion
-
-### Data / Orchestration / Infra
-- Snowflake
-- Kafka
-- Airflow
+**Production-oriented components**
 - Docker
 - Kubernetes
 - Terraform
 - GitHub Actions
+- Prometheus
+- Grafana
+- logging, monitoring, and governance direction
 
 ---
 
-## Current Project Status
+## Core Capabilities
 
-### Completed
-- Agent workflow API is working
-- Frontend workflow UI is working
-- Official demo scenarios are working
-- Urgent replenishment scenario is stable
-- Stockout risk scenario is working
-- Reorder vs transfer scenario is working
-- Integration tests for the workflow API are passing
+EDIP is designed to support enterprise decision intelligence through the following capabilities:
 
-### Current validated flow
-- backend API working
-- frontend UI working
-- manual demo validation completed
-- official workflow API tests passed
+- grounded business question answering
+- retrieval-based enterprise reasoning
+- demand forecasting support
+- replenishment recommendation support
+- explainable decision responses
+- multi-agent workflow orchestration
+- API-based enterprise integration
+- business-facing frontend interaction
+- monitoring and deployment readiness
 
 ---
 
-## API Endpoints
+## Repository Structure
 
-### Health
-`GET /agents/workflow/health`
-
-### Run full workflow
-`POST /agents/workflow/run`
-
-This endpoint returns a structured response including:
-- `business_answer`
-- `decision_summary`
-- `forecast_summary`
-- `recommendation_summary`
-- `workflow_overview`
-- `debug`
-
----
-
-## Example Official Demo Payload
-
-```json
-{
-  "question": "Why was urgent replenishment recommended for SKU-100245 at store 210?",
-  "user_role": "planner",
-  "region_scope": "west",
-  "product_id": 100245,
-  "store_id": 210,
-  "warehouse_id": 12,
-  "region_id": 3,
-  "horizon_days": 7,
-  "include_recommendations": true,
-  "require_approval": false,
-  "metadata": {
-    "source": "official_demo",
-    "scenario": "urgent_replenishment",
-    "channel": "frontend"
-  }
-}
+```text
+ENTERPRISE_DECISION_INTELLIGENCE_PLATFORM_EDIP/
+├── app/
+│   ├── agents/                  # Planner, Retrieval, Reasoning, Analytics, Execution agents
+│   ├── api/                     # FastAPI routers
+│   ├── core/                    # Config, logging, metrics, monitoring
+│   ├── schemas/                 # API request/response schemas
+│   ├── services/                # Workflow, forecast, RAG, event-processing services
+│   └── main.py                  # FastAPI application entry point
+├── artifacts/
+│   ├── forecasts/               # Forecast and recommendation outputs
+│   ├── models/                  # Trained model artifacts and schema files
+│   └── reports/                 # Evaluation and validation reports
+├── configs/                     # Kafka schema, RAG config, metadata schema
+├── data/
+│   ├── exports/                 # Kafka event exports
+│   ├── processed/               # Processed datasets
+│   ├── raw/                     # Raw datasets
+│   └── synthetic/               # Generated synthetic enterprise data
+├── database/
+│   ├── ddl/                     # Database DDL files
+│   ├── dml/                     # DML / loading logic
+│   ├── migrations/              # Migration placeholders / files
+│   └── seeds/                   # Seed placeholders / files
+├── docs/
+│   ├── policies/                # Policy documents
+│   ├── rag_source/              # RAG knowledge sources
+│   ├── reviews/                 # Business review documents
+│   └── sops/                    # Standard operating procedures
+├── infra/
+│   ├── docker/                  # Docker-related infra assets
+│   ├── k8s/                     # Kubernetes manifests
+│   └── terraform/               # Terraform for AWS and local-k8s
+├── monitoring/
+│   ├── grafana/                 # Grafana dashboards and provisioning
+│   └── prometheus/              # Prometheus configuration
+├── pipelines/
+│   ├── airflow_dags/            # Airflow orchestration DAGs
+│   ├── etl/                     # Training dataset build pipeline
+│   ├── features/                # Feature engineering
+│   ├── inference/               # Forecast scoring and recommendations
+│   └── training/                # Forecast model train/evaluate pipelines
+├── scripts/                     # Data generation, RAG, Kafka, and demo scripts
+├── tests/
+│   ├── integration/             # API and workflow integration tests
+│   └── unit/                    # Service and component unit tests
+├── ui/                          # Next.js frontend
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+├── requirements-dev.txt
+├── requirements_full.txt
+└── README.md
