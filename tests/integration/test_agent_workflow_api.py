@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-import os
-import pytest
 
 client = TestClient(app)
 
@@ -78,14 +79,29 @@ def assert_common_workflow_response(data: dict) -> None:
     assert "forecast_summary" in data
     assert "recommendation_summary" in data
 
+    business_answer = data["business_answer"]
     decision_summary = data["decision_summary"]
     forecast_summary = data["forecast_summary"]
     recommendation_summary = data["recommendation_summary"]
 
+    assert isinstance(business_answer, dict)
+    assert isinstance(decision_summary, dict)
+    assert isinstance(forecast_summary, dict)
+    assert isinstance(recommendation_summary, dict)
+
+    decision = business_answer.get("decision")
+    final_message = decision_summary.get("final_message")
+
     assert decision_summary["status"] == "ready"
     assert decision_summary["output_type"] == "recommendation"
-    assert isinstance(decision_summary.get("final_message"), str)
-    assert decision_summary["final_message"].strip() != ""
+
+    assert decision is not None
+    assert isinstance(decision, str)
+    assert decision.strip() != ""
+
+    assert final_message is not None
+    assert isinstance(final_message, str)
+    assert final_message.strip() != ""
 
     assert "forecast_units" in forecast_summary
     assert "forecast_lower_bound" in forecast_summary
@@ -114,7 +130,32 @@ def test_agent_workflow_health() -> None:
 
 # =========================================================
 # Official demo tests
+# Skip in GitHub Actions CI because these depend on external Pinecone access
 # =========================================================
+@pytest.mark.skipif(
+    os.getenv("CI") == "true",
+    reason="Skipped in GitHub Actions CI because it depends on external Pinecone access.",
+)
+def test_agent_workflow_urgent_replenishment_demo() -> None:
+    """Official urgent replenishment demo should return a valid recommendation."""
+    response = client.post(
+        "/agents/workflow/run",
+        json=URGENT_REPLENISHMENT_PAYLOAD,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert_common_workflow_response(data)
+
+    decision = data["business_answer"].get("decision")
+    assert decision is not None
+    assert "reorder" in decision.lower()
+
+    assert data["recommendation_summary"]["recommended_order_qty"] is not None
+    assert data["recommendation_summary"]["reason_code"] is not None
+
+
 @pytest.mark.skipif(
     os.getenv("CI") == "true",
     reason="Skipped in GitHub Actions CI because it depends on external Pinecone access.",
@@ -135,6 +176,11 @@ def test_agent_workflow_stockout_risk_demo() -> None:
     assert data["recommendation_summary"]["priority_level"] is not None
     assert data["recommendation_summary"]["reason_code"] is not None
 
+
+@pytest.mark.skipif(
+    os.getenv("CI") == "true",
+    reason="Skipped in GitHub Actions CI because it depends on external Pinecone access.",
+)
 def test_agent_workflow_reorder_vs_transfer_demo() -> None:
     """Official reorder-vs-transfer demo should return a clear action recommendation."""
     response = client.post(
@@ -147,11 +193,17 @@ def test_agent_workflow_reorder_vs_transfer_demo() -> None:
     data = response.json()
     assert_common_workflow_response(data)
 
-    decision_text = data["business_answer"]["decision"].lower()
-    final_message = data["decision_summary"]["final_message"].lower()
+    decision = data["business_answer"].get("decision")
+    final_message = data["decision_summary"].get("final_message")
+
+    assert decision is not None
+    assert final_message is not None
+
+    decision_text = decision.lower()
+    final_message_text = final_message.lower()
 
     assert "reorder" in decision_text or "transfer" in decision_text
-    assert "reorder" in final_message or "transfer" in final_message
+    assert "reorder" in final_message_text or "transfer" in final_message_text
 
     assert data["recommendation_summary"]["recommended_order_qty"] is not None
     assert data["recommendation_summary"]["recommended_transfer_qty"] is not None
