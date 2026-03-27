@@ -1,0 +1,47 @@
+# k8s/api-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edip-api
+  namespace: edip
+  labels:
+    app: edip-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edip-api
+  template:
+    metadata:
+      labels:
+        app: edip-api
+    spec:
+      containers:
+        - name: edip-api
+          image: chathurangasudusinghe/edip-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 20

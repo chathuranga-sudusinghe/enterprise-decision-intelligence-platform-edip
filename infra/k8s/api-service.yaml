@@ -1,0 +1,15 @@
+# k8s/api-service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: edip-api
+  namespace: edip
+spec:
+  selector:
+    app: edip-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

@@ -1,5 +1,3 @@
-# scripts\build_rag_metadata.py
-
 from __future__ import annotations
 
 import logging
@@ -8,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.core.monitoring import record_forecast_request
 from app.services.forecast_service import ForecastService, build_forecast_service
 
 
@@ -67,9 +66,12 @@ def forecast_health() -> Dict[str, Any]:
     """
     try:
         service = get_forecast_service()
-        return service.healthcheck()
+        result = service.healthcheck()
+        record_forecast_request(status="success")
+        return result
     except Exception as exc:
         logger.exception("Forecast healthcheck failed.")
+        record_forecast_request(status="server_error")
         raise HTTPException(
             status_code=500,
             detail=f"Forecast healthcheck failed: {exc}",
@@ -84,9 +86,11 @@ def get_forecast_overview() -> Dict[str, Any]:
     try:
         service = get_forecast_service()
         overview = service.get_forecast_overview()
+        record_forecast_request(status="success")
         return to_dict(overview)
     except Exception as exc:
         logger.exception("Failed to load forecast overview.")
+        record_forecast_request(status="server_error")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to load forecast overview: {exc}",
@@ -118,6 +122,8 @@ def get_forecast_recommendations(
             action_only=action_only,
         )
 
+        record_forecast_request(status="success")
+
         return {
             "count": len(recommendations),
             "top_n": top_n,
@@ -125,8 +131,19 @@ def get_forecast_recommendations(
             "action_only": action_only,
             "recommendations": to_dict(recommendations),
         }
+    except ValueError as exc:
+        logger.warning("Invalid forecast recommendations request: %s", exc)
+        record_forecast_request(status="client_error")
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+    except HTTPException:
+        record_forecast_request(status="client_error")
+        raise
     except Exception as exc:
         logger.exception("Failed to load forecast recommendations.")
+        record_forecast_request(status="server_error")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to load forecast recommendations: {exc}",
@@ -158,9 +175,21 @@ def get_forecast_response(
             action_only=action_only,
         )
 
+        record_forecast_request(status="success")
         return to_dict(response)
+    except ValueError as exc:
+        logger.warning("Invalid forecast response request: %s", exc)
+        record_forecast_request(status="client_error")
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+    except HTTPException:
+        record_forecast_request(status="client_error")
+        raise
     except Exception as exc:
         logger.exception("Failed to load combined forecast response.")
+        record_forecast_request(status="server_error")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to load combined forecast response: {exc}",

@@ -1,5 +1,3 @@
-# app\agents\planner_agent.py
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -157,6 +155,8 @@ class PlannerAgent:
             "scenario",
             "what-if",
             "recommendation",
+            "reorder",
+            "transfer",
         }
 
         rag_keywords = {
@@ -187,12 +187,26 @@ class PlannerAgent:
             "run workflow",
         }
 
+        decision_choice_patterns = [
+            "reorder or transfer",
+            "reorder vs transfer",
+            "transfer stock",
+            "another location",
+            "should store",
+            "should we reorder",
+            "should we transfer",
+        ]
+
         has_analytics = any(keyword in question for keyword in analytics_keywords)
         has_rag = any(keyword in question for keyword in rag_keywords)
         has_execution = any(keyword in question for keyword in execution_keywords)
+        has_decision_choice = any(pattern in question for pattern in decision_choice_patterns)
 
         if has_execution:
             return TaskType.EXECUTION
+
+        if has_decision_choice:
+            return TaskType.HYBRID
 
         if has_analytics and has_rag:
             return TaskType.HYBRID
@@ -242,8 +256,15 @@ class PlannerAgent:
         Detect business knowledge domains that may be relevant for retrieval.
         """
         domain_keywords = {
-            "replenishment": ["replenishment", "stock", "inventory", "warehouse"],
-            "forecasting": ["forecast", "prediction", "demand", "trend"],
+            "replenishment": [
+                "replenishment",
+                "reorder",
+                "stock",
+                "inventory",
+                "warehouse",
+                "transfer",
+            ],
+            "forecasting": ["forecast", "prediction", "demand", "trend", "next week"],
             "pricing": ["price", "discount", "promotion"],
             "supplier": ["supplier", "lead time", "shipment", "sla"],
             "governance": ["approval", "policy", "escalation", "override", "audit"],
@@ -275,6 +296,10 @@ class PlannerAgent:
 
         if task_type == TaskType.EXECUTION:
             notes.append("Execution requests should pass governance and approval checks first.")
+
+        normalized_domains = {domain.lower() for domain in knowledge_domains}
+        if "replenishment" in normalized_domains and "sales" not in normalized_domains:
+            notes.append("Decision should compare replenishment choices against operational stock position.")
 
         return notes
 

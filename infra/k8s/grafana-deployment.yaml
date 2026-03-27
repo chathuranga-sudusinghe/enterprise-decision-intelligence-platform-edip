@@ -1,0 +1,70 @@
+# infra/k8s/grafana-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: edip
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: admin
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: admin
+          volumeMounts:
+            # Prometheus datasource config
+            - name: grafana-datasource-volume
+              mountPath: /etc/grafana/provisioning/datasources
+
+            # Dashboard provisioning config
+            - name: grafana-dashboard-provisioning-volume
+              mountPath: /etc/grafana/provisioning/dashboards
+
+            # Alerting provisioning config
+            - name: grafana-alerting-volume
+              mountPath: /etc/grafana/provisioning/alerting
+
+            # Dashboard JSON files
+            - name: grafana-dashboard-json-volume
+              mountPath: /var/lib/grafana/dashboards
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "192Mi"
+            limits:
+              cpu: "300m"
+              memory: "384Mi"
+
+      volumes:
+        - name: grafana-datasource-volume
+          configMap:
+            name: grafana-datasource-config
+
+        - name: grafana-dashboard-provisioning-volume
+          configMap:
+            name: grafana-dashboard-provisioning-config
+
+        - name: grafana-alerting-volume
+          configMap:
+            name: grafana-alerting-config
+
+        - name: grafana-dashboard-json-volume
+          configMap:
+            name: grafana-dashboard-json-config

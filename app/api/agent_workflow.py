@@ -1,13 +1,11 @@
-# app/api/agent_workflow.py
-
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
-from unittest import result
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.core.monitoring import record_workflow_error, record_workflow_run
 from app.services.agent_workflow_service import (
     AgentWorkflowRequest,
     AgentWorkflowService,
@@ -101,6 +99,7 @@ class AgentWorkflowHealthResponse(BaseModel):
         description="Optional diagnostic details.",
     )
 
+
 class RagRetrievalAdapter:
     """
     Temporary adapter to make RagQueryService compatible with
@@ -127,7 +126,7 @@ class RagRetrievalAdapter:
             )
 
         if hasattr(self.rag_query_service, "answer_question"):
-            result = self.rag_query_service.answer_question(
+            rag_result = self.rag_query_service.answer_question(
                 question,
                 top_k=top_k,
                 metadata_filter=metadata_filter,
@@ -135,7 +134,7 @@ class RagRetrievalAdapter:
             )
 
             normalized_matches: list[dict] = []
-            sources = getattr(result, "sources", []) or []
+            sources = getattr(rag_result, "sources", []) or []
 
             for source in sources:
                 metadata = {
@@ -164,6 +163,7 @@ class RagRetrievalAdapter:
             "RAG service does not expose retrieve_context(...) or answer_question(...)."
         )
 
+
 # =========================================================
 # Dependency builders
 # =========================================================
@@ -180,6 +180,39 @@ def get_agent_workflow_service() -> AgentWorkflowService:
         retrieval_service=retrieval_service,
         forecast_service=forecast_service,
     )
+
+
+# =========================================================
+# Monitoring helpers
+# =========================================================
+def _extract_scenario(metadata: Dict[str, Any]) -> str:
+    """
+    Extract workflow scenario safely from request metadata.
+    """
+    scenario = metadata.get("scenario")
+    if isinstance(scenario, str) and scenario.strip():
+        return scenario.strip()
+    return "unknown"
+
+
+def _extract_workflow_status(result: Dict[str, Any]) -> str:
+    """
+    Extract final workflow status safely from the workflow result.
+    """
+    decision_summary = result.get("decision_summary", {}) or {}
+    status_value = decision_summary.get("status")
+
+    if isinstance(status_value, str) and status_value.strip():
+        return status_value.strip()
+
+    execution_result = result.get("execution_result", {}) or {}
+    execution_status = execution_result.get("status")
+
+    if isinstance(execution_status, str) and execution_status.strip():
+        return execution_status.strip()
+
+    return "unknown"
+
 
 # =========================================================
 # Routes
@@ -199,7 +232,6 @@ def agent_workflow_health() -> AgentWorkflowHealthResponse:
     forecast_ready = False
     workflow_ready = False
 
-# Try to build each service and capture any exceptions to report in the health details.
     try:
         rag_query_service = build_rag_query_service()
         retrieval_ready = True
@@ -240,9 +272,7 @@ def agent_workflow_health() -> AgentWorkflowHealthResponse:
         details=details,
     )
 
-# Note: The main workflow execution route is defined in the main.py file to avoid circular import issues with the service implementations. 
-# The service implementations may need to import the request/response schemas defined here, so we keep the route definition in main.py where 
-# we can directly call the service without importing the entire API module.
+
 @router.post(
     "/run",
     status_code=status.HTTP_200_OK,
@@ -251,6 +281,8 @@ def run_agent_workflow(request: AgentWorkflowRunRequest) -> Dict[str, Any]:
     """
     Run one full EDIP agent workflow and return the serialized summary.
     """
+    scenario = _extract_scenario(request.metadata)
+
     try:
         service = get_agent_workflow_service()
 
@@ -270,24 +302,40 @@ def run_agent_workflow(request: AgentWorkflowRunRequest) -> Dict[str, Any]:
 
         result = service.run_workflow(workflow_request)
 
-        reasoning_result = result.get("reasoning_result", {})
-        execution_result = result.get("execution_result", {})
+        reasoning_result = result.get("reasoning_result", {}) or {}
+        execution_result = result.get("execution_result", {}) or {}
 
         result["business_answer"] = {
-        "why": reasoning_result.get("reasoning_summary"),
-        "decision": execution_result.get("final_message"),
-        "recommendations": execution_result.get("recommendations"),
+            "why": reasoning_result.get("reasoning_summary"),
+            "decision": execution_result.get("final_message"),
+            "recommendations": execution_result.get("recommendations"),
         }
+
+        workflow_status = _extract_workflow_status(result)
+        record_workflow_run(
+            scenario=scenario,
+            status=workflow_status,
+        )
 
         return result
 
     except ValueError as exc:
+        record_workflow_run(
+            scenario=scenario,
+            status="client_error",
+        )
+        record_workflow_error(scenario=scenario)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
 
     except Exception as exc:
+        record_workflow_run(
+            scenario=scenario,
+            status="server_error",
+        )
+        record_workflow_error(scenario=scenario)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Agent workflow execution failed: {exc}",

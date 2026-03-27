@@ -203,11 +203,25 @@ class AnalyticsAgent:
         """
         Build a clean analytics request context for the forecast service.
         """
+        normalized_question = payload.question.lower()
+
+        action_choice_requested = any(
+            phrase in normalized_question
+            for phrase in [
+                "reorder or transfer",
+                "reorder vs transfer",
+                "transfer stock",
+                "another location",
+            ]
+        )
+
         context: Dict[str, Any] = {
             "question": payload.question,
             "task_type": payload.plan.task_type.value,
             "knowledge_domains": payload.plan.knowledge_domains,
             "notes": payload.plan.notes,
+            "decision_mode": "reorder_vs_transfer" if action_choice_requested else "standard",
+            "action_choice_requested": action_choice_requested,
         }
 
         if payload.reasoning_result is not None:

@@ -1,0 +1,95 @@
+name: EDIP Terraform CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+      - dev
+      - "feature/**"
+    paths:
+      - "infra/terraform/**"
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+      - dev
+    paths:
+      - "infra/terraform/**"
+  workflow_dispatch:
+
+jobs:
+  terraform-local-k8s:
+    name: Validate local-k8s Terraform
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: infra/terraform/local-k8s
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        run: terraform init -backend=false
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform validate
+        run: terraform validate
+
+  terraform-aws:
+    name: Validate AWS Terraform
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: infra/terraform/aws
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Create dummy tfvars
+        run: |
+          cat > terraform.tfvars <<EOF
+          project_name       = "edip"
+          environment        = "dev"
+          aws_region         = "ap-south-1"
+          app_image_tag      = "latest"
+          desired_count      = 1
+          app_name           = "EDIP API"
+          app_version        = "1.0.0"
+          app_env            = "production"
+          api_host           = "0.0.0.0"
+          api_port           = 8000
+          allowed_origins    = "*"
+          allow_credentials  = true
+          openai_api_key     = "dummy"
+          pinecone_api_key   = "dummy"
+          pinecone_index_name   = "edip-rag-index"
+          pinecone_namespace    = "edip-phase-6"
+          openai_embed_model    = "text-embedding-3-small"
+          openai_chat_model     = "gpt-4.1-mini"
+          rag_top_k             = 5
+          rag_max_context_chars = 12000
+          EOF
+
+      - name: Terraform init
+        run: terraform init -backend=false
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform validate
+        run: terraform validate
