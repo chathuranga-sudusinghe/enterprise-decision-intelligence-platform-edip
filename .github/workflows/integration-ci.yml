@@ -1,5 +1,3 @@
-# .github\workflows\integration-ci.yml
-
 name: EDIP Test CI
 
 on:
@@ -26,6 +24,7 @@ jobs:
     env:
       PYTHONUNBUFFERED: "1"
       PYTHONPATH: "."
+      CI: "true"
       OPENAI_API_KEY: "test-openai-key"
       PINECONE_API_KEY: "test-pinecone-key"
       PINECONE_INDEX_NAME: "test-index"
