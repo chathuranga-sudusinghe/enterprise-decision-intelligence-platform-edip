@@ -1,0 +1,29 @@
+name: EDIP Docker CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+      - dev
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+      - dev
+  workflow_dispatch:
+
+jobs:
+  docker-build:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t edip-api-ci:latest .

@@ -1,0 +1,15 @@
+# k8s/prometheus-service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: edip
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: 9090
+  type: ClusterIP

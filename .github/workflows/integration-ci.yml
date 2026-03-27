@@ -1,7 +1,8 @@
-name: EDIP CI Tests
+# .github\workflows\integration-ci.yml
+
+name: EDIP Test CI
 
 on:
-  # Run automatically on pushes to important branches
   push:
     branches:
       - main
@@ -9,28 +10,22 @@ on:
       - develop
       - dev
       - "feature/**"
-
-  # Run automatically on pull requests into important branches
   pull_request:
     branches:
       - main
       - master
       - develop
       - dev
-
-  # Allow manual run from GitHub Actions tab
   workflow_dispatch:
 
 jobs:
   test:
-    # Main CI job for automated test validation
     name: Run unit and integration tests
     runs-on: ubuntu-latest
 
-    # Dummy CI environment values for tests
-    # Do not put real production secrets here
     env:
       PYTHONUNBUFFERED: "1"
+      PYTHONPATH: "."
       OPENAI_API_KEY: "test-openai-key"
       PINECONE_API_KEY: "test-pinecone-key"
       PINECONE_INDEX_NAME: "test-index"
@@ -39,69 +34,46 @@ jobs:
       OPENAI_CHAT_MODEL: "gpt-4.1-mini"
       RAG_TOP_K: "5"
       RAG_MAX_CONTEXT_CHARS: "12000"
+      APP_NAME: "EDIP API"
+      APP_VERSION: "1.0.0"
+      APP_ENV: "test"
+      API_HOST: "127.0.0.1"
+      API_PORT: "8000"
+      ALLOW_CREDENTIALS: "true"
+      ALLOWED_ORIGINS: "http://localhost:3000"
 
     steps:
-      # Step 1: Check out repository code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
-      # Step 3: Upgrade pip
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      # Step 4: Install project dependencies
-      # First install from requirements files if they exist
-      # Then install core packages required by current tests/services
       - name: Install dependencies
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
 
-      # Step 5: Debug repository structure
-      - name: Debug repository structure
-        run: |
-          echo "Current working directory:"
-          pwd
-          echo ""
-          echo "Repository root contents:"
-          ls -la
-          echo ""
-          echo "Tests directory contents:"
-          ls -la tests || true
-          echo ""
-          echo "Unit tests directory contents:"
-          ls -la tests/unit || true
-          echo ""
-          echo "Integration tests directory contents:"
-          ls -la tests/integration || true
-
-      # Step 6: Run unit tests
       - name: Run unit tests
         run: |
           if [ -d tests/unit ]; then
-            pytest tests/unit -v
+            pytest tests/unit -v --maxfail=1
           else
             echo "tests/unit not found"
             exit 1
           fi
 
-      # Step 7: Run integration tests
       - name: Run integration tests
         run: |
           if [ -d tests/integration ]; then
-            pytest tests/integration -v
+            pytest tests/integration -v --maxfail=1
           else
             echo "tests/integration not found"
             exit 1
           fi
-
-      # Step 8: Run full suite
-      - name: Run full suite summary
-        run: pytest tests/unit tests/integration -v

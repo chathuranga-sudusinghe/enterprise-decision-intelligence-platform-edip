@@ -1,0 +1,20 @@
+# k8s/prometheus-configmap.yaml
+
+# k8s/grafana-datasource-configmap.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-config
+  namespace: edip
+data:
+  datasource.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: true

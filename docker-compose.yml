@@ -1,3 +1,5 @@
+# docker-compose.yml
+
 services:
   kafka: # Kafka broker
     image: apache/kafka:4.2.0
@@ -67,6 +69,40 @@ services:
       --host 0.0.0.0
       --port 8000
   
+  prometheus: # Prometheus metrics collector
+    image: prom/prometheus:latest
+    container_name: edip-prometheus
+    depends_on:
+      - api
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    restart: unless-stopped
+
+  grafana: # Grafana dashboard
+    image: grafana/grafana:latest
+    container_name: edip-grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+    restart: unless-stopped
+
   postgres: # PostgreSQL for Airflow metadata
     image: postgres:16
     container_name: edip-postgres
@@ -191,3 +227,5 @@ volumes:
   kafka_data:
   postgres_data:
   airflow_data:
+  prometheus_data:
+  grafana_data:

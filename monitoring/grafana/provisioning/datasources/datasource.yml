@@ -1,0 +1,13 @@
+# Grafana datasource provisioning
+# This automatically connects Grafana to Prometheus when Grafana starts.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true

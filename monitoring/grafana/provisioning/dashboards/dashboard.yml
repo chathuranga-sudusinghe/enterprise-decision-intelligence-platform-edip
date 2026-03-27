@@ -1,0 +1,15 @@
+# Grafana dashboard provisioning
+# This automatically loads dashboard JSON files from the mounted folder.
+
+apiVersion: 1
+
+providers:
+  - name: "EDIP Dashboards"
+    orgId: 1
+    folder: "EDIP"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

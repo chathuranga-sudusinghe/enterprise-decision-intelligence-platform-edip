@@ -1,3 +1,5 @@
+# app/api/rag.py
+
 from __future__ import annotations
 
 import logging
@@ -6,6 +8,7 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.core.monitoring import record_rag_request
 from app.schemas.rag import (
     RagHealthResponse,
     RagQueryRequest,
@@ -103,6 +106,8 @@ def query_rag(
             temperature=request.temperature,
         )
 
+        record_rag_request(status="success")
+
         return RagQueryResponse(
             question=result.question,
             answer=result.answer,
@@ -132,16 +137,19 @@ def query_rag(
 
     except ValueError as exc:
         logger.warning("Invalid RAG query request: %s", exc)
+        record_rag_request(status="client_error")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
 
     except HTTPException:
+        record_rag_request(status="client_error")
         raise
 
     except Exception as exc:
         logger.exception("Unexpected error while processing RAG query.")
+        record_rag_request(status="server_error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unexpected error while processing RAG query.",
