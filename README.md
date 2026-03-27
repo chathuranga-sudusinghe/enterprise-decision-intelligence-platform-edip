@@ -411,8 +411,8 @@ This makes the project highly relevant for roles such as:
 **Chathuranga Sudusinghe**  
 AI Systems Engineer | Generative AI & LLM Architect | Production ML & MLOps | Decision-Centric AI Systems
 
-LinkedIn: `https://www.linkedin.com/in/chathuranga-sudusinghe`  
-GitHub: `https://github.com/chathuranga-sudusinghe`
+LinkedIn: https://www.linkedin.com/in/chathuranga-sudusinghe  
+GitHub: https://github.com/chathuranga-sudusinghe
 ---
 ## Final Project Statement
 
