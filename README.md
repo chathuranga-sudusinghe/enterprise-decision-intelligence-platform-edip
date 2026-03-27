@@ -408,12 +408,11 @@ This makes the project highly relevant for roles such as:
 ---
 ## Author
 
-Chathuranga Sudusinghe  
+**Chathuranga Sudusinghe**  
 AI Systems Engineer | Generative AI & LLM Architect | Production ML & MLOps | Decision-Centric AI Systems
 
-Linkedin: https://www.linkedin.com/in/chathuranga-sudusinghe
-GutHub: https://github.com/chathuranga-sudusinghe
-
+LinkedIn: `https://www.linkedin.com/in/chathuranga-sudusinghe`  
+GitHub: `https://github.com/chathuranga-sudusinghe`
 ---
 ## Final Project Statement
 
