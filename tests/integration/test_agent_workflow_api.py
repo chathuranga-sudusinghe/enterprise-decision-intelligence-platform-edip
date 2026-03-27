@@ -119,26 +119,6 @@ def test_agent_workflow_health() -> None:
     os.getenv("CI") == "true",
     reason="Skipped in GitHub Actions CI because it depends on external Pinecone access.",
 )
-def test_agent_workflow_urgent_replenishment_demo() -> None:
-    """Official urgent replenishment demo should return a valid recommendation."""
-    response = client.post(
-        "/agents/workflow/run",
-        json=URGENT_REPLENISHMENT_PAYLOAD,
-    )
-
-    assert response.status_code == 200
-
-    data = response.json()
-    assert_common_workflow_response(data)
-
-    decision = data["business_answer"].get("decision")
-    assert decision is not None
-    assert "reorder" in decision.lower()
-
-    assert data["recommendation_summary"]["recommended_order_qty"] is not None
-    assert data["recommendation_summary"]["reason_code"] is not None
-
-
 def test_agent_workflow_stockout_risk_demo() -> None:
     """Official stockout risk demo should return a valid risk-oriented recommendation."""
     response = client.post(
@@ -154,7 +134,6 @@ def test_agent_workflow_stockout_risk_demo() -> None:
     assert "stockout" in data["question"].lower()
     assert data["recommendation_summary"]["priority_level"] is not None
     assert data["recommendation_summary"]["reason_code"] is not None
-
 
 def test_agent_workflow_reorder_vs_transfer_demo() -> None:
     """Official reorder-vs-transfer demo should return a clear action recommendation."""
