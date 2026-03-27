@@ -1,6 +1,6 @@
 # Enterprise Decision Intelligence Platform (EDIP)
 
-> Full AI Production System: RAG + Multi-Agent Workflow + Forecasting + Replenishment Recommendation + FastAPI + React/Next.js UI + Kafka Event Simulation + Airflow Orchestration + Monitoring + CI/CD + Kubernetes + Terraform
+> Full AI Production System: RAG + Multi-Agent Workflow + XGBoost Forecasting + Replenishment Recommendation + FastAPI + React/Next.js UI + Kafka Event Simulation + Airflow Orchestration + Monitoring + CI/CD + Kubernetes + Terraform
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-green)
@@ -15,6 +15,55 @@
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-brightgreen)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-Deployment-326ce5)
 ![Terraform](https://img.shields.io/badge/Terraform-IaC-623ce4)
+
+## Business Problem Solved
+
+Modern enterprises often struggle with fragmented data, slow decision cycles, policy-heavy operations, and weak connections between analytics and action. In many organizations, teams can access dashboards and reports, but still cannot quickly answer high-value operational questions such as:
+
+- Why was urgent replenishment recommended?
+- Is this location at high stockout risk next week?
+- Should the store reorder inventory or transfer stock from another location?
+- Which policy or operational context supports this recommendation?
+
+The result is delayed action, inconsistent decisions, and limited trust in enterprise analytics systems.
+
+**Enterprise Decision Intelligence Platform (EDIP)** solves this problem by combining enterprise retrieval, grounded AI reasoning, forecasting signals, and decision-oriented recommendations in one production-oriented system.
+
+This project is built around a practical enterprise use case:
+
+**Demand Forecasting + Inventory Decision Support for NorthStar Retail & Distribution**
+
+---
+
+## System Overview
+
+EDIP is a production-oriented enterprise AI system designed to support real business decision workflows. It combines:
+
+- **RAG + LLM reasoning** for grounded business explanations
+- **Multi-agent orchestration** for structured workflow execution
+- **Predictive and prescriptive analytics** for forecasting and replenishment support
+- **Business-facing APIs and UI** for operational access
+- **Testing, observability, and deployment readiness** for enterprise delivery
+
+At a high level, EDIP transforms enterprise data and knowledge into explainable business recommendations.
+
+### Current Decision Flow
+
+**Planner → Retrieval → Reasoning → Analytics → Execution**
+
+### Workflow Behavior
+
+1. A business user submits a decision-oriented request.
+2. The **Planner Agent** identifies the task type and required workflow path.
+3. The **Retrieval Agent** gathers relevant enterprise documents, policy context, and business knowledge.
+4. The **Reasoning Agent** interprets the request using grounded evidence.
+5. The **Analytics Agent** adds forecasting and recommendation logic when numerical support is needed.
+6. The **Execution Agent** converts the result into a business-facing response.
+7. The system returns structured outputs through the API and frontend UI.
+
+This design helps bridge the gap between raw enterprise data, enterprise knowledge, analytical reasoning, and operational action.
+
+---
 
 ## Live Endpoints
 
@@ -38,53 +87,6 @@
 ### Agent Workflow
 - Health: `GET /agents/workflow/health`
 - Run Workflow: `POST /agents/workflow/run`
-  
-## Business Problem Solved
-
-Modern enterprises often struggle with fragmented data, slow decision cycles, policy-heavy operations, and weak connections between analytics and action. In many organizations, business teams can access dashboards and reports, but still cannot quickly answer high-value operational questions such as:
-
-- Why was urgent replenishment recommended?
-- Is this location at high stockout risk next week?
-- Should the store reorder inventory or transfer stock from another location?
-- Which business policy or operational context supports this recommendation?
-
-The result is delayed action, inconsistent decisions, and limited trust in enterprise analytics systems.
-
-**Enterprise Decision Intelligence Platform (EDIP)** solves this problem by combining enterprise retrieval, grounded AI reasoning, forecasting signals, and decision-oriented recommendations in one production-oriented system.
-
-This project is built around a practical enterprise use case:
-
-**Demand Forecasting + Inventory Decision Support for NorthStar Retail & Distribution**
-
----
-
-## System Overview
-
-EDIP is a production-oriented enterprise AI system designed to support real business decision workflows. It combines:
-
-- **RAG + LLM reasoning** for grounded business explanations
-- **Multi-agent orchestration** for structured decision workflow execution
-- **Predictive and prescriptive analytics** for forecasting and replenishment support
-- **Business-facing APIs and UI** for operational access
-- **Testing, observability, and deployment readiness** for enterprise delivery
-
-At a high level, EDIP transforms enterprise data and knowledge into explainable business recommendations.
-
-### Current Decision Flow
-
-**Planner → Retrieval → Reasoning → Analytics → Execution**
-
-### Workflow Behavior
-
-1. A business user submits a decision-oriented request.
-2. The **Planner Agent** identifies the task type and required workflow path.
-3. The **Retrieval Agent** gathers relevant enterprise documents, policy context, and business knowledge.
-4. The **Reasoning Agent** interprets the request using grounded evidence.
-5. The **Analytics Agent** adds forecast and recommendation logic when numerical support is needed.
-6. The **Execution Agent** converts the result into a business-facing response.
-7. The system returns structured outputs through API and frontend UI.
-
-This design helps bridge the gap between raw enterprise data, knowledge retrieval, analytical reasoning, and operational action.
 
 ---
 
@@ -98,9 +100,7 @@ The project currently demonstrates three official enterprise decision scenarios.
 Why was urgent replenishment recommended for SKU-100245 at store 210?
 
 **What this demonstrates:**  
-This is the strongest end-to-end EDIP scenario. It shows how the system combines retrieval, grounded reasoning, forecast signals, and prescriptive recommendation logic to explain why immediate replenishment is required.
-
----
+This is the strongest end-to-end EDIP scenario. It shows how the system combines retrieval, grounded reasoning, forecasting signals, and prescriptive recommendation logic to explain why immediate replenishment is required.
 
 ### 2) High Stockout Risk
 
@@ -109,8 +109,6 @@ Is there a high stockout risk for SKU-100245 at store 210 next week?
 
 **What this demonstrates:**  
 This scenario shows risk-focused decision support using business context, forecast-related signals, and structured explanation output.
-
----
 
 ### 3) Reorder vs Transfer
 
@@ -121,60 +119,6 @@ Should store 210 reorder SKU-100245 or transfer stock from another location?
 This scenario shows action-choice decision intelligence, where the system recommends the better operational action based on business context and decision logic.
 
 ---
-
-## Architecture
-
-EDIP is designed as a layered enterprise AI system.
-
-### 1. Unified Data Layer
-
-Structured and semi-structured enterprise data is unified to support downstream decision intelligence.
-
-**Used / planned components**
-- synthetic enterprise data foundation
-- normalized business entities and fact tables
-- forecasting input datasets
-- Kafka event payload exports
-- enterprise document sources
-
-### 2. RAG + LLM Layer
-
-Enterprise policies, SOPs, reviews, and knowledge assets are embedded, indexed, retrieved, and used for grounded reasoning.
-
-**Core components**
-- OpenAI
-- Pinecone
-- RAG ingestion pipeline
-- metadata schema and chunking pipeline
-- enterprise markdown document corpus
-
-### 3. AI Agent Orchestration Layer
-
-The decision workflow is controlled through modular agents with clearly separated responsibilities.
-
-**Agents**
-- Planner Agent
-- Retrieval Agent
-- Reasoning Agent
-- Analytics Agent
-- Execution Agent
-
-### 4. Predictive + Prescriptive Analytics Layer
-
-EDIP goes beyond language generation by adding business analytics and decision logic.
-
-**Core functions**
-- demand forecasting
-- stockout risk support
-- replenishment recommendation logic
-- structured business outputs for action support
-
-### 5. API + Frontend Layer
-
-This layer provides the business-facing interaction surface.
-
-**Backend**
-- FastAPI
 
 ## Example Official Demo Payload
 
