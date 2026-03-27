@@ -67,80 +67,6 @@ REORDER_VS_TRANSFER_PAYLOAD = {
 
 
 # =========================================================
-# Mock workflow service
-# =========================================================
-class DummyAgentWorkflowService:
-    """CI-safe fake service to avoid real Pinecone / external calls."""
-
-    def run_workflow(self, request):
-        question = request.question.lower()
-
-        if "urgent replenishment" in question:
-            decision = "Reorder immediately to avoid near-term stockout."
-            final_message = "Recommendation: reorder urgently for this SKU."
-            recommended_order_qty = 180
-            recommended_transfer_qty = 0
-            priority_level = "high"
-            reason_code = "URGENT_REPLENISHMENT"
-        elif "stockout risk" in question:
-            decision = "High stockout risk detected; reorder is recommended."
-            final_message = "Recommendation: reorder because stockout risk is high."
-            recommended_order_qty = 140
-            recommended_transfer_qty = 0
-            priority_level = "high"
-            reason_code = "STOCKOUT_RISK"
-        else:
-            decision = "Transfer is preferred, but reorder remains a valid fallback."
-            final_message = "Recommendation: transfer first, reorder if transfer is not possible."
-            recommended_order_qty = 60
-            recommended_transfer_qty = 90
-            priority_level = "medium"
-            reason_code = "REORDER_VS_TRANSFER"
-
-        return {
-            "question": request.question,
-            "business_answer": {
-                "decision": decision,
-                "explanation": "Mocked workflow response for CI integration stability.",
-            },
-            "decision_summary": {
-                "status": "ready",
-                "output_type": "recommendation",
-                "final_message": final_message,
-            },
-            "forecast_summary": {
-                "forecast_units": 125.0,
-                "forecast_lower_bound": 110.0,
-                "forecast_upper_bound": 145.0,
-                "confidence_score": 0.91,
-            },
-            "recommendation_summary": {
-                "recommended_order_qty": recommended_order_qty,
-                "recommended_transfer_qty": recommended_transfer_qty,
-                "priority_level": priority_level,
-                "reason_code": reason_code,
-            },
-        }
-
-
-def install_mock_workflow_service(monkeypatch) -> None:
-    """
-    Patch the API dependency so integration tests do not call
-    real Pinecone / external RAG services in CI.
-    """
-    import app.api.agent_workflow as agent_workflow_module
-
-    def mock_get_agent_workflow_service():
-        return DummyAgentWorkflowService()
-
-    monkeypatch.setattr(
-        agent_workflow_module,
-        "get_agent_workflow_service",
-        mock_get_agent_workflow_service,
-    )
-
-
-# =========================================================
 # Small helpers
 # =========================================================
 def assert_common_workflow_response(data: dict) -> None:
@@ -188,10 +114,8 @@ def test_agent_workflow_health() -> None:
 # =========================================================
 # Official demo tests
 # =========================================================
-def test_agent_workflow_urgent_replenishment_demo(monkeypatch) -> None:
+def test_agent_workflow_urgent_replenishment_demo() -> None:
     """Official urgent replenishment demo should return a valid recommendation."""
-    install_mock_workflow_service(monkeypatch)
-
     response = client.post(
         "/agents/workflow/run",
         json=URGENT_REPLENISHMENT_PAYLOAD,
@@ -207,10 +131,8 @@ def test_agent_workflow_urgent_replenishment_demo(monkeypatch) -> None:
     assert data["recommendation_summary"]["reason_code"] is not None
 
 
-def test_agent_workflow_stockout_risk_demo(monkeypatch) -> None:
+def test_agent_workflow_stockout_risk_demo() -> None:
     """Official stockout risk demo should return a valid risk-oriented recommendation."""
-    install_mock_workflow_service(monkeypatch)
-
     response = client.post(
         "/agents/workflow/run",
         json=STOCKOUT_RISK_PAYLOAD,
@@ -226,10 +148,8 @@ def test_agent_workflow_stockout_risk_demo(monkeypatch) -> None:
     assert data["recommendation_summary"]["reason_code"] is not None
 
 
-def test_agent_workflow_reorder_vs_transfer_demo(monkeypatch) -> None:
+def test_agent_workflow_reorder_vs_transfer_demo() -> None:
     """Official reorder-vs-transfer demo should return a clear action recommendation."""
-    install_mock_workflow_service(monkeypatch)
-
     response = client.post(
         "/agents/workflow/run",
         json=REORDER_VS_TRANSFER_PAYLOAD,
