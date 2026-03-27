@@ -137,6 +137,28 @@ This layer provides the business-facing interaction surface.
 **Backend**
 - FastAPI
 
+## Example Official Demo Payload
+
+```json
+{
+  "question": "Why was urgent replenishment recommended for SKU-100245 at store 210?",
+  "user_role": "planner",
+  "region_scope": "west",
+  "product_id": 100245,
+  "store_id": 210,
+  "warehouse_id": 12,
+  "region_id": 3,
+  "horizon_days": 7,
+  "include_recommendations": true,
+  "require_approval": false,
+  "metadata": {
+    "source": "official_demo",
+    "scenario": "urgent_replenishment",
+    "channel": "frontend"
+  }
+}
+```
+
 **Frontend**
 - React / Next.js / TypeScript
 
@@ -241,3 +263,78 @@ ENTERPRISE_DECISION_INTELLIGENCE_PLATFORM_EDIP/
 ├── requirements-dev.txt
 ├── requirements_full.txt
 └── README.md
+```
+## Tech Stack
+
+### Core AI / Decision System
+- Python
+- FastAPI
+- OpenAI
+- Pinecone
+- Multi-agent workflow orchestration
+
+### Analytics
+- Demand forecasting
+- Replenishment recommendation logic
+- Predictive analytics
+- Prescriptive decision support
+
+### Frontend
+- React
+- Next.js
+- TypeScript
+- shadcn/ui
+
+### Data / Workflow / Infrastructure
+- Kafka
+- Airflow
+- Docker
+- Kubernetes
+- Terraform
+- GitHub Actions
+
+### Monitoring / Observability
+- Prometheus
+- Grafana
+
+### Knowledge / RAG Layer
+- Enterprise markdown documents
+- Metadata-driven chunking
+- Vector retrieval pipeline
+
+## Current Project Status
+
+### Completed
+- Multi-agent workflow API implemented
+- Frontend workflow UI implemented
+- Three official business demo scenarios prepared
+- Forecasting and replenishment artifacts generated
+- RAG ingestion and retrieval pipeline included
+- Integration and unit tests included
+- Monitoring assets included
+- Kubernetes manifests included
+- Terraform structure included
+
+### Current Validated Flow
+- Backend API working
+- Frontend UI working
+- Official demo workflow runs end-to-end
+- Forecast and recommendation outputs generated
+- RAG-supported reasoning integrated into the workflow
+- Core workflow API tests included
+
+## API Endpoints
+
+### Health
+`GET /agents/workflow/health`
+
+### Run Workflow
+`POST /agents/workflow/run`
+
+Returns structured business workflow outputs such as:
+- business_answer
+- decision_summary
+- forecast_summary
+- recommendation_summary
+- workflow_overview
+- debug
