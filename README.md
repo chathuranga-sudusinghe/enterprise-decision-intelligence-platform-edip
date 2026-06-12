@@ -406,6 +406,18 @@ This makes the project highly relevant for roles such as:
 - Production ML / MLOps Engineer
 
 ---
+## Contributing
+
+Contributions are welcome for documentation, tests, examples, setup improvements, and small focused fixes. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before starting work, and look for issues labeled `good first issue` for contributor-ready tasks.
+
+---
+## AI Usage Disclosure
+
+This project was developed with selective assistance from AI tools such as ChatGPT and Codex. All AI-assisted outputs were reviewed, edited, and approved by the maintainer before being committed.
+
+See [AI_USAGE.md](AI_USAGE.md) for details on how AI tools were used responsibly in this project.
+
+---
 ## Author
 
 **Chathuranga Sudusinghe**  
