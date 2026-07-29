@@ -11,6 +11,11 @@ venv/
 env/
 ENV/
 
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
 # Python packaging
 build/
 dist/
@@ -57,11 +62,6 @@ dmypy.json
 
 # Jupyter
 .ipynb_checkpoints/
-
-# Environment variables / secrets
-.env
-.env.*
-!.env.example
 
 # IDE / Editor
 .vscode/
