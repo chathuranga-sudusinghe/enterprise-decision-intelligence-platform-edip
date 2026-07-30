@@ -36,7 +36,6 @@ except ImportError:
     LIGHTGBM_AVAILABLE = False
 
 
-import logging
 from app.core.logging import get_logger, setup_logging
 
 # =========================================================
@@ -44,21 +43,6 @@ from app.core.logging import get_logger, setup_logging
 # =========================================================
 
 logger = get_logger(__name__)
-
-"""This module implements the training pipeline for the demand forecasting model. 
-It includes data loading, validation, feature preparation, model training, evaluation, and artifact saving. 
-The pipeline is designed to be modular and extensible for future enhancements.
-
-logger = logging.getLogger(__name__)
-
-
-def setup_logging() -> None:
-    if not logging.getLogger().handlers:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-        )
-"""
 
 # =========================================================
 # Configuration
@@ -632,6 +616,3 @@ if __name__ == "__main__":
         "Training pipeline completed successfully. Selected model: %s",
         selected_model,                                               
     )
-        
-         #  logger.info("Training pipeline completed successfully. Selected model: %s", selected_model,) 
-                    #  = logger.info(f"Training pipeline completed successfully. Selected model: {selected_model}") 
