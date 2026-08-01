@@ -1,432 +1,197 @@
 # Enterprise Decision Intelligence Platform (EDIP)
 
-> Full AI Production System: RAG + Multi-Agent Workflow + XGBoost Forecasting + Replenishment Recommendation + FastAPI + React/Next.js UI + Kafka Event Simulation + Airflow Orchestration + Monitoring + CI/CD + Kubernetes + Terraform
+EDIP Version 2 is the approved architecture for a trustworthy enterprise decision-intelligence platform: grounded evidence, forecasting, governed agent workflows, deterministic controls, and accountable human decisions.
 
-![Python](https://img.shields.io/badge/Python-3.11-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-API-green)
-![XGBoost](https://img.shields.io/badge/XGBoost-Forecasting-orange)
-![RAG](https://img.shields.io/badge/RAG-Grounded%20Reasoning-purple)
-![Agents](https://img.shields.io/badge/Multi--Agent-Workflow-red)
-![Kafka](https://img.shields.io/badge/Kafka-Event%20Simulation-black)
-![Airflow](https://img.shields.io/badge/Airflow-Orchestration-darkred)
-![Docker](https://img.shields.io/badge/Docker-Containerized-blue)
-![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-orange)
-![Grafana](https://img.shields.io/badge/Grafana-Dashboards-yellow)
-![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-brightgreen)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-Deployment-326ce5)
-![Terraform](https://img.shields.io/badge/Terraform-IaC-623ce4)
+> **Current status:** Phase 0 repository audit and controlled cleanup are complete. The V2 architecture is approved. Phase 1 implementation has not started.
 
-## Business Problem Solved
+EDIP is not currently production-ready. Capabilities below are explicitly distinguished as current, approved target, or future work.
 
-Modern enterprises often struggle with fragmented data, slow decision cycles, policy-heavy operations, and weak connections between analytics and action. In many organizations, teams can access dashboards and reports, but still cannot quickly answer high-value operational questions such as:
+## Vision and positioning
 
-- Why was urgent replenishment recommended?
-- Is this location at high stockout risk next week?
-- Should the store reorder inventory or transfer stock from another location?
-- Which policy or operational context supports this recommendation?
+Operational teams often have data and dashboards but still lack a defensible path from evidence to action. EDIP is intended to help inventory, supply-chain, operations, risk, and technology stakeholders determine:
 
-The result is delayed action, inconsistent decisions, and limited trust in enterprise analytics systems.
+- forecast inventory risk and its uncertainty;
+- which internal and approved market evidence supports a recommendation;
+- whether evidence is sufficient to decide or the system should abstain; and
+- which actions require human approval and what was ultimately executed.
 
-**Enterprise Decision Intelligence Platform (EDIP)** solves this problem by combining enterprise retrieval, grounded AI reasoning, forecasting signals, and decision-oriented recommendations in one production-oriented system.
+The flagship engineering goal is a reviewable enterprise platform rather than an unconstrained chatbot. Its research direction is: **Trustworthy Human-in-the-Loop multi-agent systems for safe, explainable, and auditable decision-making.**
 
-This project is built around a practical enterprise use case:
+## Status and evidence boundary
 
-**Demand Forecasting + Inventory Decision Support for NorthStar Retail & Distribution**
+| State | Meaning |
+|---|---|
+| **Current implemented state** | A FastAPI application, Next.js UI, forecasting and replenishment code, agent/RAG experiments, tests, deployment assets, and monitoring assets exist. Phase 0 verified repository truth and completed controlled cleanup; it did not certify the whole system for production. |
+| **Approved target architecture** | A capability-oriented modular monolith, LangGraph workflows, governed retrieval and integrations, deterministic safety controls, durable audit, and AWS ECS Fargate deployment define V2. |
+| **Future implementation** | Phase 1 and later phases must implement, integrate, evaluate, secure, and validate the approved architecture through explicit acceptance gates. |
 
----
+There is no claim here of complete test-suite health or live Pinecone, OpenAI, Kafka, AWS, or ERP/CRM operation.
 
-## System Overview
+## Approved V2 capabilities
 
-EDIP is a production-oriented enterprise AI system designed to support real business decision workflows. It combines:
+- **Next.js frontend** for decision workspaces, evidence review, uncertainty display, approvals, and audit views.
+- **FastAPI capability-oriented modular monolith** with explicit module boundaries; microservices are not the initial design.
+- **LangGraph workflows** for durable, stateful, controlled orchestration.
+- **Internal RAG with Pinecone** for tenant-scoped retrieval from governed enterprise knowledge.
+- **Forecasting and inventory-risk analytics** with versioned data, models, metrics, and uncertainty evidence.
+- **Approved external evidence** through a governed source registry, provenance, freshness, and citation controls.
+- **Internal-to-market benchmarking** that keeps internal facts distinct from external evidence.
+- **Deterministic safety gate** for critical calculations, policy checks, evidence sufficiency, and abstention.
+- **Human-in-the-Loop (HITL) approval** before controlled, consequential execution.
+- **Governed MCP integrations** for bounded ERP/CRM tools; LLMs must not authorize irreversible actions.
+- **Durable audit and observability** using PostgreSQL business records, LangSmith traces, Prometheus/Grafana, and CloudWatch with distinct ownership.
+- **AWS ECS Fargate deployment direction** as the canonical production target.
 
-- **RAG + LLM reasoning** for grounded business explanations
-- **Multi-agent orchestration** for structured workflow execution
-- **Predictive and prescriptive analytics** for forecasting and replenishment support
-- **Business-facing APIs and UI** for operational access
-- **Testing, observability, and deployment readiness** for enterprise delivery
+Kafka and Airflow are not mandatory V2 core components. They remain gated future options only if measured scale, scheduling, or event-processing needs justify their operational cost. Kubernetes is optional learning evidence, not the canonical deployment target.
 
-At a high level, EDIP transforms enterprise data and knowledge into explainable business recommendations.
+## Architecture principles
 
-### Current Decision Flow
+- Trustworthy decisions require traceable evidence, uncertainty, abstention, and human accountability.
+- Critical calculations and safety policies remain deterministic and testable.
+- LLM output is advisory; it cannot directly authorize irreversible business actions.
+- Tenant identity, RBAC, source approval, and audit context cross every capability boundary.
+- The initial architecture is a capability-oriented modular monolith, not microservices.
+- Python remains in the existing `app/` layout; no migration to a `src/` layout is planned.
+- Online RAG and workflows will move to `app/rag/` and `app/workflows/` as contracts stabilize.
+- Offline ingestion and model training remain under `pipelines/`.
+- Forecasting migrates only after its artifacts, interfaces, and tests are stable.
+- Generated datasets and artifacts stay outside Git, with manifests, versions, provenance, and checksums.
+- LangSmith supports workflow observability but is not the authoritative business audit store.
+- ECS Fargate is canonical; added infrastructure requires evidence-backed decisions.
 
-**Planner → Retrieval → Reasoning → Analytics → Execution**
+## Architecture at a glance
 
-### Workflow Behavior
-
-1. A business user submits a decision-oriented request.
-2. The **Planner Agent** identifies the task type and required workflow path.
-3. The **Retrieval Agent** gathers relevant enterprise documents, policy context, and business knowledge.
-4. The **Reasoning Agent** interprets the request using grounded evidence.
-5. The **Analytics Agent** adds forecasting and recommendation logic when numerical support is needed.
-6. The **Execution Agent** converts the result into a business-facing response.
-7. The system returns structured outputs through the API and frontend UI.
-
-This design helps bridge the gap between raw enterprise data, enterprise knowledge, analytical reasoning, and operational action.
-
----
-
-## Live Endpoints
-
-### Local API Docs
-- Swagger UI: `http://127.0.0.1:8000/docs`
-
-### Core Endpoints
-- Health: `GET /health`
-- Metrics: `GET /metrics`
-
-### RAG
-- Health: `GET /rag/health`
-- Query: `POST /rag/query`
-
-### Forecast
-- Health: `GET /forecast/health`
-- Overview: `GET /forecast/overview`
-- Recommendations: `GET /forecast/recommendations`
-- Forecast Response: `GET /forecast`
-
-### Agent Workflow
-- Health: `GET /agents/workflow/health`
-- Run Workflow: `POST /agents/workflow/run`
-
----
-
-## Official Demo Scenarios
-
-The project currently demonstrates three official enterprise decision scenarios.
-
-### 1) Urgent Replenishment
-
-**Question:**  
-Why was urgent replenishment recommended for SKU-100245 at store 210?
-
-**What this demonstrates:**  
-This is the strongest end-to-end EDIP scenario. It shows how the system combines retrieval, grounded reasoning, forecasting signals, and prescriptive recommendation logic to explain why immediate replenishment is required.
-
-### 2) High Stockout Risk
-
-**Question:**  
-Is there a high stockout risk for SKU-100245 at store 210 next week?
-
-**What this demonstrates:**  
-This scenario shows risk-focused decision support using business context, forecast-related signals, and structured explanation output.
-
-### 3) Reorder vs Transfer
-
-**Question:**  
-Should store 210 reorder SKU-100245 or transfer stock from another location?
-
-**What this demonstrates:**  
-This scenario shows action-choice decision intelligence, where the system recommends the better operational action based on business context and decision logic.
-
----
-
-## Example Official Demo Payload
-
-```json
-{
-  "question": "Why was urgent replenishment recommended for SKU-100245 at store 210?",
-  "user_role": "planner",
-  "region_scope": "west",
-  "product_id": 100245,
-  "store_id": 210,
-  "warehouse_id": 12,
-  "region_id": 3,
-  "horizon_days": 7,
-  "include_recommendations": true,
-  "require_approval": false,
-  "metadata": {
-    "source": "official_demo",
-    "scenario": "urgent_replenishment",
-    "channel": "frontend"
-  }
-}
+```mermaid
+flowchart LR
+    User["Business user or approver"] --> UI["Next.js decision workspace"]
+    UI --> API["FastAPI modular monolith"]
+    API --> WF["LangGraph controlled workflow"]
+    WF --> RAG["Internal RAG and approved external evidence"]
+    WF --> Analytics["Forecasting and inventory-risk analytics"]
+    WF --> Gate["Deterministic safety gate"]
+    Gate --> HITL["Human approval"]
+    HITL --> MCP["Governed MCP tools"]
+    MCP --> Systems["ERP / CRM systems"]
+    API --> Data["PostgreSQL / Pinecone / S3"]
+    API --> Obs["Audit and observability"]
 ```
 
-**Frontend**
-- React / Next.js / TypeScript
+See the [EDIP V2 Flagship Architecture Plan](docs/architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md) for complete boundaries, decisions, diagrams, gates, risks, and acceptance criteria.
 
-**Current frontend workflow display**
-- Why
-- Decision
-- Forecast Summary
-- Recommendation
-- Workflow Overview
-- Debug Payload
+## Phased V2 roadmap
 
-### 6. Workflow Orchestration Layer
+1. **Phase 0 — completed:** establish repository truth, audit the baseline, and complete controlled cleanup.
+2. **Phase 1 — Stable local baseline (next, not implemented):**
+   - one supported Python runtime;
+   - dependency reconciliation;
+   - clean application and LangGraph imports;
+   - full pytest collection;
+   - controlled PostgreSQL initialization;
+   - deterministic fixtures; and
+   - API container startup and health/readiness smoke checks.
+3. **Evidence and RAG:** implement governed ingestion, Pinecone retrieval, citations, evidence sufficiency, and retrieval evaluation.
+4. **Analytics:** stabilize forecasting artifacts and tests, then add uncertainty-aware inventory-risk capability.
+5. **Workflow and safety:** implement LangGraph state, controlled stages, deterministic gates, and abstention.
+6. **Approval and execution:** add durable HITL decisions and bounded MCP execution with idempotency and audit.
+7. **Evaluation and operations:** validate retrieval, forecasts, workflows, decisions, safety, reliability, security, and ECS Fargate delivery.
 
-EDIP also includes scheduled and orchestration-ready workflow capability.
+Each phase requires documented evidence and review before the next stable checkpoint is merged.
 
-**Orchestration**
-- Airflow
+## Engineering framework alignment
 
-### 7. Production Engineering Layer
+EDIP adopts the [Enterprise AI/ML Engineering Framework](https://github.com/chathuranga-sudusinghe/enterprise-ai-ml-engineering-framework) as an evidence lifecycle:
 
-The system is designed with deployment, monitoring, and infrastructure management in mind.
+**Problem → Data → Baseline → Advanced AI → Evaluation → Delivery → Production → Maintenance**
 
-**Production-oriented components**
-- Docker
-- Kubernetes
-- Terraform
-- GitHub Actions
-- Prometheus
-- Grafana
-- logging, monitoring, and governance direction
+The architecture plan maps each stage to EDIP gates, required artifacts, validation evidence, owners, and review outcomes. Advanced AI follows adequate problem, data, and baseline evidence; deployment assets alone do not establish production readiness.
 
----
+## Professional and research alignment
 
-## Core Capabilities
+- **BCS CITP evidence:** responsibility and autonomy, architecture judgement, alternatives and trade-offs, stakeholder influence, security and ethical decisions, measurable outcomes, review, and professional reflection. No SFIA level is claimed.
+- **MSc evidence:** applied architecture, reproducible evaluation, forecasting, RAG, deployment, observability, and critical analysis.
+- **PhD direction:** trustworthy HITL multi-agent systems, reliable RAG, uncertainty-aware decisions, evidence sufficiency, abstention, safe execution, and auditable outcomes.
 
-EDIP is designed to support enterprise decision intelligence through the following capabilities:
+The traceability chain is: **finding → risk → decision → implementation → validation → outcome → reflection**.
 
-- grounded business question answering
-- retrieval-based enterprise reasoning
-- demand forecasting support
-- replenishment recommendation support
-- explainable decision responses
-- multi-agent workflow orchestration
-- API-based enterprise integration
-- business-facing frontend interaction
-- monitoring and deployment readiness
-
----
-
-## Repository Structure
+## Repository structure
 
 ```text
-ENTERPRISE_DECISION_INTELLIGENCE_PLATFORM_EDIP/
-├── app/
-│   ├── agents/                  # Planner, Retrieval, Reasoning, Analytics, Execution agents
-│   ├── api/                     # FastAPI routers
-│   ├── core/                    # Config, logging, metrics, monitoring
-│   ├── schemas/                 # API request/response schemas
-│   ├── services/                # Workflow, forecast, RAG, event-processing services
-│   └── main.py                  # FastAPI application entry point
-├── artifacts/
-│   ├── forecasts/               # Forecast and recommendation outputs
-│   ├── models/                  # Trained model artifacts and schema files
-│   └── reports/                 # Evaluation and validation reports
-├── configs/                     # Kafka schema, RAG config, metadata schema
-├── data/
-│   ├── exports/                 # Kafka event exports
-│   ├── processed/               # Processed datasets
-│   ├── raw/                     # Raw datasets
-│   └── synthetic/               # Generated synthetic enterprise data
-├── database/
-│   ├── ddl/                     # Database DDL files
-│   ├── dml/                     # DML / loading logic
-│   ├── migrations/              # Migration placeholders / files
-│   └── seeds/                   # Seed placeholders / files
-├── docs/
-│   ├── policies/                # Policy documents
-│   ├── rag_source/              # RAG knowledge sources
-│   ├── reviews/                 # Business review documents
-│   └── sops/                    # Standard operating procedures
-├── infra/
-│   ├── docker/                  # Docker-related infra assets
-│   ├── k8s/                     # Kubernetes manifests
-│   └── terraform/               # Terraform for AWS and local-k8s
-├── monitoring/
-│   ├── grafana/                 # Grafana dashboards and provisioning
-│   └── prometheus/              # Prometheus configuration
-├── pipelines/
-│   ├── airflow_dags/            # Airflow orchestration DAGs
-│   ├── etl/                     # Training dataset build pipeline
-│   ├── features/                # Feature engineering
-│   ├── inference/               # Forecast scoring and recommendations
-│   └── training/                # Forecast model train/evaluate pipelines
-├── scripts/                     # Data generation, RAG, Kafka, and demo scripts
-├── tests/
-│   ├── integration/             # API and workflow integration tests
-│   └── unit/                    # Service and component unit tests
-├── ui/                          # Next.js frontend
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-├── requirements-dev.txt
-├── requirements_full.txt
-└── README.md
+app/          FastAPI application and current online capabilities
+ui/           Next.js frontend
+pipelines/    Offline ingestion, training, and evaluation workflows
+tests/        Automated test assets
+docs/         Architecture, audits, runbooks, and evidence
+monitoring/   Prometheus and Grafana assets
+infra/        Deployment and infrastructure assets
 ```
-## Tech Stack
 
-### Core AI / Decision System
-- Python
-- FastAPI
-- OpenAI
-- Pinecone
-- Multi-agent workflow orchestration
+Some directories reflect the pre-V2 implementation. Their presence is evidence of repository assets, not proof that every component is integrated or operational.
 
-### Analytics
-- Demand forecasting
-- Replenishment recommendation logic
-- Predictive analytics
-- Prescriptive decision support
+## Local setup and usage
+
+### Backend
+
+Use Python 3.11 for consistency with the current CI baseline.
+
+```bash
+python -m venv .venv
+```
+
+Activate the environment, then install and start the API:
+
+```bash
+python -m pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Open `http://localhost:8000/docs` for generated API documentation. External-provider features require valid configuration and credentials; installation alone does not demonstrate live connectivity.
 
 ### Frontend
-- React
-- Next.js
-- TypeScript
-- shadcn/ui
 
-Frontend: `http://localhost:3000`
+```bash
+cd ui
+npm install
+npm run dev
+```
 
-### Data / Workflow / Infrastructure
-- Kafka
-- Airflow
-- Docker
-- Kubernetes
-- Terraform
-- GitHub Actions
+Open `http://localhost:3000`. The current frontend is an existing baseline and does not yet represent the complete approved V2 decision workspace.
 
-### Monitoring / Observability
-- Prometheus
-- Grafana
-
-### Knowledge / RAG Layer
-- Enterprise markdown documents
-- Metadata-driven chunking
-- Vector retrieval pipeline
-
-## Current Project Status
-
-### Completed
-- Multi-agent workflow API implemented
-- Frontend workflow UI implemented
-- Three official business demo scenarios prepared
-- Forecasting and replenishment artifacts generated
-- RAG ingestion and retrieval pipeline included
-- Integration and unit tests included
-- Monitoring assets included
-- Kubernetes manifests included
-- Terraform structure included
-
-### Current Validated Flow
-- Backend API working
-- Frontend UI working
-- Official demo workflow runs end-to-end
-- Forecast and recommendation outputs generated
-- RAG-supported reasoning integrated into the workflow
-- Core workflow API tests included
-
-## API Endpoints
-
-### Health
-`GET /agents/workflow/health`
-
-### Run Workflow
-`POST /agents/workflow/run`
-
-Returns structured business workflow outputs such as:
-- business_answer
-- decision_summary
-- forecast_summary
-- recommendation_summary
-- workflow_overview
-- debug
-
-## Testing
-
-The project includes both integration and unit testing coverage.
-
-### Integration Tests
-
-- Workflow API tests
-- Forecast API tests
-- RAG API tests
-- RAG retrieval tests
-- Kafka end-to-end related tests
-- Kafka event generation tests
-
-### Unit Tests
-
-- Event processing service tests
-- Forecast service tests
-- Kafka producer and consumer tests
-- RAG query service tests
-- RAG generation service tests
-
-Example test run:
+### Tests and checks
 
 ```bash
 pytest
+cd ui
+npm run lint
+npm run build
 ```
-## Monitoring and Observability
 
-EDIP includes observability-oriented assets for production readiness.
+These are contributor commands, not a claim that the entire suite currently passes in every environment. Consult the audit evidence and run relevant checks for each change.
 
-### Monitoring Stack
+## Current known limitations
 
-- Prometheus configuration
-- Grafana dashboards
-- Alerting configuration
-- Metrics integration in the backend
+- The Phase 1 stable local baseline is not yet established: runtime and dependencies require reconciliation; application and LangGraph imports, full pytest collection, controlled PostgreSQL initialization, deterministic fixtures, and API container health/readiness smoke checks remain to be validated.
+- Pinecone-backed internal RAG and its ingestion, retrieval, isolation, freshness, and citation evaluations are not confirmed live.
+- LangGraph orchestration, evidence-sufficiency rules, abstention, durable HITL resume, and deterministic execution gates require implementation and validation.
+- Forecasting and inventory-risk artifacts require stabilization, versioning, provenance, uncertainty evaluation, and monitored acceptance thresholds before migration.
+- External evidence needs an approved source registry and provenance, freshness, licensing, and injection-resistance controls.
+- MCP ERP/CRM actions require allow-listed tools, least privilege, schema validation, idempotency, approval binding, and reconciliation testing.
+- ECS Fargate is the approved deployment direction; a production AWS environment has not been demonstrated by this README.
+- Existing tests, CI, monitoring, Kubernetes, Terraform, Kafka, and Airflow assets vary in maturity and do not demonstrate integrated production operation.
 
-This supports system visibility, operational monitoring, and enterprise deployment maturity.
+## Authoritative documents
 
----
+- [EDIP V2 Flagship Architecture Plan](docs/architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md)
+- [Phase 0 Completion Review](docs/audits/PHASE_0_COMPLETION_REVIEW.md)
+- [All repository audits](docs/audits/)
 
-## Deployment Direction
+## Contribution workflow
 
-EDIP is designed with an enterprise deployment path in mind.
+V2 work integrates through `dev`, using short-lived branches from `dev`. Reviewed phase checkpoints move from `dev` to `main`; `main` represents reviewed stable checkpoints. Architecture-significant decisions require an ADR, validation evidence, and stakeholder review.
 
-### Included Deployment-Oriented Assets
+## Responsible AI use
 
-- Dockerfile
-- Docker Compose setup
-- Kubernetes manifests
-- Terraform structure for AWS and local-k8s
-- CI workflow files
-- Monitoring configuration
+AI-assisted development may support drafting, review, tests, and documentation. Contributors remain responsible for technical correctness, security, evidence quality, licensing, and professional judgement.
 
-This project is positioned not only as an AI prototype, but as a production-oriented enterprise AI system.
+## Project statement
 
----
-
-## Why This Project Matters
-
-EDIP demonstrates more than isolated model development. It shows how enterprise AI systems can connect:
-
-- Business problem framing
-- Enterprise knowledge retrieval
-- Grounded reasoning
-- Forecasting and analytics
-- Operational recommendation logic
-- API delivery
-- Frontend interaction
-- Testing
-- Observability
-- Deployment direction
-
-This makes the project highly relevant for roles such as:
-
-- AI/ML Systems Engineer
-- Enterprise AI Engineer
-- Generative AI / RAG Engineer
-- Applied AI Engineer
-- Production ML / MLOps Engineer
-
----
-## Contributing
-
-Contributions are welcome for documentation, tests, examples, setup improvements, and small focused fixes. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before starting work, and look for issues labeled `good first issue` for contributor-ready tasks.
-
----
-## AI Usage Disclosure
-
-This project was developed with selective assistance from AI tools such as ChatGPT and Codex. All AI-assisted outputs were reviewed, edited, and approved by the maintainer before being committed.
-
-See [AI_USAGE.md](AI_USAGE.md) for details on how AI tools were used responsibly in this project.
-
----
-## Author
-
-**Chathuranga Sudusinghe**  
-AI Systems Engineer | Generative AI & LLM Architect | Production ML & MLOps | Decision-Centric AI Systems
-
-LinkedIn: https://www.linkedin.com/in/chathuranga-sudusinghe  
-GitHub: https://github.com/chathuranga-sudusinghe
-
----
-## Final Project Statement
-
-**Enterprise Decision Intelligence Platform (EDIP)** is a production-oriented enterprise AI decision system that unifies business data, grounds LLM reasoning with retrieval, orchestrates multi-agent workflows, combines predictive analytics with prescriptive decision support, and delivers explainable business outputs through APIs, UI, testing, monitoring, and deployment-oriented engineering.
+EDIP V2 is an approved architecture and a phased engineering/research programme. It is not a claim of production readiness, complete integration, or completed Phase 1 delivery.
