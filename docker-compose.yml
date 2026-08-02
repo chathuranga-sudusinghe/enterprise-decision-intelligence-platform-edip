@@ -41,7 +41,7 @@ services:
     volumes:
       - ./:/app
     command: >
-      sh -c "pip install --no-cache-dir kafka-python &&
+      sh -c "pip install --no-cache-dir kafka-python==3.0.9 &&
              python scripts/init_kafka_topics.py"
     restart: "no"
 
@@ -137,7 +137,7 @@ services:
       - airflow_data:/opt/airflow
     command: >
       bash -c "
-      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python &&
+      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python==3.0.9 &&
       airflow db migrate &&
       airflow users create
       --username admin
@@ -171,7 +171,7 @@ services:
       - airflow_data:/opt/airflow
     command: >
       bash -c "
-      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python &&
+      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python==3.0.9 &&
       airflow api-server --port 8080
       "
 
@@ -195,7 +195,7 @@ services:
       - airflow_data:/opt/airflow
     command: >
       bash -c "
-      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python &&
+      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python==3.0.9 &&
       airflow scheduler
       "
   airflow-dag-processor: # Airflow DAG processor
@@ -218,7 +218,7 @@ services:
       - airflow_data:/opt/airflow
     command: >
       bash -c "
-      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python &&
+      pip install --no-cache-dir pandas scikit-learn joblib pyyaml kafka-python==3.0.9 &&
       airflow dag-processor
       "
 
