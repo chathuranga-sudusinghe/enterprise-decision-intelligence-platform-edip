@@ -147,3 +147,45 @@ A rollback to 2.0.2 is mechanically simple but knowingly restores the confirmed 
 ## 12. Professional reflection
 
 The smallest safe correction was a tested dependency pin, not an application-code workaround. Probing the maintained distribution first preserved the existing API contract and avoided introducing a second package identity or local compatibility shim. Aligning all Compose installations prevents local tests and container startup from silently selecting different Kafka clients. The evidence remains deliberately bounded: deterministic fakes and successful collection establish compatibility and test discoverability, while live-broker reliability requires a separately approved integration validation.
+
+## 13. CI event-fixture reproducibility follow-up (2026-08-02)
+
+### CI failure root cause
+
+PR #26 exposed an environment-dependent test contract. `tests/integration/test_kafka_event_generation.py` read all eight JSONL outputs directly from `data/exports/kafka_events/`, but that generated directory is intentionally Git-ignored. The generator also reads eight CSV inputs from `data/synthetic/`; those datasets are likewise Git-ignored, with only `.gitkeep` tracked. A developer workspace containing prior generated files therefore passed while a clean GitHub Actions checkout failed at `test_expected_topic_files_exist`.
+
+The CI workflow was not the correct ownership point for the fix. Adding a generation command there would still require unavailable ignored datasets and would preserve the test's dependency on repository runtime paths.
+
+### Reproducibility fix
+
+The integration module now owns a module-scoped pytest fixture built with `tmp_path_factory`. The fixture:
+
+- writes one minimal deterministic CSV row for every source table expected by the existing generator;
+- selects values that exercise the existing low-stock, delayed-shipment, and approved-replenishment filters;
+- injects temporary synthetic and output directories through the existing `scripts.generate_phase_6_kafka_events.Paths` contract;
+- calls the existing configuration loader, `generate_all_events`, and `save_topic_outputs` functions;
+- replaces random event-ID generation only inside the fixture with a stable test-only function; and
+- returns the temporary output path to the unchanged topic, envelope, schema, uniqueness, timestamp, and business-rule assertions.
+
+No production generator, production path, topic, event schema, dependency, or CI workflow changed.
+
+### Follow-up files changed
+
+- `tests/integration/test_kafka_event_generation.py`
+- `docs/phase-1/PHASE_1_BATCH_1A2_KAFKA_PYTHON312_COMPATIBILITY.md`
+
+### Follow-up validation
+
+Validation started by removing the eight local generated JSONL files and the `data/exports/kafka_events/` directory. Results in the disposable Python 3.12 environment were:
+
+| Validation | Result |
+|---|---|
+| Kafka event-generation integration module | Passed: 54 tests |
+| Unit suite | Passed: 91 tests |
+| Integration suite | Passed: 77 tests |
+| Full suite | Passed: 168 tests |
+| `python -m compileall -q app scripts tests` | Passed |
+| Repository Kafka output directory after tests | Absent; tests wrote only under pytest temporary storage |
+| `git ls-files data/exports/kafka_events` | No output; no generated Kafka event files are tracked |
+
+The test evidence remains local and deterministic. It does not demonstrate a live Kafka broker exchange or external-service operation. The existing upstream `kafka-python` deprecation warnings and WSL-mounted `.pytest_cache` permission warning remain non-failing limitations.
