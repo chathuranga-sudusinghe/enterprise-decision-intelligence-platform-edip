@@ -6,10 +6,13 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Set
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
 import yaml
+
+from scripts import generate_phase_6_kafka_events as kafka_event_generator
 
 
 # =========================================================
@@ -40,6 +43,97 @@ TOPIC_OUTPUT_FILES: Dict[str, str] = {
     "returns.return.created": "returns.return.created.jsonl",
     "planning.forecast.generated": "planning.forecast.generated.jsonl",
     "planning.replenishment.approved": "planning.replenishment.approved.jsonl",
+}
+
+DETERMINISTIC_SOURCE_ROWS: Dict[str, Dict[str, Any]] = {
+    "fact_orders.csv": {
+        "order_id": "ORDER-001",
+        "order_timestamp": "2026-01-01T09:00:00Z",
+        "customer_id": "CUSTOMER-001",
+        "channel_id": "CHANNEL-001",
+        "region_id": 1,
+        "order_value": 125.50,
+        "total_units": 5,
+    },
+    "fact_sales.csv": {
+        "sale_id": "SALE-001",
+        "sale_timestamp": "2026-01-01T10:00:00Z",
+        "order_id": "ORDER-001",
+        "customer_id": "CUSTOMER-001",
+        "channel_id": "CHANNEL-001",
+        "product_id": "PRODUCT-001",
+        "region_id": 1,
+        "units_sold": 5,
+        "sales_amount": 125.50,
+    },
+    "fact_stock_movements.csv": {
+        "movement_id": "MOVEMENT-001",
+        "movement_timestamp": "2026-01-01T11:00:00Z",
+        "product_id": "PRODUCT-001",
+        "location_type": "warehouse",
+        "location_id": "WAREHOUSE-001",
+        "region_id": 1,
+        "previous_qty": 15,
+        "new_qty": 10,
+        "delta_qty": -5,
+        "reason_code": "sale",
+    },
+    "fact_inventory_snapshot.csv": {
+        "snapshot_date": "2026-01-01T12:00:00Z",
+        "product_id": "PRODUCT-001",
+        "warehouse_id": "WAREHOUSE-001",
+        "region_id": 1,
+        "available_qty": 5,
+        "reorder_point_qty": 10,
+        "safety_stock": 3,
+    },
+    "fact_inbound_shipments.csv": {
+        "shipment_id": "SHIPMENT-001",
+        "supplier_id": "SUPPLIER-001",
+        "warehouse_id": "WAREHOUSE-001",
+        "region_id": 1,
+        "updated_at": "2026-01-01T13:00:00Z",
+        "expected_date": "2026-01-02",
+        "new_expected_date": "2026-01-04",
+        "delay_days": 2,
+        "impact_severity": "medium",
+        "shipment_status": "delayed",
+    },
+    "fact_returns.csv": {
+        "return_id": "RETURN-001",
+        "return_timestamp": "2026-01-01T14:00:00Z",
+        "order_id": "ORDER-001",
+        "sale_id": "SALE-001",
+        "product_id": "PRODUCT-001",
+        "region_id": 1,
+        "return_qty": 1,
+        "restockable_flag": True,
+        "damaged_flag": False,
+        "return_reason": "customer_return",
+    },
+    "fact_demand_forecast.csv": {
+        "forecast_id": "FORECAST-001",
+        "forecast_run_id": "RUN-001",
+        "product_id": "PRODUCT-001",
+        "location_id": "WAREHOUSE-001",
+        "region_id": 1,
+        "generated_at": "2026-01-01T15:00:00Z",
+        "forecast_date": "2026-01-02",
+        "forecast_qty": 20,
+        "confidence_band": "medium",
+        "model_name": "deterministic-test-model",
+    },
+    "fact_replenishment_recommendation.csv": {
+        "recommendation_id": "RECOMMENDATION-001",
+        "product_id": "PRODUCT-001",
+        "location_id": "WAREHOUSE-001",
+        "region_id": 1,
+        "recommended_qty": 15,
+        "approved_qty": 15,
+        "decision_status": "approved",
+        "planner_id": "PLANNER-001",
+        "decision_timestamp": "2026-01-01T16:00:00Z",
+    },
 }
 
 
@@ -170,8 +264,42 @@ def assert_required_envelope_fields(
 # Pytest fixtures
 # =========================================================
 @pytest.fixture(scope="module")
-def paths() -> Paths:
-    return build_paths()
+def paths(tmp_path_factory: pytest.TempPathFactory) -> Paths:
+    project_paths = build_paths()
+    fixture_root = tmp_path_factory.mktemp("kafka-event-generation")
+    synthetic_dir = fixture_root / "synthetic"
+    output_dir = fixture_root / "kafka_events"
+    synthetic_dir.mkdir()
+    kafka_event_generator.ensure_output_dir(output_dir)
+
+    for file_name, row in DETERMINISTIC_SOURCE_ROWS.items():
+        pd.DataFrame([row]).to_csv(synthetic_dir / file_name, index=False)
+
+    generator_paths = kafka_event_generator.Paths(
+        project_root=project_paths.project_root,
+        config_path=project_paths.config_path,
+        synthetic_dir=synthetic_dir,
+        output_dir=output_dir,
+    )
+    config = kafka_event_generator.load_yaml_config(generator_paths.config_path)
+
+    def deterministic_event_id(topic: str, entity_id: str, row_index: int) -> str:
+        return f"TEST-{topic}-{entity_id}-{row_index}"
+
+    with patch.object(
+        kafka_event_generator,
+        "build_event_id",
+        side_effect=deterministic_event_id,
+    ):
+        all_events = kafka_event_generator.generate_all_events(generator_paths, config)
+
+    kafka_event_generator.save_topic_outputs(output_dir, all_events)
+
+    return Paths(
+        project_root=project_paths.project_root,
+        config_path=project_paths.config_path,
+        output_dir=output_dir,
+    )
 
 
 @pytest.fixture(scope="module")
