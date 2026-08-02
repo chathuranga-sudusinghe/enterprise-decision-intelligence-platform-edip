@@ -131,7 +131,7 @@ Some directories reflect the pre-V2 implementation. Their presence is evidence o
 
 ### Backend
 
-Use Python 3.11 for consistency with the current CI baseline.
+Use Python 3.12, the supported EDIP runtime for local development, CI, and Docker.
 
 ```bash
 python -m venv .venv

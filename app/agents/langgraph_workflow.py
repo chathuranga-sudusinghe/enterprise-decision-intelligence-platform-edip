@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional, TypedDict
 
+from langgraph.graph import END, StateGraph
+
 from app.agents.analytics_agent import (
     AnalyticsAgent,
     AnalyticsAgentInput,
@@ -34,17 +36,6 @@ from app.core.logging import get_logger
 
 
 logger = get_logger(__name__)
-
-
-# =========================================================
-# Optional LangGraph import
-# =========================================================
-try:
-    from langgraph.graph import END, StateGraph
-except Exception:  # pragma: no cover
-    END = "__end__"
-    StateGraph = None
-
 
 # =========================================================
 # Workflow state
@@ -146,11 +137,6 @@ class EDIPLangGraphWorkflow:
         self.reasoning_agent = reasoning_agent
         self.analytics_agent = analytics_agent
         self.execution_agent = execution_agent
-
-        if StateGraph is None:
-            raise ImportError(
-                "LangGraph is not installed. Install it before using EDIPLangGraphWorkflow."
-            )
 
         self.graph = self._build_graph()
         logger.info("EDIPLangGraphWorkflow initialized.")
