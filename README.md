@@ -192,6 +192,10 @@ V2 work integrates through `dev`, using short-lived branches from `dev`. Reviewe
 
 AI-assisted development may support drafting, review, tests, and documentation. Contributors remain responsible for technical correctness, security, evidence quality, licensing, and professional judgement.
 
+## License
+
+EDIP is publicly available for portfolio, professional evaluation, educational review, and research-demonstration purposes. It is not distributed under an open-source license. Copyright © 2026 Chathuranga Sudusinghe. All rights reserved. See [LICENSE](LICENSE) for permitted and prohibited uses.
+
 ## Project statement
 
 EDIP V2 is an approved architecture and a phased engineering/research programme. It is not a claim of production readiness, complete integration, or completed Phase 1 delivery.
