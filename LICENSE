@@ -1,21 +1,34 @@
-MIT License
+Copyright © 2026 Chathuranga Sudusinghe. All rights reserved.
 
-Copyright (c) 2026 Chathuranga Sudusinghe
+# Enterprise Decision Intelligence Platform (EDIP)
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+## Portfolio and Evaluation License
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This repository and its contents are made publicly available for portfolio presentation, professional evaluation, educational review, and research-demonstration purposes.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Permission is granted to view and inspect the source code, documentation, architecture, notebooks, tests, and other materials contained in this repository for personal evaluation and review.
+
+Unless prior written permission is obtained from the copyright holder, you may not:
+
+* copy or redistribute substantial portions of this project;
+* modify and republish the project or substantial portions of it as your own work;
+* use the project or substantial portions of it for commercial purposes;
+* incorporate substantial portions of this project into another product, service, commercial system, research project, publication, or repository;
+* sublicense, sell, resell, or commercially exploit the project or derivative works;
+* remove or misrepresent copyright, authorship, attribution, provenance, or ownership information.
+
+Public availability of this repository does not constitute a grant of an open-source license.
+
+GitHub platform functionality, including viewing and forking public repositories, remains subject to GitHub's Terms of Service.
+
+Third-party libraries, datasets, models, APIs, trademarks, and other external materials referenced or used by this project remain subject to their own respective licenses and terms.
+
+No patent, trademark, or other intellectual-property rights are granted except the limited permission to view and evaluate the repository described above.
+
+THE PROJECT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THIS PROJECT.
+
+For permissions beyond portfolio review and evaluation, contact the repository owner.
+
+Project: Enterprise Decision Intelligence Platform (EDIP)
+Author: Chathuranga Sudusinghe
+Copyright: © 2026 Chathuranga Sudusinghe. All rights reserved.
