@@ -176,7 +176,7 @@ These are contributor commands, not a claim that the entire suite currently pass
 - External evidence needs an approved source registry and provenance, freshness, licensing, and injection-resistance controls.
 - MCP ERP/CRM actions require allow-listed tools, least privilege, schema validation, idempotency, approval binding, and reconciliation testing.
 - ECS Fargate is the approved deployment direction; a production AWS environment has not been demonstrated by this README.
-- Existing tests, CI, monitoring, Kubernetes, Terraform, Kafka, and Airflow assets vary in maturity and do not demonstrate integrated production operation.
+- Existing tests, CI, monitoring, Kubernetes, and Terraform assets vary in maturity and do not demonstrate integrated production operation. Kafka and Airflow remain gated future options; the legacy demo assets are not part of the active runtime.
 
 ## Authoritative documents
 
