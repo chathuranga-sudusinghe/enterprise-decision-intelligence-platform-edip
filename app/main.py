@@ -5,9 +5,6 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.agent_workflow import router as agent_workflow_router
-from app.api.forecast import router as forecast_router
-from app.api.rag import router as rag_router
 from app.core.config import settings
 from app.core.monitoring import (
     decrement_http_requests_in_progress,
@@ -83,11 +80,3 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# =========================================================
-# Routers
-# =========================================================
-app.include_router(rag_router)
-app.include_router(forecast_router)
-app.include_router(agent_workflow_router)
