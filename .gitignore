@@ -122,23 +122,6 @@ data/processed/*
 data/external/*
 !data/external/.gitkeep
 
-data/synthetic/*
-!data/synthetic/.gitkeep
-
-data/exports/kafka_events/
-
-
-# Airflow
-airflow.db
-airflow-webserver.pid
-airflow.cfg
-airflow_home/
-
-# Kafka / streaming temp
-*.snap
-kafka-logs/
-zookeeper-logs/
-
 # Monitoring runtime data
 .prometheus/
 grafana_data/
@@ -173,7 +156,6 @@ temp/
 !data/interim/.gitkeep
 !data/processed/.gitkeep
 !data/external/.gitkeep
-!data/synthetic/.gitkeep
 !database/.gitkeep
 !database/ddl/.gitkeep
 !database/dml/.gitkeep

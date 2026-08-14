@@ -2,7 +2,7 @@
 
 EDIP Version 2 is the approved architecture for a trustworthy enterprise decision-intelligence platform: grounded evidence, forecasting, governed agent workflows, deterministic controls, and accountable human decisions.
 
-> **Current status:** Phase 0 repository audit and controlled cleanup are complete. The V2 architecture is approved. Phase 1 implementation has not started.
+> **Current status:** The real Favorita data foundation and the FastAPI health/monitoring boundary are implemented. Legacy synthetic forecast, RAG, and demo workflow runtimes have been retired; their governed V2 replacements have not been built.
 
 EDIP is not currently production-ready. Capabilities below are explicitly distinguished as current, approved target, or future work.
 
@@ -21,7 +21,7 @@ The flagship engineering goal is a reviewable enterprise platform rather than an
 
 | State | Meaning |
 |---|---|
-| **Current implemented state** | A FastAPI application, Next.js UI, forecasting and replenishment code, agent/RAG experiments, tests, deployment assets, and monitoring assets exist. Phase 0 verified repository truth and completed controlled cleanup; it did not certify the whole system for production. |
+| **Current implemented state** | A FastAPI health/monitoring foundation, Next.js UI baseline, real Favorita data-preparation workflow, focused feature-contract tests, deployment assets, and monitoring assets exist. Legacy synthetic forecast, RAG, and demo workflow implementations are absent. |
 | **Approved target architecture** | A capability-oriented modular monolith, LangGraph workflows, governed retrieval and integrations, deterministic safety controls, durable audit, and AWS ECS Fargate deployment define V2. |
 | **Future implementation** | Phase 1 and later phases must implement, integrate, evaluate, secure, and validate the approved architecture through explicit acceptance gates. |
 
@@ -144,7 +144,7 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Open `http://localhost:8000/docs` for generated API documentation. External-provider features require valid configuration and credentials; installation alone does not demonstrate live connectivity.
+Open `http://localhost:8000/docs` for generated API documentation. The current API exposes foundation health and monitoring behavior; forecast, RAG, and governed workflow APIs require future implementation.
 
 ### Frontend
 
@@ -169,10 +169,10 @@ These are contributor commands, not a claim that the entire suite currently pass
 
 ## Current known limitations
 
-- The Phase 1 stable local baseline is not yet established: runtime and dependencies require reconciliation; application and LangGraph imports, full pytest collection, controlled PostgreSQL initialization, deterministic fixtures, and API container health/readiness smoke checks remain to be validated.
-- Pinecone-backed internal RAG and its ingestion, retrieval, isolation, freshness, and citation evaluations are not confirmed live.
-- LangGraph orchestration, evidence-sufficiency rules, abstention, durable HITL resume, and deterministic execution gates require implementation and validation.
-- Forecasting and inventory-risk artifacts require stabilization, versioning, provenance, uncertainty evaluation, and monitored acceptance thresholds before migration.
+- The local Python import and test baseline is established, but controlled PostgreSQL initialization and API container health/readiness still require validation.
+- No active RAG implementation or corpus is present; governed ingestion, retrieval, isolation, freshness, citation, and evaluation capabilities require a new implementation.
+- LangGraph remains a declared foundation dependency, but orchestration, evidence-sufficiency rules, abstention, durable HITL resume, and deterministic execution gates require a new implementation and validation.
+- No active forecast runtime or model artifact is present; future forecasting must use the Favorita feature contract with temporal evaluation, uncertainty, versioning, provenance, and monitored acceptance thresholds.
 - External evidence needs an approved source registry and provenance, freshness, licensing, and injection-resistance controls.
 - MCP ERP/CRM actions require allow-listed tools, least privilege, schema validation, idempotency, approval binding, and reconciliation testing.
 - ECS Fargate is the approved deployment direction; a production AWS environment has not been demonstrated by this README.

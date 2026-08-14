@@ -51,15 +51,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "API_HOST", value = var.api_host },
         { name = "API_PORT", value = tostring(var.api_port) },
         { name = "ALLOW_CREDENTIALS", value = tostring(var.allow_credentials) },
-        { name = "ALLOWED_ORIGINS", value = var.allowed_origins },
-        { name = "OPENAI_API_KEY", value = var.openai_api_key },
-        { name = "PINECONE_API_KEY", value = var.pinecone_api_key },
-        { name = "PINECONE_INDEX_NAME", value = var.pinecone_index_name },
-        { name = "PINECONE_NAMESPACE", value = var.pinecone_namespace },
-        { name = "OPENAI_EMBED_MODEL", value = var.openai_embed_model },
-        { name = "OPENAI_CHAT_MODEL", value = var.openai_chat_model },
-        { name = "RAG_TOP_K", value = tostring(var.rag_top_k) },
-        { name = "RAG_MAX_CONTEXT_CHARS", value = tostring(var.rag_max_context_chars) }
+        { name = "ALLOWED_ORIGINS", value = var.allowed_origins }
       ]
 
       logConfiguration = {
