@@ -16,7 +16,7 @@ import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 
-FORECAST_HORIZONS: tuple[int, ...] = tuple(range(1, 15))
+FORECAST_HORIZONS: tuple[int, ...] = tuple(range(1, 17))
 SALES_LAG_OFFSETS: dict[str, int] = {
     "sales_lag_1": 1,
     "sales_lag_7": 7,
@@ -187,7 +187,7 @@ OUTPUT_ARROW_SCHEMA = pa.schema(
 SEMANTIC_TYPES: dict[str, str] = {
     "forecast_origin": "audit timestamp: end-of-day origin t",
     "forecast_date": "audit timestamp: target date t+h",
-    "forecast_horizon": "bounded integer horizon 1..14",
+    "forecast_horizon": "bounded integer horizon 1..16",
     "store_nbr": "categorical identifier (physical int16 code retained)",
     "item_nbr": "categorical identifier (physical int32 code retained)",
     "family": "categorical",
@@ -658,7 +658,7 @@ def validate_feature_frame(frame: pd.DataFrame) -> None:
     if tuple(frame.columns) != TRAINING_OUTPUT_COLUMNS:
         raise AssertionError("Training output column order differs from contract")
     if not frame["forecast_horizon"].isin(FORECAST_HORIZONS).all():
-        raise AssertionError("forecast_horizon must be restricted to 1..14")
+        raise AssertionError("forecast_horizon must be restricted to 1..16")
     expected_dates = frame["forecast_origin"] + pd.to_timedelta(
         frame["forecast_horizon"], unit="D"
     )
@@ -988,7 +988,8 @@ def write_json_atomic(payload: dict[str, Any], path: Path, *, overwrite: bool) -
 def _fixture_source_frame() -> tuple[pd.DataFrame, pd.Timestamp]:
     origin = pd.Timestamp("2020-02-10")
     dates = pd.date_range(
-        origin - pd.Timedelta(days=35), origin + pd.Timedelta(days=14)
+        origin - pd.Timedelta(days=35),
+        origin + pd.Timedelta(days=max(FORECAST_HORIZONS)),
     )
     rows: list[dict[str, Any]] = []
     for item_nbr in (100, 200):
@@ -1063,7 +1064,7 @@ def run_deterministic_fixture_validation() -> dict[str, bool]:
         reloaded = _read_filtered_source_slice(
             parquet_path,
             start_date=origin - pd.Timedelta(days=28),
-            end_date=origin + pd.Timedelta(days=14),
+            end_date=origin + pd.Timedelta(days=max(FORECAST_HORIZONS)),
             store_nbrs=(1,),
         )
         across_row_groups = build_feature_rows_for_origin(
@@ -1177,7 +1178,7 @@ def run_deterministic_fixture_validation() -> dict[str, bool]:
     assert "dcoilwtico" not in direct.columns
     assert "id" not in direct.columns
     assert TARGET_COLUMN not in INFERENCE_OUTPUT_COLUMNS
-    assert direct["forecast_horizon"].between(1, 14).all()
+    assert set(direct["forecast_horizon"]) == set(FORECAST_HORIZONS)
     assert (
         direct["forecast_date"]
         == direct["forecast_origin"]

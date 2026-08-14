@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pandas as pd
+
 from pipelines.features.favorita_model_ready import (
     FEATURE_DEFINITIONS,
     FORBIDDEN_MODEL_COLUMNS,
@@ -10,6 +12,8 @@ from pipelines.features.favorita_model_ready import (
     SALES_LAG_OFFSETS,
     TARGET_COLUMN,
     TRAINING_OUTPUT_COLUMNS,
+    _fixture_source_frame,
+    build_feature_rows_for_origin,
     run_deterministic_fixture_validation,
 )
 
@@ -67,4 +71,41 @@ def test_ordered_training_and_inference_schema_parity() -> None:
 
 def test_forbidden_columns_and_horizon_contract() -> None:
     assert not FORBIDDEN_MODEL_COLUMNS.intersection(MODEL_FEATURE_COLUMNS)
-    assert FORECAST_HORIZONS == tuple(range(1, 15))
+    assert FORECAST_HORIZONS == tuple(range(1, 17))
+    assert min(FORECAST_HORIZONS) == 1
+    assert max(FORECAST_HORIZONS) == 16
+
+
+def test_sixteen_day_row_generation_is_deterministic() -> None:
+    fixture, origin = _fixture_source_frame()
+
+    first = build_feature_rows_for_origin(
+        fixture,
+        forecast_origin=origin,
+        allow_assumed_future_promotion=True,
+        allow_assumed_future_holidays=True,
+    )
+    second = build_feature_rows_for_origin(
+        fixture,
+        forecast_origin=origin,
+        allow_assumed_future_promotion=True,
+        allow_assumed_future_holidays=True,
+    )
+
+    pd.testing.assert_frame_equal(first, second)
+    assert len(first) == 2 * len(FORECAST_HORIZONS) == 32
+    assert set(first["forecast_horizon"]) == set(FORECAST_HORIZONS)
+    group_horizons = first.groupby(
+        ["forecast_origin", "store_nbr", "item_nbr"], observed=True
+    )["forecast_horizon"].agg(lambda values: tuple(sorted(values)))
+    assert (group_horizons == tuple(FORECAST_HORIZONS)).all()
+    assert not first.duplicated(
+        ["forecast_origin", "forecast_date", "store_nbr", "item_nbr"]
+    ).any()
+    assert first["forecast_date"].min() == origin + pd.Timedelta(days=1)
+    assert first["forecast_date"].max() == origin + pd.Timedelta(days=16)
+    assert (
+        first["forecast_date"]
+        == first["forecast_origin"]
+        + pd.to_timedelta(first["forecast_horizon"], unit="D")
+    ).all()
