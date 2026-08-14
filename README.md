@@ -181,7 +181,11 @@ These are contributor commands, not a claim that the entire suite currently pass
 ## Authoritative documents
 
 - [EDIP V2 Flagship Architecture Plan](docs/architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md)
+- [EDIP Research and Engineering Delivery Workflow](docs/governance/EDIP_RESEARCH_ENGINEERING_DELIVERY_WORKFLOW.md)
 - [Phase 0 Completion Review](docs/audits/PHASE_0_COMPLETION_REVIEW.md)
+- [Legacy Synthetic-Asset Cleanup Completion Review](docs/audits/LEGACY_SYNTHETIC_ASSET_CLEANUP_COMPLETION_REVIEW.md)
+- [Favorita Dataset Source and Governance](docs/phase-1/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md)
+- [Favorita Post-Download Verification](docs/phase-1/FAVORITA_POST_DOWNLOAD_VERIFICATION.md)
 - [All repository audits](docs/audits/)
 
 ## Contribution workflow
