@@ -85,22 +85,6 @@ class Settings:
         )
     )
 
-    # OpenAI / Pinecone / RAG
-    openai_api_key: str = field(default_factory=lambda: _get_env_str("OPENAI_API_KEY"))
-    pinecone_api_key: str = field(default_factory=lambda: _get_env_str("PINECONE_API_KEY"))
-    pinecone_index_name: str = field(default_factory=lambda: _get_env_str("PINECONE_INDEX_NAME", "edip-rag-index"))
-    pinecone_namespace: str = field(default_factory=lambda: _get_env_str("PINECONE_NAMESPACE", "edip-phase-6"))
-
-    openai_embed_model: str = field(
-        default_factory=lambda: _get_env_str("OPENAI_EMBED_MODEL", "text-embedding-3-small")
-    )
-    openai_chat_model: str = field(
-        default_factory=lambda: _get_env_str("OPENAI_CHAT_MODEL", "gpt-4.1-mini")
-    )
-
-    rag_top_k: int = field(default_factory=lambda: _get_env_int("RAG_TOP_K", 5))
-    rag_max_context_chars: int = field(default_factory=lambda: _get_env_int("RAG_MAX_CONTEXT_CHARS", 12000))
-
 
 # Shared settings instance
 settings = Settings()
