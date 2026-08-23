@@ -1,257 +1,247 @@
 # EDIP Research and Engineering Delivery Workflow
 
-- Version: 1.0
-- Status: Active governance
-- Effective date: 14 August 2026
-- Owner and accountable decision-maker: Human project owner/researcher
-- Architecture authority: [EDIP V2 Flagship Architecture Plan](../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md)
-- AI-use policy: [AI Usage](../../AI_USAGE.md)
-
-## 1. Purpose, authority and scope
-
-This document defines how EDIP research questions, architecture decisions and engineering changes move from evidence to a reviewed outcome. It operationalizes the authoritative architecture plan; it does not replace it, redefine its target architecture or certify implementation maturity.
-
-The workflow applies to repository research, APIs, data, feature engineering, forecasting, machine learning, RAG, agent workflows, deterministic safety, infrastructure, deployment and governance records. It governs both implementation and documentation-only work when either could affect an architectural claim, research conclusion, professional-evidence claim or operational boundary.
-
-Where records disagree, use the evidence precedence in architecture-plan section 1.1: current verified repository and test evidence takes priority for current implementation truth; dated audits remain evidence of the state they inspected; the architecture plan and accepted ADRs define the approved target and decisions. A plan is not implementation evidence, and a historical implementation record is not automatically current truth.
-
-Review this workflow when any of the following occurs:
-
-- the architecture authority, branching model or phase gates change;
-- a new regulated, safety-critical, external-data or irreversible-action capability is proposed;
-- research, academic, licensing, privacy or professional-evidence requirements change;
-- repeated delivery failures show that an evidence or approval gate is ineffective;
-- an audit finds a contradiction between this workflow and repository practice; or
-- at each major phase checkpoint before promotion from `dev` to `main`.
-
-Changes to this workflow require human approval, a focused pull request and an explicit supersession note. They must not be inferred from an AI-generated suggestion.
-
-## 2. Record hierarchy and evidence roles
-
-| Record type | Purpose | Authority and expected relationship |
-|---|---|---|
-| Architecture plan | Defines the approved target, principles, boundaries, gates and non-goals | Highest design authority unless formally superseded; see architecture-plan sections 1, 5–7 and 31 |
-| Governance record | Defines repeatable decision, evidence and accountability controls | Must conform to the architecture plan and applicable legal, academic and professional obligations |
-| ADR | Records one architecture-significant decision, alternatives, consequences and rollback | Required by architecture-plan section 34 triggers; cannot silently override the architecture plan |
-| Audit | Records verified conditions, risks and limitations at a named revision and date | Historical evidence remains unchanged; later records link to it and state what resolved or superseded it |
-| Phase record | Defines or reviews a bounded phase, gate and acceptance decision | Links work items, ADRs, validation and unresolved risks to architecture-plan sections 27–31 |
-| Experiment record | Defines a question or hypothesis, protocol, baseline, dataset and evaluation | Results may inform a decision but do not become runtime truth without approval and implementation evidence |
-| Implementation record | Identifies scoped files, branch, commits, migration and rollback | Proves what changed, not that the change is correct, useful, safe or deployed |
-| Validation record | Preserves commands, environment, inputs, outputs, failures and evidence limits | Must distinguish static, mocked, local, credentialed, deployment and live-operational evidence |
-| Reflection/outcome record | Compares observed outcomes with intended outcomes and records learning | Must include negative or inconclusive results and follow-up decisions |
-
-Records should link rather than duplicate large sections of another authority. A later resolution record may classify an earlier finding as resolved, partially resolved or superseded, but it must not rewrite the original audit.
-
-## 3. Roles and decision authority
-
-| Role | Permitted contribution | Decision/accountability boundary |
-|---|---|---|
-| Human project owner/researcher | Frames research, owns requirements, evaluates evidence, approves decisions and accepts risk | Sole accountable owner for repository direction, academic integrity, professional claims and release/phase decisions |
-| ChatGPT discussion and decision-support assistant | Helps explore evidence, alternatives, risks, questions and draft plans | Cannot approve work, own authorship/accountability, validate unobserved facts or substitute for supervisor/stakeholder judgement |
-| Codex bounded coding and validation assistant | Inspects the authorized scope, implements approved changes and runs proportionate checks | Must obey file/action boundaries; cannot broaden authority, approve its own output or convert generated text into verified evidence |
-| GitHub and CI | Preserve branches, reviews, commits, workflow logs and check results | Evidence surfaces only; a merge or green check is not by itself proof of research validity, security, deployment or production readiness |
-| Stakeholder, supervisor or reviewer | Challenges requirements, design, ethics, evaluation and outcomes within their remit | Approval authority must be explicit; review participation does not transfer the project owner's accountability |
-
-AI tools are not authors, approvers, accountable decision-makers or substitutes for academic or professional judgement. The human owner must verify every material AI-assisted claim, citation, code change, test interpretation and decision before acceptance. AI assistance must be disclosed consistently with [AI_USAGE.md](../../AI_USAGE.md), including its bounded role and the human verification performed. Credentials, personal data, restricted data and unpublished confidential material must not be exposed to an AI tool without explicit authorization and an appropriate data-handling basis.
-
-## 4. Mandatory lifecycle
-
-Every material work item must preserve this chain:
-
-`finding → risk → decision → implementation → validation → outcome → reflection`
-
-The chain is mandatory because each link answers a different question:
-
-- **Finding:** What was observed, at which revision, using what evidence?
-- **Risk:** Why does the finding matter, to whom, and with what likelihood/impact?
-- **Decision:** What option did the human owner approve, and which alternatives were rejected or deferred?
-- **Implementation:** What changed, where, by whom, and with what rollback boundary?
-- **Validation:** Which checks ran, with which inputs/environment, and what passed, failed, was skipped or remained untested?
-- **Outcome:** Did the change produce the intended technical, research or stakeholder result?
-- **Reflection:** What was learned, what assumptions failed, and what should change next?
-
-Missing links must be marked explicitly; they must not be filled with inferred or fabricated evidence.
-
-## 5. Discussion-to-Codex delivery workflow
-
-1. **Evidence review.** Inspect current code, data contracts, tests, prior decisions, audits and applicable architecture sections. Record the revision and evidence limits.
-2. **Problem definition.** State the observed problem, affected users/systems, scope, non-goals and risk.
-3. **Alternatives and non-AI baseline.** Compare reasonable alternatives, including a deterministic or non-AI baseline where AI is proposed. Record cost, safety, reversibility and evidence needs.
-4. **Human approval.** The project owner approves the direction and any consequential external action. AI discussion is advisory only.
-5. **Work item and acceptance criteria.** Define files/capabilities in scope, exclusions, required evidence, rollback and phase relationship before coding.
-6. **Scoped Codex prompt.** Name the repository, branch, exact authorized changes, protected assets, validation and prohibited actions.
-7. **Implementation.** Make the smallest coherent change. Preserve unrelated work and do not combine cleanup, redesign and new capability work without an approved reason.
-8. **Validation.** Run proportionate checks; preserve exact commands/results; distinguish simulated/static evidence from live or deployment evidence.
-9. **Completion record.** Reconcile implementation with acceptance criteria, failures, residual risks, changed files and rollback.
-10. **PR and phase gate.** Obtain review, resolve comments, inspect CI evidence and apply the relevant architecture-plan section 31 gate before integration or promotion.
-11. **Outcome measurement and reflection.** Measure the agreed outcome after sufficient observation, record negative/inconclusive results and decide whether to retain, revise, roll back or supersede.
-
-## 6. Branch, commit and pull-request rules
-
-The branching policy follows architecture-plan section 32:
-
-- `main` holds reviewed stable checkpoints;
-- `dev` holds integrated development;
-- short-lived work branches start from `dev` and return to `dev` through review;
-- a reviewed phase checkpoint moves from `dev` to `main`;
-- commits are focused, explain intent and do not conceal unrelated generated changes;
-- a PR links its work item, relevant finding/audit, ADR when required, acceptance criteria, validation and rollback;
-- required checks and human review must be interpreted, not merely counted; failures, skips and mocked boundaries remain visible; and
-- no force-push, history rewrite, external deployment or irreversible operation is implied by this workflow.
-
-Emergency exceptions require a named human approver, documented risk, minimum safe validation and a follow-up completion/reflection record.
-
-## 7. Evidence required by change type
-
-| Change type | Minimum required records and evidence |
+| Field | Value |
 |---|---|
-| API or schema | Versioned contract, OpenAPI impact, identity/authorization analysis, error and compatibility contract, migration/rollback, unit/integration/security tests |
-| Data or feature engineering | Source/version/provenance, grain and schema contract, lineage, leakage and temporal controls, row/value preservation rules, quality assertions, reproducible manifest and rollback |
-| Forecasting or ML experiment | Research question, dataset/version, chronological split, non-AI/naive baselines, predeclared metrics/thresholds, uncertainty/error analysis, reproducibility, artifact lineage, negative results |
-| RAG or corpus | Approved source registry and licences, corpus/chunk manifests, ACL/tenant model, index/embedding compatibility, retrieval baseline, grounding/citation/abstention/staleness/injection tests |
-| Agent, workflow or deterministic safety | State/transition contract, tool allow-list, authorization boundary, deterministic safety rules, HITL and revalidation behavior, failure/idempotency/reconciliation tests, durable audit evidence |
-| Infrastructure or deployment | ADR where triggered, environment ownership, immutable versions, secret handling, state/backend, static validation, plan review, security/cost review, deployment/health/rollback evidence appropriate to the claim |
+| Status | Active governance |
+| Owner and accountable decision-maker | Human project owner/researcher |
+| Engineering lifecycle | Enterprise AI/ML Engineering Framework v2.1.0 |
+| Execution management | Jira Sprints and SCRUM work items |
+| Architecture authority | [EDIP V2 Flagship Architecture Plan](../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md) |
+| AI-use policy | [AI Usage](../../AI_USAGE.md) |
 
-## 8. API and schema evidence
+## 1. Purpose and scope
 
-API changes must align with architecture-plan sections 10, 11, 19, 20 and 23. The change record must include:
+This document defines how EDIP research questions, architecture decisions, engineering changes, releases, and outcomes move from evidence to a reviewed result. It operationalizes the architecture plan without converting target design into implementation evidence.
 
-- versioned request and response schemas, representative valid/invalid examples and the affected OpenAPI surface;
-- authentication, tenant context, role/permission checks and fail-closed authorization behavior;
-- stable error codes, safe error messages, correlation/audit identifiers and retry/idempotency semantics where relevant;
-- backward/forward compatibility, deprecation window, consumer impact, migration and rollback;
-- unit tests for validation/business rules, in-process integration tests for routing and dependency boundaries, and security tests for unauthorized, cross-tenant and malformed requests; and
-- an explicit statement when live consumer, performance, external-service or deployment behavior was not exercised.
+The workflow applies to APIs, data, feature engineering, forecasting, machine learning, RAG, LangGraph workflows, Human-in-the-Loop controls, MCP integrations, infrastructure, deployment, security, governance, and documentation that affects technical or research claims.
 
-## 9. Data, feature and ML/research evidence
+Current verified repository and execution evidence has priority for current implementation truth. The architecture plan and approved ADRs define target decisions. Dated historical records describe only the revision and boundary they inspected.
 
-Data and model work must follow architecture-plan sections 16, 24, 26, 29–31 and the applicable dataset governance, including the [Favorita source and governance record](../phase-1/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md).
+## 2. Two-layer operating model
 
-Before evaluation, record:
+EDIP separates lifecycle governance from execution management.
 
-- the hypothesis or research question and intended decision relevance;
-- dataset identifier/version, access terms, provenance, checksums/manifests, grain and date coverage;
-- leakage controls, chronological train/validation/test splits and any embargo or rolling-origin protocol;
-- naive, rules-based or other non-AI baselines;
-- metrics, aggregation rules, segments, thresholds and statistical comparison method;
-- reproducible environment, seeds where meaningful, code/commit and artifact identifiers.
+### Engineering lifecycle and quality layer
 
-After evaluation, record uncertainty, calibration where relevant, error and subgroup analysis, sensitivity, limitations, failed hypotheses and negative results. Promotion requires evidence that the selected approach improves on declared baselines for the intended use; an experiment notebook or model artifact alone is not approval for serving or decision use.
+The Enterprise AI/ML Engineering Framework v2.1.0 supplies the lifecycle:
 
-## 10. RAG evidence
+```text
+Problem -> Data -> Baseline -> Advanced AI -> Evaluation -> Delivery -> Production -> Maintenance
+```
 
-RAG work must use the controls in architecture-plan sections 14, 23, 24 and 26. At minimum preserve:
+Each stage defines questions, controls, evidence, and promotion gates. The lifecycle is not a Sprint plan and does not prescribe ticket numbering.
 
-- a human-approved source registry with owner, authority, licence, sensitivity, freshness and supersession status;
-- corpus, document, chunk and ingestion manifests with stable identifiers and hashes;
-- tenant and document ACL enforcement from ingestion through retrieval and citation;
-- embedding model, dimension, index and namespace compatibility plus deletion/re-index behavior;
-- deterministic lexical/vector or other retrieval baselines and predeclared retrieval metrics;
-- grounding, citation correctness, unsupported-answer abstention, conflicting-source, stale-source and insufficient-context tests; and
-- prompt-injection, malicious-document, cross-tenant and data-exfiltration tests.
+### Jira Sprint and SCRUM execution layer
 
-Model-free tests, fake-backed tests and credentialed live-service evaluations must be reported separately. No source may enter the corpus solely because an AI tool generated or recommended it.
+Jira Sprints and SCRUM work items define planned delivery:
 
-## 11. Agent, workflow and deterministic-safety evidence
+```text
+Sprint goal
+-> approved SCRUM work item
+-> acceptance criteria and protected scope
+-> feature branch from dev
+-> implementation and local validation
+-> pull request to dev
+-> CI and human review
+-> Sprint/release review
+-> reviewed dev-to-main release checkpoint
+-> approved CD
+-> measured outcome and reflection
+```
 
-Workflow changes must align with architecture-plan sections 12, 13, 19 and 20. Record state transitions, interrupt/resume rules, actor identity, tool permissions, decision provenance and deterministic post-model controls. An LLM must not authorize irreversible action.
+A work item may cover part of one framework stage or evidence spanning several stages. A framework quality gate may require several work items across several Sprints.
 
-Tests must cover evidence insufficiency, abstention, unauthorized tools, stale approvals, changed inputs after approval, duplicate/replayed requests, partial failures, compensation/reconciliation, timeout and durable resume. Human approval must bind a known actor to a specific versioned action and expire or revalidate when material inputs change.
+## 3. Evidence hierarchy
 
-## 12. Infrastructure and deployment evidence
+| Record | Purpose | Authority |
+|---|---|---|
+| Architecture plan | Approved target, boundaries, principles, and non-goals | Design authority unless formally superseded |
+| Governance record | Repeatable evidence, decision, accountability, and release controls | Must conform to architecture and legal/research duties |
+| Jira work item | Sprint scope, acceptance criteria, exclusions, owner, and dependencies | Execution authority for the bounded change |
+| ADR | Architecture-significant decision, alternatives, consequences, and rollback | Required for material or difficult-to-reverse decisions |
+| Dataset/corpus governance record | Source, licence, access, provenance, lineage, retention, and restrictions | Data-use authority for the named asset |
+| Research design | Hypothesis, methodology, baseline, split, metrics, limitations, and approval | Evaluation authority for the named study |
+| Implementation record | Files and behavior changed, migration, and rollback | Proves what changed, not that it is correct or deployed |
+| Validation record | Commands, environment, inputs, outputs, failures, and evidence limits | Proves only the executed boundary |
+| Release/deployment record | Approved immutable release and environment outcome | Proves the named deployment, not sustained operation |
+| Outcome/reflection record | Observed result, negative evidence, learning, and next decision | Closes the evidence chain |
 
-Infrastructure work must preserve the ECS Fargate canonical direction and Kubernetes optionality defined by the architecture plan. Record environment/account ownership, Terraform/backend state, immutable image and artifact identifiers, network/IAM boundaries, secret-manager references, observability, backup/recovery and rollback.
+Records should link instead of duplicating large bodies. Historical records may be summarized or removed after unique evidence is consolidated, while Git history preserves their original form.
 
-`terraform validate`, Docker build, configuration rendering and CI success are static or construction evidence. Deployment, health, load, resilience, security and recovery require separate environment evidence. A plan or successful build must never be labelled production readiness.
+## 4. Roles and accountability
 
-## 13. ADR triggers and contents
+| Role | Contribution | Boundary |
+|---|---|---|
+| Human project owner/researcher | Frames questions, approves work and architecture, accepts risk, reviews evidence, owns academic integrity | Sole accountable decision-maker for project direction and claims |
+| ChatGPT discussion and decision-support assistant | Explores evidence, alternatives, risks, questions, and draft plans | Advisory only; cannot approve work or validate unobserved facts |
+| Codex bounded implementation assistant | Inspects authorized scope, implements approved changes, and runs proportionate checks | Cannot broaden scope, approve its own output, or manufacture evidence |
+| Jira | Preserves Sprint goals, work-item scope, decisions, ownership, and status | Planning evidence; ticket closure alone is not technical completion |
+| GitHub and CI/CD | Preserve branches, reviews, checks, releases, and deployment automation | Evidence surfaces; a merge or green check is not production readiness |
+| Reviewer, supervisor, or stakeholder | Challenges requirements, design, ethics, method, and outcomes | Authority must be explicit; participation does not transfer owner accountability |
 
-Create or update an ADR when a decision changes a system boundary, public/API/data contract, security or tenant model, persistence/state model, external provider, model/corpus strategy, deterministic safety rule, deployment topology, irreversible-action control, canonical framework, or a previously accepted architecture decision. Also use an ADR when a difficult-to-reverse choice has material cost, compliance or research consequences. See architecture-plan section 34.
+AI tools are not authors, approvers, or accountable decision-makers. The human owner verifies material AI-assisted claims, citations, code, test interpretation, and decisions. AI use must be disclosed consistently with `AI_USAGE.md`. Credentials, restricted data, personal data, and unpublished confidential material require explicit authority and appropriate handling.
 
-Every ADR must state:
+## 5. Mandatory evidence chain
 
-- status, date, owner and linked work item/finding;
-- context, constraints, risks and decision drivers;
-- considered alternatives, including status quo and non-AI baseline where applicable;
-- approved decision and explicit scope/non-goals;
-- consequences, security/privacy/ethics/licensing implications;
-- validation, observability, migration and rollback;
-- superseded/superseding ADR links; and
-- named human approval and review date.
+Every material work item preserves:
 
-## 14. Definition of Ready
+```text
+finding -> risk -> decision -> implementation -> validation -> outcome -> reflection
+```
+
+- **Finding:** What was observed, at which revision, from which evidence?
+- **Risk:** Why does it matter, to whom, with what likelihood and impact?
+- **Decision:** What did the human owner approve, reject, or defer?
+- **Implementation:** What changed and what remained protected?
+- **Validation:** Which checks ran, with which environment and evidence boundary?
+- **Outcome:** Did the change produce the intended technical or research result?
+- **Reflection:** What was learned and what changes next?
+
+A missing link is stated explicitly; it is never inferred or fabricated.
+
+## 6. Work-item workflow
+
+1. Inspect current evidence and applicable architecture, governance, research, and data contracts.
+2. Define the problem, affected users, decision value, scope, non-goals, protected assets, and risk.
+3. Compare alternatives, including a simple or non-AI baseline where appropriate.
+4. Obtain human approval for the direction and consequential external actions.
+5. Create or refine the Jira SCRUM work item with acceptance criteria, dependencies, evidence, rollback, and exclusions.
+6. Branch from `dev` using a short-lived feature or chore branch.
+7. Implement the smallest coherent change without unrelated cleanup.
+8. Validate locally using evidence proportionate to risk.
+9. Create a pull request to `dev`; interpret CI results and review feedback.
+10. Record changed files, failures, limitations, rollback, and completion evidence.
+11. Review the outcome in the Sprint and decide whether it contributes to a release checkpoint.
+12. Obtain human approval for the reviewed release and merge the release checkpoint from `dev` to `main`.
+13. Allow the approved GitHub Actions Continuous Deployment (CD) workflow to deploy the immutable application image automatically, perform post-deployment validation, and preserve rollback evidence.
+14. Measure outcomes and record negative or inconclusive results.
+
+Emergency exceptions require a named human approver, documented risk, minimum safe validation, bounded authority, and a follow-up completion/reflection record.
+
+## 7. Branch, pull-request, and release controls
+
+- `main` represents reviewed release checkpoints.
+- `dev` integrates reviewed development work.
+- Short-lived feature/chore branches start from `dev` and return through pull-request review.
+- A feature or `dev` push is not a production release.
+- CI must complete before the relevant merge or release decision.
+- Human approval must occur before the reviewed release is merged to `main`.
+- The approved `main`/release merge is the deployment boundary.
+- Continuous Deployment (CD) is then triggered automatically by the approved GitHub Actions workflow.
+- Commits and pull requests remain focused and do not conceal unrelated generated changes.
+- Force-push, history rewrite, production deployment, data publication, or irreversible external action requires explicit authority.
+
+## 8. CI/CD and infrastructure governance
+
+### Continuous integration
+
+CI validates the bounded revision before release. Depending on change type, it may include compilation, unit and integration tests, schema or contract checks, notebook validation, linting, type checking, container construction, dependency review, and static Infrastructure as Code checks.
+
+CI evidence must identify mocks, skipped tests, unavailable services, and static-only checks. It does not prove cloud deployment or live operation.
+
+### Continuous Deployment (CD)
+
+After a human-reviewed release is merged to `main`, the approved GitHub Actions Continuous Deployment (CD) workflow automatically:
+
+1. builds an immutable application container image;
+2. publishes the image to Azure Container Registry;
+3. deploys a new Azure Container Apps revision to the target Azure environment;
+4. verifies health, readiness, version, and telemetry after deployment; and
+5. preserves evidence and the ability to roll back to a known revision.
+
+Feature or `dev` pushes do not deploy production. Human approval occurs before the `main`/release merge; that merge is the deployment boundary, after which CD performs the automated deployment and post-deployment validation.
+
+### Infrastructure lifecycle
+
+Terraform is the preferred direction for reviewed Azure infrastructure lifecycle. Infrastructure changes require focused IaC review, static validation, plan review, security/cost analysis, and environment-appropriate apply authority.
+
+Application release and infrastructure lifecycle are distinct. Terraform is used when infrastructure changes; it is not a mandatory step for every application image deployment. Detailed Azure Terraform, identity, networking, and workflow configuration require a dedicated ADR and implementation task.
+
+## 9. Evidence required by change type
+
+| Change type | Minimum evidence |
+|---|---|
+| API/schema | Versioned contract, identity/authorization impact, stable errors, compatibility, migration/rollback, unit/integration/security tests |
+| Data/features | Source/version/provenance, grain/schema, lineage, leakage/temporal controls, preservation rules, quality assertions, manifest |
+| Forecasting/ML | Research question, governed data, chronological split, baseline, predeclared metrics, reproducibility, uncertainty/error analysis, artifact lineage |
+| RAG/corpus | Approved source registry/licences, corpus and chunk manifests, ACL model, compatibility, retrieval baseline, grounding/citation/abstention/injection tests |
+| LangGraph/workflow | State and transition contract, tool allowlist, identity, deterministic safety, HITL, idempotency, failure/resume/reconciliation tests |
+| MCP/integration | Versioned tools, read/write separation, authorization, approval, idempotency, simulation, reconciliation, threat model |
+| Infrastructure | ADR where required, environment owner, Terraform/backend contract, immutable versions, secrets, plan/security/cost/rollback evidence |
+| Application release | Reviewed revision, CI, immutable image digest, deployment approval, health/readiness, telemetry, rollback |
+| Research outcome | Protocol, comparator, results, uncertainty, threats, ethics/licensing, negative evidence, critical discussion |
+
+## 10. Data, feature, and research integrity
+
+Favorita work follows the [dataset source and governance record](FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md), [temporal validation design](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md), and [temporal validation contract](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
+
+Research records must preserve:
+
+- question or hypothesis and decision relevance;
+- dataset identity, permitted use, provenance, grain, date coverage, and checksums;
+- leakage-safe temporal splits and holdout protection;
+- baseline and model comparison under identical conditions;
+- predeclared metrics, aggregation, segments, thresholds, and negative-target treatment;
+- code revision, environment, seeds where meaningful, and artifact identifiers;
+- uncertainty, error, subgroup and sensitivity analysis;
+- limitations, failed hypotheses, and negative results.
+
+Raw data is not redistributed. Sparse absent rows are not silently interpreted as zero demand. Synthetic fixtures may test logic but cannot establish real-world model quality.
+
+## 11. RAG, agentic, and safety evidence
+
+RAG sources require human-approved authority, licensing, sensitivity, freshness, access, and supersession. Corpus and retrieval evidence is versioned. Model-free, fake-backed, credentialed live-service, and production evidence are reported separately.
+
+LangGraph work records state transitions, interrupts, resume rules, actor identity, tool permissions, decision provenance, and deterministic post-model controls. Tests cover insufficient evidence, abstention, unauthorized tools, stale approval, changed inputs, replay, partial failure, timeout, and durable resume.
+
+An LLM must not authorize irreversible action. Human approval binds a known actor to a specific action and versioned inputs and expires or revalidates when material conditions change.
+
+## 12. Definition of Ready
 
 A work item is ready only when:
 
-- the finding, risk, user/research value and scope are evidence-based;
-- architecture sections, prior audits and relevant ADRs are linked;
-- alternatives and a non-AI baseline have been considered where applicable;
-- data access, licensing, privacy, ethics and external-service authority are resolved or explicitly gated;
-- acceptance criteria, exclusions, evidence types, rollback and owner are written;
-- dependencies and protected assets are identified;
-- required stakeholder/supervisor review is scheduled; and
-- the human owner has approved implementation.
+- the finding, risk, user/research value, and Sprint relationship are evidence-based;
+- architecture, governance, data/research contracts, and relevant ADRs are linked;
+- scope, non-goals, protected assets, dependencies, and owner are clear;
+- alternatives and a non-AI baseline are considered where appropriate;
+- data access, licensing, privacy, ethics, and external authority are resolved or gated;
+- acceptance criteria, evidence types, rollback, and review are written; and
+- the human owner approves implementation.
 
-## 15. Definition of Done
+## 13. Definition of Done
 
 A work item is done only when:
 
-- implementation matches the approved scope and no unexplained changes remain;
-- required tests/checks ran and exact pass/fail/skip evidence is recorded;
-- contracts, manifests, documentation and audit trails are consistent with executed behavior;
-- security, privacy, licensing, accessibility and research-integrity controls relevant to the change were reviewed;
+- implementation matches approved scope and unexplained changes are absent;
+- required checks ran and exact pass/fail/skip evidence is recorded;
+- contracts, manifests, documentation, and executed behavior agree;
+- relevant security, privacy, licensing, accessibility, and integrity controls were reviewed;
 - rollback is feasible and versioned assets are recoverable;
-- the PR is reviewed and applicable CI/phase-gate evidence is interpreted;
-- residual risks, limitations and unverified external/live behavior are explicit;
-- outcome measurement is defined or completed at the appropriate time; and
-- the completion record links the entire mandatory lifecycle and includes reflection.
+- the pull request is reviewed and CI evidence is interpreted;
+- residual risks and unverified live behavior are explicit;
+- release/deployment status is stated accurately; and
+- outcome measurement and reflection are recorded at the appropriate time.
 
-“Code written,” “PR merged” or “tests passed” alone does not satisfy this definition.
+“Code written,” “ticket closed,” “PR merged,” or “tests passed” alone is insufficient.
 
-## 16. Academic and professional evidence
+## 14. ADR discipline
 
-### MSc evidence
+Create or update an ADR when a decision changes a system boundary, public/data contract, security/tenant model, persistence, external provider, model/corpus strategy, deterministic safety rule, deployment topology, irreversible-action control, or other difficult-to-reverse choice.
 
-MSc evidence should demonstrate a defensible research question, literature/context review, justified methodology, governed dataset/provenance, comparative baselines, reproducible experiments, quantitative and qualitative evaluation, ethics/privacy/licensing review, limitations, negative results and a critical discussion connecting results to the question. Repository activity alone is not academic contribution.
+An ADR records status, date, owner, linked work item, context, constraints, alternatives including status quo, approved decision, non-goals, consequences, security/privacy/licensing implications, validation, observability, migration, rollback, supersession, named human approval, and review date.
 
-### CITP evidence
+The detailed Azure topology, Terraform implementation, identity, networking, managed services, and CD workflow require a dedicated ADR before implementation.
 
-Professional evidence should connect decisions and outcomes to responsibility, complexity, stakeholder communication, risk, governance, quality, security, ethics, learning and influence. Preserve the project owner's personal contribution, review feedback and measured outcome rather than presenting AI output or commit volume as competence. This workflow does not assign an SFIA level, award CITP or predict an assessment outcome; see architecture-plan section 29.
+## 15. Academic and professional evidence
 
-### PhD pathway evidence
+MSc evidence requires a defensible research question, context/literature, justified method, governed data, comparative baselines, reproducibility, evaluation, ethics/licensing, limitations, negative results, and critical discussion. Repository activity alone is not academic contribution.
 
-A PhD pathway requires a precise research gap, systematic literature evidence, a reproducible method, credible comparators, repeated evaluation across relevant settings, statistical/qualitative rigor, threats to validity, ethical approval where required and peer/supervisor challenge. Architecture ambition, system breadth or use of an LLM does not establish novelty. Novelty and contribution may be claimed only after comparative evidence supports them; see architecture-plan section 30.
+Professional evidence connects decisions and outcomes to responsibility, complexity, stakeholders, risk, quality, security, ethics, learning, and influence. AI output, commit volume, or document volume does not establish competence or an SFIA level.
 
-## 17. Research-integrity controls
+A future PhD pathway requires a precise gap, reproducible method, credible comparators, repeated evaluation, threats to validity, ethical approval where required, and supervisor/peer challenge. Architecture ambition or LLM use does not establish novelty.
 
-- Preserve source and artifact provenance, dataset/corpus versions, code revision and environment details.
-- Make experiments reproducible to the extent permitted by access, privacy and provider constraints; document unavoidable nondeterminism.
-- Review ethics, bias, safety, privacy, consent, confidentiality, retention and stakeholder impact proportionately.
-- Respect licences and restricted-access terms; do not redistribute Favorita or other restricted data without permission.
-- Disclose AI assistance and record human verification; do not cite an AI answer as source evidence.
-- Preserve negative, null and inconclusive results and changes to hypotheses or thresholds.
-- Never fabricate test output, metrics, citations, approvals, users, deployments, external-service checks or stakeholder outcomes.
-- Separate observation from inference and planned target from implemented/validated state.
-- Correct errors through a linked amendment or supersession record; do not silently rewrite historical evidence.
+## 16. Supersession and review
 
-## 18. Traceability matrix template
+Review this workflow when architecture, Jira practice, branch/release policy, CI/CD, regulated data, safety controls, research obligations, or repeated delivery failures change.
 
-| Work item | Finding/evidence | Risk | ADR/decision | Branch | PR | Commit | Test/validation | Dataset/model/corpus artifact | Result | Outcome | Reflection |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| `SCRUM-XX` | Audit/path/revision | Impact and owner | `ADR-XXX` or approved decision | `type/name` | `#NN` | Full SHA | Command/run/link and status | Manifest/version/hash or N/A | Pass/fail/partial | Measured effect or pending | Link and learning |
-
-Each cell should contain a durable identifier or an explicit `N/A` with reason. “Passed” without the command, environment and revision is insufficient.
-
-## 19. Rollback, supersession and historical evidence
-
-Tracked changes should normally be rolled back with a focused Git revert, not destructive history rewriting. Data, model, vector-index, database and infrastructure rollback also requires explicit external-state, compatibility and reconciliation procedures; a source revert alone may be insufficient.
-
-Documents use explicit status and links:
-
-- a replacement record names what it supersedes and why;
-- the superseded record remains unchanged and retains its original date/revision;
-- current documents link back to the original finding and forward to resolution evidence;
-- corrections are recorded as dated amendments when factual accuracy requires them; and
-- no historical audit is edited merely to make old findings appear current or resolved.
-
-The human project owner decides rollback, acceptance and supersession after reviewing evidence and stakeholder obligations.
+Changes require human approval and a focused pull request. A new governance record must identify what it supersedes. Historical evidence must not be silently rewritten to claim that it originally described a later state.
