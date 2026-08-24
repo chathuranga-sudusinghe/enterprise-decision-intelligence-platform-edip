@@ -14,12 +14,13 @@
 
 This document records the approved evidence-based temporal validation design for Favorita forecasting. It defines why the eight validation windows were selected, how expanding training histories are bounded, how leakage is prevented, and which limitations must accompany later model results.
 
-It is a research design, not evidence that a model was trained, a backtest ran, a metric was selected, or the final holdout was scored.
+It is a research design, not evidence that a model was trained, a backtest ran, metrics were calculated, or the final holdout was scored.
 
 Related authorities:
 
 - [Favorita Dataset Source and Governance](../../governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md);
-- [Favorita Temporal Validation Contract](FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md); and
+- [Favorita Temporal Validation Contract](FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md);
+- [Favorita Forecasting Evaluation Metric Contract](FAVORITA_FORECASTING_EVALUATION_METRICS.md); and
 - [EDIP Architecture Plan](../../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md).
 
 ## 2. Fixed forecast and data decisions
@@ -57,6 +58,8 @@ The cleaned source-derived dataset records:
 | Grain | `(date, store_nbr, item_nbr)` |
 | Recorded duplicate grain keys | 0 |
 
+Parquet row group: `a physical block of rows stored together inside a Parquet file, allowing selective reading of relevant blocks instead of scanning the full dataset.`
+
 The cleaned-data contract preserves source rows without densification, inferred zero sales, or feature engineering.
 
 Fold coverage was measured through a bounded read: row-group date statistics identified relevant groups, then only the date and holiday/event lineage fields required for the design were projected. The scan read 59 of 502 row groups and 14,750,000 rows rather than materializing the complete dataset.
@@ -89,16 +92,16 @@ A December 16-31 window was rejected because the cleaned source contains no obse
 
 ## 6. Approved eight folds
 
-| Fold | Forecast origin | Validation start | Validation end | Observed target rows | Available source history through origin | Research rationale |
-|---:|---|---|---|---:|---|---|
-| 1 | `2015-08-31` | `2015-09-01` | `2015-09-16` | 1,387,388 | `2013-01-01` to `2015-08-31` (973 days) | First September shoulder-season reference |
-| 2 | `2015-12-08` | `2015-12-09` | `2015-12-24` | 1,525,492 | `2013-01-01` to `2015-12-08` (1,072 days) | Pre-Christmas regime with recorded `Navidad-4` through `Navidad-1` lineage |
-| 3 | `2016-04-15` | `2016-04-16` | `2016-05-01` | 1,546,383 | `2013-01-01` to `2016-04-15` (1,201 days) | `Terremoto Manabi` day and recorded aftermath stress period |
-| 4 | `2016-06-30` | `2016-07-01` | `2016-07-16` | 1,561,914 | `2013-01-01` to `2016-06-30` (1,277 days) | Early-July mid-year comparison |
-| 5 | `2016-08-31` | `2016-09-01` | `2016-09-16` | 1,539,969 | `2013-01-01` to `2016-08-31` (1,339 days) | Calendar-matched September comparison for Fold 1 |
-| 6 | `2016-12-08` | `2016-12-09` | `2016-12-24` | 1,694,286 | `2013-01-01` to `2016-12-08` (1,438 days) | Repeated pre-Christmas lead-in |
-| 7 | `2017-04-15` | `2017-04-16` | `2017-05-01` | 1,705,829 | `2013-01-01` to `2017-04-15` (1,566 days) | Calendar-matched comparison for Fold 3 without the 2016 earthquake sequence |
-| 8 | `2017-06-30` | `2017-07-01` | `2017-07-16` | 1,717,606 | `2013-01-01` to `2017-06-30` (1,642 days) | Most recent approved pre-holdout window and July comparison |
+| Fold | Available source history through origin | Forecast origin | Validation start | Validation end | Observed target rows | Research rationale |
+|---:|---|---|---|---|---:|---|
+| 1 | `2013-01-01` to `2015-08-31` (973 days) | `2015-08-31` | `2015-09-01` | `2015-09-16` | 1,387,388 | First September shoulder-season reference |
+| 2 | `2013-01-01` to `2015-12-08` (1,072 days) | `2015-12-08` | `2015-12-09` | `2015-12-24` | 1,525,492 | Pre-Christmas regime with recorded `Navidad-4` through `Navidad-1` lineage |
+| 3 | `2013-01-01` to `2016-04-15` (1,201 days) | `2016-04-15` | `2016-04-16` | `2016-05-01` | 1,546,383 | `Terremoto Manabi` day and recorded aftermath stress period |
+| 4 | `2013-01-01` to `2016-06-30` (1,277 days) | `2016-06-30` | `2016-07-01` | `2016-07-16` | 1,561,914 | Early-July mid-year comparison |
+| 5 | `2013-01-01` to `2016-08-31` (1,339 days) | `2016-08-31` | `2016-09-01` | `2016-09-16` | 1,539,969 | Calendar-matched September comparison for Fold 1 |
+| 6 | `2013-01-01` to `2016-12-08` (1,438 days) | `2016-12-08` | `2016-12-09` | `2016-12-24` | 1,694,286 | Repeated pre-Christmas lead-in |
+| 7 | `2013-01-01` to `2017-04-15` (1,566 days) | `2017-04-15` | `2017-04-16` | `2017-05-01` | 1,705,829 | Calendar-matched comparison for Fold 3 without the 2016 earthquake sequence |
+| 8 | `2013-01-01` to `2017-06-30` (1,642 days) | `2017-06-30` | `2017-07-01` | `2017-07-16` | 1,717,606 | Most recent approved pre-holdout window and July comparison |
 
 The origin sequence is strictly increasing. All windows are exactly 16 inclusive calendar days, no approved validation windows overlap, and every validation window ends before the final holdout.
 
@@ -174,7 +177,7 @@ These are descriptive evaluation strata, not causal matched pairs. Store/item av
 - Holiday metadata is retrospective unless publication-time availability is proven.
 - The sparse source does not provide an identical dense entity panel across dates or horizons.
 - Compute cost for full fold construction and fitting remains unmeasured.
-- Fold dates do not define metrics, negative-target treatment, weighting, uncertainty, preprocessing, or model choice.
+- Fold dates do not define uncertainty, preprocessing, or model choice. Metric and negative-target policies are defined by the separate SCRUM-17 contract.
 - Eight folds do not prove exhaustive robustness across all historical regimes.
 
 Optional sensitivity designs may examine evenly spaced history, earthquake-excluded aggregates, or a more recent-heavy schedule. They must be pre-specified before viewing final holdout performance.
@@ -183,9 +186,8 @@ Optional sensitivity designs may examine evenly spaced history, earthquake-exclu
 
 Human approval is still required for:
 
-- primary/supporting metrics and fold aggregation;
-- negative-`unit_sales` treatment;
-- perishable weighting and uncertainty reporting;
+- backtest execution and metric reporting by fold and horizon;
+- uncertainty reporting;
 - entity eligibility and fixed/dynamic population;
 - training-origin schedule inside each fold;
 - preprocessing, categorical, nullable-feature, and feature-availability policy;

@@ -20,7 +20,8 @@ It consolidates the completed 16-day horizon alignment and the executable tempor
 Related authorities:
 
 - [Favorita Dataset Source and Governance](../../governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md);
-- [Favorita Temporal Validation Design](FAVORITA_TEMPORAL_VALIDATION_DESIGN.md); and
+- [Favorita Temporal Validation Design](FAVORITA_TEMPORAL_VALIDATION_DESIGN.md);
+- [Favorita Forecasting Evaluation Metric Contract](FAVORITA_FORECASTING_EVALUATION_METRICS.md); and
 - [EDIP Architecture Plan](../../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md).
 
 ## 2. Forecast contract
@@ -189,7 +190,7 @@ This contract does **not** complete:
 
 - LightGBM, naive, statistical, or alternative-model training;
 - actual expanding-window model fits or prediction runs;
-- metric definition, negative-target treatment, weighting, or aggregation;
+- backtest execution and metric reporting by fold and horizon;
 - preprocessing/model-input policy;
 - entity eligibility and population policy;
 - model comparison or selection;
