@@ -179,6 +179,10 @@ The current implementation provides deterministic structures and functions that:
 - validate fold identifiers, chronology, duration, and non-overlap;
 - determine training-label eligibility;
 - reject a post-origin training target;
+- build the canonical eight fold datasets from the approved boundaries;
+- require a fresh model-agnostic adapter and target-free prediction inputs for each fold;
+- validate prediction counts, finiteness, audit-key alignment, and unique validation keys;
+- calculate SCRUM-17 metrics per fold, per horizon, and from pooled row-level evidence;
 - validate the exact holdout dates and separation; and
 - validate the canonical contract on demand.
 
@@ -189,8 +193,8 @@ The current executed temporal-definition notebook demonstrates these date and le
 This contract does **not** complete:
 
 - LightGBM, naive, statistical, or alternative-model training;
-- actual expanding-window model fits or prediction runs;
-- backtest execution and metric reporting by fold and horizon;
+- full-data expanding-window model fits or prediction runs;
+- persisted full-data backtest evidence and metric reporting;
 - preprocessing/model-input policy;
 - entity eligibility and population policy;
 - model comparison or selection;
