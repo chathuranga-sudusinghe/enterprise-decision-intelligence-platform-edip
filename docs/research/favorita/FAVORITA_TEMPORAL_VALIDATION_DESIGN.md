@@ -7,7 +7,7 @@
 | Target | `unit_sales` |
 | Forecast strategy | Direct horizon-aware global forecasting |
 | Maximum horizon | 16 calendar days |
-| Validation method | Eight-fold expanding-window evaluation |
+| Validation method | Eight-fold expanding-window backtesting |
 | Final untouched holdout | `2017-07-31` through `2017-08-15` |
 
 ## 1. Purpose
@@ -33,7 +33,7 @@ Related authorities:
 - strategy: direct horizon-aware global forecasting;
 - recursive prediction feedback: forbidden;
 - validation duration: 16 calendar days;
-- validation method: expanding window; random splitting is forbidden;
+- validation method: eight-fold expanding-window backtesting; random splitting is forbidden;
 - approved main fold count: eight;
 - final holdout origin: `2017-07-30`;
 - final untouched holdout: `2017-07-31` through `2017-08-15`;
@@ -58,7 +58,7 @@ The cleaned source-derived dataset records:
 | Grain | `(date, store_nbr, item_nbr)` |
 | Recorded duplicate grain keys | 0 |
 
-Parquet row group: `a physical block of rows stored together inside a Parquet file, allowing selective reading of relevant blocks instead of scanning the full dataset.`
+Parquet row group: **a physical block of rows stored together inside a Parquet file, allowing selective reading of relevant blocks instead of scanning the full dataset.**
 
 The cleaned-data contract preserves source rows without densification, inferred zero sales, or feature engineering.
 
@@ -66,7 +66,26 @@ Fold coverage was measured through a bounded read: row-group date statistics ide
 
 All eight approved validation windows contain observed targets on every one of their 16 calendar dates. Together they contain 12,678,867 cleaned source target rows. These are source-row counts, not guaranteed final scoring counts; entity eligibility, history completeness, and feature-null rules may reduce the evaluated population.
 
-## 4. Fold-selection methodology
+## 4. Common time-series validation methods
+
+| Method | How it works | EDIP decision |
+|---|---|---|
+| Single holdout / temporal split | Trains on past data and validates on one future period. | Not selected: one validation period gives limited evidence about stability across seasons and business regimes. |
+| Rolling-window backtesting | Moves a fixed-size training window forward; older observations leave as newer observations enter. | Not selected: EDIP needs to retain the full available historical sales history. |
+| Expanding-window backtesting | Keeps the same historical starting point, adds more history at each fold, and evaluates the next fixed future window. | **SELECTED.** |
+| Blocked time-series cross-validation | Uses separate chronological training and validation blocks while preserving time order. | Not selected as the main method: the approved design requires an expanding training history. |
+| Random cross-validation | Randomly distributes rows between training and validation sets. | Rejected: future information can influence training and create temporal leakage. |
+
+EDIP's validation method is **eight-fold expanding-window backtesting**. The training history grows at each fold while each validation window remains 16 calendar days. This preserves temporal order, prevents future-data leakage, retains all available historical information, and evaluates performance across multiple seasonal and business regimes.
+
+```text
+Fold 1: shorter historical training period -> next 16 days validation
+Fold 2: larger historical training period  -> next 16 days validation
+...
+Fold 8: largest approved training period   -> next 16 days validation
+```
+
+## 5. Fold-selection methodology
 
 The approved strategy is **paired-season, recent-two-cycle stratification**:
 
@@ -79,7 +98,7 @@ The approved strategy is **paired-season, recent-two-cycle stratification**:
 
 The design favors relevance to the 2017 forecasting setting while retaining two annual cycles and at least 973 days of source history before the earliest origin.
 
-## 5. Alternatives considered
+## 6. Alternatives considered
 
 | Strategy | Strength | Main weakness | Decision |
 |---|---|---|---|
@@ -90,7 +109,7 @@ The design favors relevance to the 2017 forecasting setting while retaining two 
 
 A December 16-31 window was rejected because the cleaned source contains no observed target rows on December 25. Filling that date would violate sparse-row governance. December 9-24 retains a complete 16-date window and the recorded pre-Christmas regime.
 
-## 6. Approved eight folds
+## 7. Approved eight folds
 
 | Fold | Available source history through origin | Forecast origin | Validation start | Validation end | Observed target rows | Research rationale |
 |---:|---|---|---|---|---:|---|
@@ -105,7 +124,7 @@ A December 16-31 window was rejected because the cleaned source contains no obse
 
 The origin sequence is strictly increasing. All windows are exactly 16 inclusive calendar days, no approved validation windows overlap, and every validation window ends before the final holdout.
 
-## 7. Expanding-window training rule
+## 8. Expanding-window training rule
 
 For fold origin `O`:
 
@@ -118,7 +137,7 @@ For fold origin `O`:
 - validation actuals are joined only after predictions are produced;
 - an earlier validation period may enter a later fold's training history only after it is in that later fold's simulated past.
 
-## 8. Leakage controls
+## 9. Leakage controls
 
 Later implementation and evaluation must enforce:
 
@@ -140,7 +159,7 @@ Later implementation and evaluation must enforce:
 
 Holiday and earthquake lineage in this design is descriptive. It does not authorize post-origin actual event fields as model inputs or establish causal effects.
 
-## 9. Final untouched holdout
+## 10. Final untouched holdout
 
 The protected holdout is:
 
@@ -151,7 +170,7 @@ The latest approved validation date is `2017-07-16`. The intervening dates `2017
 
 Holdout outcomes must not influence fold selection, preprocessing, metric selection, model selection, hyperparameter tuning, threshold setting, or sensitivity design. They remain unavailable until the validation protocol and modeling decisions are frozen.
 
-## 10. Research rationale
+## 11. Research rationale
 
 The design provides:
 
@@ -167,7 +186,7 @@ The paired structure supports transparent descriptive comparison of September 20
 
 These are descriptive evaluation strata, not causal matched pairs. Store/item availability, promotions, macroeconomic conditions, assortment, and operations differ between years. Fold-specific results and dispersion must be reported rather than relying only on one pooled score.
 
-## 11. Threats and limitations
+## 12. Threats and limitations
 
 - Source row counts precede entity, history, and null-feature eligibility.
 - Store/item population changes across folds.
@@ -182,7 +201,7 @@ These are descriptive evaluation strata, not causal matched pairs. Store/item av
 
 Optional sensitivity designs may examine evenly spaced history, earthquake-excluded aggregates, or a more recent-heavy schedule. They must be pre-specified before viewing final holdout performance.
 
-## 12. Remaining decisions
+## 13. Remaining decisions
 
 Human approval is still required for:
 
