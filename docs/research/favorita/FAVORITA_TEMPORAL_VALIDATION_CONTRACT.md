@@ -182,6 +182,7 @@ The current implementation provides deterministic structures and functions that:
 - build the canonical eight fold datasets from the approved boundaries;
 - require a fresh model-agnostic adapter and target-free prediction inputs for each fold;
 - validate prediction counts, finiteness, audit-key alignment, and unique validation keys;
+- provide a reusable fold-local global LightGBM adapter with training-only categorical state, native missing-value handling, and the approved direct-horizon feature contract;
 - calculate SCRUM-17 metrics per fold, per horizon, and from pooled row-level evidence;
 - validate the exact holdout dates and separation; and
 - validate the canonical contract on demand.
@@ -192,10 +193,10 @@ The current executed temporal-definition notebook demonstrates these date and le
 
 This contract does **not** complete:
 
-- LightGBM, naive, statistical, or alternative-model training;
+- full-data LightGBM, naive, statistical, or alternative-model training runs;
 - full-data expanding-window model fits or prediction runs;
 - persisted full-data backtest evidence and metric reporting;
-- preprocessing/model-input policy;
+- full-data preprocessing and model-input materialization;
 - entity eligibility and population policy;
 - model comparison or selection;
 - hyperparameter tuning;
