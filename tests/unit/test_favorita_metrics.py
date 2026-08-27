@@ -5,6 +5,7 @@ from math import log1p, sqrt
 import pytest
 
 from pipelines.evaluation.favorita_metrics import (
+    FavoritaMetricAccumulator,
     evaluate_favorita_forecasts,
     mean_absolute_error,
     mean_forecast_error,
@@ -13,6 +14,37 @@ from pipelines.evaluation.favorita_metrics import (
     root_mean_squared_logarithmic_error,
     weighted_absolute_percentage_error,
 )
+
+
+def test_incremental_metrics_match_batch_independent_metric_contract() -> None:
+    actual = (-2.5, 0.0, 3.25, 10.0, 7.5)
+    prediction = (-1.0, 2.0, 2.75, 12.5, 6.0)
+    perishable = (0, 1, 1, 0, 1)
+    expected = evaluate_favorita_forecasts(actual, prediction, perishable)
+
+    accumulator = FavoritaMetricAccumulator()
+    accumulator.update(actual[:2], prediction[:2], perishable[:2])
+    accumulator.update(actual[2:], prediction[2:], perishable[2:])
+    streamed = accumulator.finalize()
+
+    assert streamed.mae == pytest.approx(expected.mae, rel=1e-14, abs=1e-14)
+    assert streamed.rmse == pytest.approx(expected.rmse, rel=1e-14, abs=1e-14)
+    assert streamed.wape == pytest.approx(expected.wape, rel=1e-14, abs=1e-14)
+    assert streamed.bias == pytest.approx(expected.bias, rel=1e-14, abs=1e-14)
+    assert streamed.rmsle == pytest.approx(expected.rmsle, rel=1e-14, abs=1e-14)
+    assert streamed.nwrmsle == pytest.approx(
+        expected.nwrmsle,
+        rel=1e-14,
+        abs=1e-14,
+    )
+
+
+def test_incremental_metrics_preserve_undefined_wape_error() -> None:
+    accumulator = FavoritaMetricAccumulator()
+    accumulator.update((-1.0, 0.0), (1.0, 2.0), (0, 1))
+
+    with pytest.raises(ValueError, match="total evaluation target is zero"):
+        accumulator.finalize()
 
 
 def test_perfect_predictions_return_exact_zero_for_every_metric() -> None:
