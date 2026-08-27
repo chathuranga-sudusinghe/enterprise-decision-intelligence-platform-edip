@@ -359,6 +359,131 @@ def _metric_results(
     )
 
 
+def run_fold_backtest(
+    dataset: FoldBacktestDataset,
+    adapter: FoldModelAdapter,
+) -> FoldBacktestResult:
+    """Fit and score one canonical fold without materializing any other fold."""
+
+    if not isinstance(dataset, FoldBacktestDataset):
+        raise TypeError("dataset must be a FoldBacktestDataset")
+    if dataset.fold not in APPROVED_FOLDS:
+        raise ValueError("dataset must use one canonical approved fold")
+    training_rows = _validated_examples(dataset.training_rows)
+    validation_rows = _validated_examples(dataset.validation_rows)
+    if any(
+        not is_training_target_eligible(
+            row.forecast_date,
+            dataset.fold.forecast_origin,
+        )
+        for row in training_rows
+    ):
+        raise ValueError(
+            f"Fold {dataset.fold.fold_id} training labels exceed the fold origin"
+        )
+    if any(
+        row.forecast_origin != dataset.fold.forecast_origin
+        or not (
+            dataset.fold.validation_start
+            <= row.forecast_date
+            <= dataset.fold.validation_end
+        )
+        for row in validation_rows
+    ):
+        raise ValueError(
+            f"Fold {dataset.fold.fold_id} validation rows are outside O+1..O+16"
+        )
+    if tuple(sorted({row.forecast_horizon for row in validation_rows})) != (
+        FORECAST_HORIZONS
+    ):
+        raise ValueError(
+            f"Fold {dataset.fold.fold_id} validation rows must cover "
+            "horizons 1 through 16"
+        )
+    _require_unique_example_keys(
+        validation_rows,
+        dataset.fold.fold_id,
+        "validation",
+    )
+
+    adapter.fit(training_rows)
+    model_inputs = _model_inputs(validation_rows)
+    predictions = _validated_predictions(
+        model_inputs,
+        adapter.predict(model_inputs),
+        dataset.fold.fold_id,
+    )
+    fold_evidence = tuple(
+        EvaluationEvidence(
+            fold_id=dataset.fold.fold_id,
+            forecast_origin=actual.forecast_origin,
+            forecast_date=actual.forecast_date,
+            forecast_horizon=actual.forecast_horizon,
+            store_nbr=actual.store_nbr,
+            item_nbr=actual.item_nbr,
+            actual_unit_sales=float(actual.unit_sales),
+            prediction=float(prediction.prediction),
+            perishable=int(actual.perishable),
+        )
+        for actual, prediction in zip(validation_rows, predictions, strict=True)
+    )
+    return FoldBacktestResult(
+        fold_id=dataset.fold.fold_id,
+        forecast_origin=dataset.fold.forecast_origin,
+        validation_start=dataset.fold.validation_start,
+        validation_end=dataset.fold.validation_end,
+        metrics=_metric_results(fold_evidence),
+        predictions=fold_evidence,
+    )
+
+
+def aggregate_fold_backtest_results(
+    fold_results: Sequence[FoldBacktestResult],
+) -> BacktestResult:
+    """Aggregate eight completed fold results without retaining fold training rows."""
+
+    results = tuple(fold_results)
+    if tuple(result.fold_id for result in results) != tuple(range(1, 9)):
+        raise ValueError("Fold results must be the ordered canonical folds 1 through 8")
+    for result, fold in zip(results, APPROVED_FOLDS, strict=True):
+        if (
+            result.forecast_origin != fold.forecast_origin
+            or result.validation_start != fold.validation_start
+            or result.validation_end != fold.validation_end
+        ):
+            raise ValueError(
+                f"Fold result {result.fold_id} does not match canonical dates"
+            )
+
+    predictions = tuple(
+        row for result in results for row in result.predictions
+    )
+    if not predictions:
+        raise ValueError("Completed fold results contain no prediction evidence")
+    horizon_results = tuple(
+        HorizonBacktestResult(
+            forecast_horizon=horizon,
+            metrics=_metric_results(
+                tuple(
+                    row
+                    for row in predictions
+                    if row.forecast_horizon == horizon
+                )
+            ),
+            row_count=sum(
+                row.forecast_horizon == horizon for row in predictions
+            ),
+        )
+        for horizon in FORECAST_HORIZONS
+    )
+    return BacktestResult(
+        overall_metrics=_metric_results(predictions),
+        fold_results=results,
+        horizon_results=horizon_results,
+        predictions=predictions,
+    )
+
+
 def run_expanding_window_backtest(
     examples: Sequence[BacktestExample],
     adapter_factory: FoldAdapterFactory,
@@ -368,7 +493,6 @@ def run_expanding_window_backtest(
     fold_datasets = build_approved_fold_datasets(examples)
     adapters: list[FoldModelAdapter] = []
     fold_results: list[FoldBacktestResult] = []
-    pooled_evidence: list[EvaluationEvidence] = []
 
     for dataset in fold_datasets:
         adapter = adapter_factory(dataset.fold)
@@ -377,54 +501,7 @@ def run_expanding_window_backtest(
                 "adapter_factory must return a fresh adapter for each fold"
             )
         adapters.append(adapter)
-        adapter.fit(dataset.training_rows)
+        fold_result = run_fold_backtest(dataset, adapter)
+        fold_results.append(fold_result)
 
-        model_inputs = _model_inputs(dataset.validation_rows)
-        predictions = _validated_predictions(
-            model_inputs,
-            adapter.predict(model_inputs),
-            dataset.fold.fold_id,
-        )
-        fold_evidence = tuple(
-            EvaluationEvidence(
-                fold_id=dataset.fold.fold_id,
-                forecast_origin=actual.forecast_origin,
-                forecast_date=actual.forecast_date,
-                forecast_horizon=actual.forecast_horizon,
-                store_nbr=actual.store_nbr,
-                item_nbr=actual.item_nbr,
-                actual_unit_sales=float(actual.unit_sales),
-                prediction=float(prediction.prediction),
-                perishable=int(actual.perishable),
-            )
-            for actual, prediction in zip(dataset.validation_rows, predictions)
-        )
-        pooled_evidence.extend(fold_evidence)
-        fold_results.append(
-            FoldBacktestResult(
-                fold_id=dataset.fold.fold_id,
-                forecast_origin=dataset.fold.forecast_origin,
-                validation_start=dataset.fold.validation_start,
-                validation_end=dataset.fold.validation_end,
-                metrics=_metric_results(fold_evidence),
-                predictions=fold_evidence,
-            )
-        )
-
-    predictions = tuple(pooled_evidence)
-    horizon_results = tuple(
-        HorizonBacktestResult(
-            forecast_horizon=horizon,
-            metrics=_metric_results(
-                tuple(row for row in predictions if row.forecast_horizon == horizon)
-            ),
-            row_count=sum(row.forecast_horizon == horizon for row in predictions),
-        )
-        for horizon in FORECAST_HORIZONS
-    )
-    return BacktestResult(
-        overall_metrics=_metric_results(predictions),
-        fold_results=tuple(fold_results),
-        horizon_results=horizon_results,
-        predictions=predictions,
-    )
+    return aggregate_fold_backtest_results(fold_results)

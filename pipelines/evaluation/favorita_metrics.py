@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from itertools import zip_longest
 from math import fsum, isfinite, log1p, sqrt
 from numbers import Real
 
@@ -21,6 +22,91 @@ class ForecastMetricResults:
     bias: float
     rmsle: float
     nwrmsle: float
+
+
+@dataclass(slots=True)
+class FavoritaMetricAccumulator:
+    """Bounded-memory accumulator matching the Favorita metric contract."""
+
+    count: int = 0
+    sum_abs_error: float = 0.0
+    sum_squared_error: float = 0.0
+    sum_error: float = 0.0
+    sum_abs_clipped_error: float = 0.0
+    sum_clipped_actual: float = 0.0
+    sum_squared_log_error: float = 0.0
+    sum_weighted_squared_log_error: float = 0.0
+    sum_weights: float = 0.0
+
+    def update(
+        self,
+        actual: Iterable[Real],
+        prediction: Iterable[Real],
+        perishable: Iterable[object],
+    ) -> None:
+        """Accumulate one bounded batch without retaining its row values."""
+
+        sentinel = object()
+        batch_count = 0
+        for observed, predicted, perishability in zip_longest(
+            actual,
+            prediction,
+            perishable,
+            fillvalue=sentinel,
+        ):
+            if sentinel in (observed, predicted, perishability):
+                raise ValueError(
+                    "actual, prediction, and perishable must have the same "
+                    "number of rows"
+                )
+            if isinstance(observed, bool) or not isinstance(observed, Real):
+                raise TypeError("actual must contain only real numbers")
+            if isinstance(predicted, bool) or not isinstance(predicted, Real):
+                raise TypeError("prediction must contain only real numbers")
+            observed_value = float(observed)
+            predicted_value = float(predicted)
+            if not isfinite(observed_value):
+                raise ValueError("actual must contain only finite values")
+            if not isfinite(predicted_value):
+                raise ValueError("prediction must contain only finite values")
+            if perishability not in (0, 1, False, True):
+                raise ValueError("perishable must contain only binary 0/1 indicators")
+
+            error = predicted_value - observed_value
+            actual_plus = max(observed_value, 0.0)
+            prediction_plus = max(predicted_value, 0.0)
+            log_error = log1p(prediction_plus) - log1p(actual_plus)
+            weight = PERISHABLE_WEIGHT if bool(perishability) else NON_PERISHABLE_WEIGHT
+            self.count += 1
+            batch_count += 1
+            self.sum_abs_error += abs(error)
+            self.sum_squared_error += error**2
+            self.sum_error += error
+            self.sum_abs_clipped_error += abs(prediction_plus - actual_plus)
+            self.sum_clipped_actual += actual_plus
+            self.sum_squared_log_error += log_error**2
+            self.sum_weighted_squared_log_error += weight * log_error**2
+            self.sum_weights += weight
+        if batch_count == 0:
+            raise ValueError("metric batch must not be empty")
+
+    def finalize(self) -> ForecastMetricResults:
+        """Return the six metrics after at least one accumulated row."""
+
+        if self.count == 0:
+            raise ValueError("metrics must contain at least one row")
+        if self.sum_clipped_actual == 0.0:
+            raise ValueError("WAPE is undefined when total evaluation target is zero")
+        return ForecastMetricResults(
+            mae=self.sum_abs_error / self.count,
+            rmse=sqrt(self.sum_squared_error / self.count),
+            wape=self.sum_abs_clipped_error / self.sum_clipped_actual,
+            bias=self.sum_error / self.count,
+            rmsle=sqrt(self.sum_squared_log_error / self.count),
+            nwrmsle=sqrt(
+                self.sum_weighted_squared_log_error / self.sum_weights
+            ),
+        )
 
 
 def _finite_values(values: Iterable[Real], name: str) -> tuple[float, ...]:

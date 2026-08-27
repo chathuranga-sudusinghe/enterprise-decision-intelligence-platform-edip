@@ -126,6 +126,8 @@ The origin sequence is strictly increasing. All windows are exactly 16 inclusive
 
 ## 8. Expanding-window training rule
 
+Each fold uses all eligible historical model-ready training records whose labels are available on or before that fold's forecast origin. No additional historical-origin sampling cadence is approved. SCRUM-15 now provides serial fold-wise Parquet materialization and evaluation orchestration that preserves full eligible history and entity coverage without changing these temporal boundaries. The production adapter scans training Parquet in bounded batches, retains training-only categorical/null metadata, stores labels in a temporary disk memory map, and supplies feature ranges to LightGBM through Sequence; it does not create full-fold BacktestExample tuples or a full-fold training pandas frame. Validation is also consumed in bounded Parquet batches. Each batch is contract-checked, predicted, written directly to staged row-level evidence Parquet, and discarded after updating fold, horizon, and pooled metric accumulators; no full-fold validation pandas frame or EvaluationEvidence tuple is retained. Runtime duplicate checks use the feature artifact's contiguous single-store block and strict within-store key ordering guarantees, so cross-batch state is bounded by the 54 stores. LightGBM's native binned training dataset remains in memory, so this removes Python-object/DataFrame amplification but is not true out-of-core training. The implementation is validated with bounded fixtures only; full real-data peak RAM remains unmeasured, and no full real-data backtest, reported metrics, model selection, or final-holdout scoring is claimed.
+
 For fold origin `O`:
 
 - training begins at the earliest eligible historical data and expands through `O`;
@@ -208,7 +210,7 @@ Human approval is still required for:
 - backtest execution and metric reporting by fold and horizon;
 - uncertainty reporting;
 - entity eligibility and fixed/dynamic population;
-- training-origin schedule inside each fold;
+- full real-data resource sizing and execution approval;
 - preprocessing, categorical, nullable-feature, and feature-availability policy;
 - the model-input role of `forecast_horizon`;
 - earthquake sensitivity and optional folds;

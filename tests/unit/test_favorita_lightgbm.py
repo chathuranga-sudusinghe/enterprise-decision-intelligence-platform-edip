@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from math import isfinite
+from pathlib import Path
 
+import numpy as np
+import pandas as pd
+import pyarrow.parquet as pq
 import pytest
 
 from pipelines.evaluation.favorita_backtesting import (
@@ -14,7 +18,13 @@ from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FORECAST_HORIZONS,
 )
-from pipelines.features.favorita_model_ready import MODEL_FEATURE_COLUMNS
+from pipelines.features.favorita_model_ready import (
+    MODEL_FEATURE_COLUMNS,
+    TARGET_COLUMN,
+    _fixture_source_frame,
+    build_feature_rows_for_origin,
+    to_arrow_table,
+)
 from pipelines.models.favorita_lightgbm import (
     DEFAULT_FEATURE_COLUMNS,
     NUM_BOOST_ROUND,
@@ -116,6 +126,70 @@ def _model_input(
         item_nbr=1000 + index,
         features=features,
     )
+
+
+def _model_ready_frame() -> pd.DataFrame:
+    source, origin = _fixture_source_frame()
+    return build_feature_rows_for_origin(
+        source,
+        forecast_origin=origin,
+        allow_assumed_future_promotion=True,
+        allow_assumed_future_holidays=True,
+    )
+
+
+def _write_model_ready_parquet(frame: pd.DataFrame, path: Path) -> None:
+    pq.write_table(to_arrow_table(frame), path, row_group_size=7)
+
+
+def test_parquet_native_fit_and_frame_prediction_avoid_row_objects(
+    tmp_path: Path,
+) -> None:
+    frame = _model_ready_frame()
+    training_path = tmp_path / "training.parquet"
+    _write_model_ready_parquet(frame, training_path)
+    adapter = FavoritaLightGBMAdapter()
+
+    adapter.fit_parquet(training_path)
+    predictions = adapter.predict_frame(frame.iloc[:4].copy())
+
+    assert adapter.is_fitted
+    assert adapter.fitted_feature_columns[0] == "forecast_horizon"
+    assert TARGET_COLUMN not in adapter.fitted_feature_columns
+    assert predictions.shape == (4,)
+    assert np.isfinite(predictions).all()
+
+
+def test_parquet_native_fit_rejects_noncanonical_schema(tmp_path: Path) -> None:
+    frame = _model_ready_frame().drop(columns="sales_lag_1")
+    training_path = tmp_path / "invalid.parquet"
+    frame.to_parquet(training_path, index=False)
+
+    with pytest.raises(ValueError, match="ordered training schema"):
+        FavoritaLightGBMAdapter().fit_parquet(training_path)
+
+
+def test_predict_frame_excludes_target_from_booster_input(tmp_path: Path) -> None:
+    frame = _model_ready_frame()
+    training_path = tmp_path / "training.parquet"
+    _write_model_ready_parquet(frame, training_path)
+    adapter = FavoritaLightGBMAdapter()
+    adapter.fit_parquet(training_path)
+    captured_columns: tuple[str, ...] = ()
+
+    class CapturingBooster:
+        def predict(self, model_frame: pd.DataFrame) -> np.ndarray:
+            nonlocal captured_columns
+            captured_columns = tuple(model_frame.columns)
+            return np.zeros(len(model_frame), dtype="float64")
+
+    adapter._booster = CapturingBooster()  # type: ignore[assignment]
+
+    predictions = adapter.predict_frame(frame.iloc[:2].copy())
+
+    assert TARGET_COLUMN not in captured_columns
+    assert captured_columns == adapter.fitted_feature_columns
+    assert predictions.tolist() == [0.0, 0.0]
 
 
 def test_adapter_fits_and_predicts_with_tiny_synthetic_data() -> None:

@@ -86,6 +86,8 @@ Only canonical origins need to be stored; validation starts and ends should be d
 
 ## 5. Expanding-window training-label eligibility
 
+Each fold uses all eligible historical model-ready training records whose labels are available on or before that fold's forecast origin. No additional historical-origin sampling policy is approved. SCRUM-15 now implements serial fold-wise Parquet materialization and evaluation orchestration that preserves the canonical folds, full eligible history and entity coverage, and final holdout separation. Production training no longer expands a fold into Python BacktestExample objects or one full-fold pandas frame: LightGBM receives bounded Parquet row-group feature batches through its Sequence interface, while the target vector uses a temporary disk-backed float64 memory map. Production validation is consumed in bounded Parquet batches; each batch is predicted, contract-checked, and written directly to staged row-level prediction Parquet while fold, horizon, and pooled metrics are accumulated incrementally. It does not retain full-fold EvaluationEvidence tuples or a full-fold validation pandas frame. Duplicate-key enforcement relies on the feature builder's contiguous single-store blocks and strict within-store key order, retaining state bounded by the 54 stores. LightGBM still constructs its complete native binned dataset in memory, so this is not true external-memory training and no production-safe peak-RAM ceiling is claimed. This execution path has unit-level bounded-fixture evidence only; full real-data peak RAM remains unmeasured, and the full real-data fold build and LightGBM backtest have not been run.
+
 For fold origin `O`, a training example is eligible only when:
 
 ```text
@@ -183,7 +185,7 @@ The current implementation provides deterministic structures and functions that:
 - require a fresh model-agnostic adapter and target-free prediction inputs for each fold;
 - validate prediction counts, finiteness, audit-key alignment, and unique validation keys;
 - provide a reusable fold-local global LightGBM adapter with training-only categorical state, native missing-value handling, and the approved direct-horizon feature contract;
-- calculate SCRUM-17 metrics per fold, per horizon, and from pooled row-level evidence;
+- stream row-level prediction evidence to Parquet and calculate SCRUM-17 metrics incrementally per fold, per horizon, and over the pooled rows;
 - validate the exact holdout dates and separation; and
 - validate the canonical contract on demand.
 
