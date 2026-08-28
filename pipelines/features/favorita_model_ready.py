@@ -832,52 +832,110 @@ def materialize_feature_dataset(
     forecast_date_cutoff: date | None = None,
     drop_targets_without_origin_history: bool = False,
     bounded_memory_validation: bool = False,
+    reuse_source_across_origins: bool = False,
+    progress_prefix: str | None = None,
+    progress_phase: str = "",
 ) -> dict[str, Any]:
     validate_build_config(config)
     writer = AtomicParquetBatchWriter(config.output_path, overwrite=config.overwrite)
     expected_target_rows = 0
     batches_written = 0
+    processed_stores: set[int] = set()
+
+    def write_origin_batch(
+        source_slice: pd.DataFrame,
+        *,
+        origin: pd.Timestamp,
+    ) -> None:
+        nonlocal batches_written, expected_target_rows
+        source_slice = _select_bounded_items(
+            source_slice,
+            origin=origin,
+            max_items_per_store=config.max_items_per_store,
+        )
+        feature_rows = build_feature_rows_for_origin(
+            source_slice,
+            forecast_origin=origin,
+            max_items_per_store=None,
+            allow_assumed_future_promotion=(
+                config.allow_assumed_future_promotion
+            ),
+            allow_assumed_future_holidays=(
+                config.allow_assumed_future_holidays
+            ),
+            drop_targets_without_origin_history=(
+                drop_targets_without_origin_history
+            ),
+        )
+        if forecast_date_cutoff is not None:
+            feature_rows = feature_rows.loc[
+                feature_rows["forecast_date"]
+                <= pd.Timestamp(forecast_date_cutoff)
+            ].reset_index(drop=True)
+        if feature_rows.empty:
+            return
+        expected_target_rows += len(feature_rows)
+        writer.write(to_arrow_table(feature_rows))
+        batches_written += 1
+
     try:
-        for origin_date in config.forecast_origins:
-            origin = pd.Timestamp(origin_date)
-            start_date = origin - pd.Timedelta(days=28)
-            end_date = origin + pd.Timedelta(days=max(FORECAST_HORIZONS))
-            for store_batch in config.store_batches:
+        if reuse_source_across_origins:
+            origins = tuple(pd.Timestamp(value) for value in config.forecast_origins)
+            broad_start_date = min(origins) - pd.Timedelta(days=28)
+            broad_end_date = max(origins) + pd.Timedelta(
+                days=max(FORECAST_HORIZONS)
+            )
+            store_batch_count = len(config.store_batches)
+            phase = f" {progress_phase}" if progress_phase else ""
+            for store_batch_index, store_batch in enumerate(
+                config.store_batches,
+                start=1,
+            ):
+                if progress_prefix is not None:
+                    print(
+                        f"{progress_prefix}{phase} store "
+                        f"{store_batch_index}/{store_batch_count}",
+                        flush=True,
+                    )
                 source_slice = _read_filtered_source_slice(
                     config.source_path,
-                    start_date=start_date,
-                    end_date=end_date,
+                    start_date=broad_start_date,
+                    end_date=broad_end_date,
                     store_nbrs=store_batch,
                 )
-                source_slice = _select_bounded_items(
-                    source_slice,
-                    origin=origin,
-                    max_items_per_store=config.max_items_per_store,
-                )
-                feature_rows = build_feature_rows_for_origin(
-                    source_slice,
-                    forecast_origin=origin,
-                    max_items_per_store=None,
-                    allow_assumed_future_promotion=(
-                        config.allow_assumed_future_promotion
-                    ),
-                    allow_assumed_future_holidays=(
-                        config.allow_assumed_future_holidays
-                    ),
-                    drop_targets_without_origin_history=(
-                        drop_targets_without_origin_history
-                    ),
-                )
-                if forecast_date_cutoff is not None:
-                    feature_rows = feature_rows.loc[
-                        feature_rows["forecast_date"]
-                        <= pd.Timestamp(forecast_date_cutoff)
+                processed_stores.update(store_batch)
+                source_dates = source_slice["date"]
+                for origin in origins:
+                    origin_start_date = origin - pd.Timedelta(days=28)
+                    origin_end_date = origin + pd.Timedelta(
+                        days=max(FORECAST_HORIZONS)
+                    )
+                    start_index = source_dates.searchsorted(
+                        origin_start_date,
+                        side="left",
+                    )
+                    end_index = source_dates.searchsorted(
+                        origin_end_date,
+                        side="right",
+                    )
+                    origin_source_slice = source_slice.iloc[
+                        start_index:end_index
                     ].reset_index(drop=True)
-                if feature_rows.empty:
-                    continue
-                expected_target_rows += len(feature_rows)
-                writer.write(to_arrow_table(feature_rows))
-                batches_written += 1
+                    write_origin_batch(origin_source_slice, origin=origin)
+        else:
+            for origin_date in config.forecast_origins:
+                origin = pd.Timestamp(origin_date)
+                start_date = origin - pd.Timedelta(days=28)
+                end_date = origin + pd.Timedelta(days=max(FORECAST_HORIZONS))
+                for store_batch in config.store_batches:
+                    source_slice = _read_filtered_source_slice(
+                        config.source_path,
+                        start_date=start_date,
+                        end_date=end_date,
+                        store_nbrs=store_batch,
+                    )
+                    processed_stores.update(store_batch)
+                    write_origin_batch(source_slice, origin=origin)
         writer.finalize()
     except Exception:
         writer.abort()
@@ -894,6 +952,7 @@ def materialize_feature_dataset(
     return {
         "creation_status": "created",
         "batches_written": batches_written,
+        "processed_stores": sorted(processed_stores),
         "expected_observed_target_rows": expected_target_rows,
         "artifact_validation": artifact_validation,
     }

@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-import pandas as pd
+from pathlib import Path
 
+import pandas as pd
+import pyarrow.parquet as pq
+import pytest
+
+from pipelines.features import favorita_model_ready as model_ready
 from pipelines.features.favorita_model_ready import (
     FEATURE_DEFINITIONS,
     FORBIDDEN_MODEL_COLUMNS,
@@ -12,8 +17,10 @@ from pipelines.features.favorita_model_ready import (
     SALES_LAG_OFFSETS,
     TARGET_COLUMN,
     TRAINING_OUTPUT_COLUMNS,
+    FeatureBuildConfig,
     _fixture_source_frame,
     build_feature_rows_for_origin,
+    materialize_feature_dataset,
     run_deterministic_fixture_validation,
 )
 
@@ -109,3 +116,71 @@ def test_sixteen_day_row_generation_is_deterministic() -> None:
         == first["forecast_origin"]
         + pd.to_timedelta(first["forecast_horizon"], unit="D")
     ).all()
+
+
+def test_store_major_materialization_matches_origin_major_reference(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture, origin = _fixture_source_frame()
+    source_path = tmp_path / "source.parquet"
+    fixture.to_parquet(source_path, index=False, row_group_size=7)
+    origins = (
+        (origin - pd.Timedelta(days=1)).date(),
+        origin.date(),
+    )
+
+    def config_for(filename: str) -> FeatureBuildConfig:
+        return FeatureBuildConfig(
+            source_path=source_path,
+            output_path=tmp_path / filename,
+            manifest_path=tmp_path / f"{filename}.json",
+            forecast_origins=origins,
+            store_batches=((1,),),
+            max_items_per_store=None,
+            allow_assumed_future_promotion=True,
+            allow_assumed_future_holidays=True,
+        )
+
+    read_counts = {"reference": 0, "optimized": 0}
+    active_path = "reference"
+    original_reader = model_ready._read_filtered_source_slice
+
+    def counting_reader(*args: object, **kwargs: object) -> pd.DataFrame:
+        read_counts[active_path] += 1
+        return original_reader(*args, **kwargs)
+
+    monkeypatch.setattr(model_ready, "_read_filtered_source_slice", counting_reader)
+    reference_path = tmp_path / "reference.parquet"
+    materialize_feature_dataset(config_for(reference_path.name))
+
+    active_path = "optimized"
+    optimized_path = tmp_path / "optimized.parquet"
+    materialize_feature_dataset(
+        config_for(optimized_path.name),
+        reuse_source_across_origins=True,
+    )
+
+    reference_file = pq.ParquetFile(reference_path)
+    optimized_file = pq.ParquetFile(optimized_path)
+    assert optimized_file.schema_arrow.equals(reference_file.schema_arrow)
+    sort_columns = [
+        "forecast_origin",
+        "forecast_date",
+        "store_nbr",
+        "item_nbr",
+    ]
+    reference_rows = (
+        reference_file.read()
+        .to_pandas()
+        .sort_values(sort_columns)
+        .reset_index(drop=True)
+    )
+    optimized_rows = (
+        optimized_file.read()
+        .to_pandas()
+        .sort_values(sort_columns)
+        .reset_index(drop=True)
+    )
+    pd.testing.assert_frame_equal(optimized_rows, reference_rows)
+    assert read_counts == {"reference": len(origins), "optimized": 1}

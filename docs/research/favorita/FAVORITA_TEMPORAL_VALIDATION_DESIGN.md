@@ -78,6 +78,8 @@ All eight approved validation windows contain observed targets on every one of t
 
 EDIP's validation method is **eight-fold expanding-window backtesting**. The training history grows at each fold while each validation window remains 16 calendar days. This preserves temporal order, prevents future-data leakage, retains all available historical information, and evaluates performance across multiple seasonal and business regimes.
 
+The approved validation design contains eight expanding-window folds. The initial full-scale LightGBM experiment executes folds 1, 3, 6, and 8 as a representative resource-constrained subset because the full eight-fold feature-materialization and model-training workload exceeds the current local compute/time budget. This subset preserves chronological separation and multiple seasonal regimes but provides less robustness evidence than the complete eight-fold protocol.
+
 ```text
 Fold 1: shorter historical training period -> next 16 days validation
 Fold 2: larger historical training period  -> next 16 days validation

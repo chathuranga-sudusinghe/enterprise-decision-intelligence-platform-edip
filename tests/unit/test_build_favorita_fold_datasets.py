@@ -51,6 +51,25 @@ def test_exactly_eight_canonical_fold_output_definitions(tmp_path: Path) -> None
     assert all(path.manifest.name == "manifest.json" for path in paths)
 
 
+def test_resource_constrained_subset_is_exactly_folds_1_3_6_8() -> None:
+    selected = builder.selected_approved_folds()
+
+    assert len(APPROVED_FOLDS) == 8
+    assert builder.RESOURCE_CONSTRAINED_FOLD_IDS == (1, 3, 6, 8)
+    assert tuple(fold.fold_id for fold in selected) == (1, 3, 6, 8)
+    args = builder._argument_parser().parse_args(
+        ["--folds", "1", "3", "6", "8"]
+    )
+    assert args.folds == [1, 3, 6, 8]
+
+
+def test_invalid_or_duplicate_fold_ids_are_rejected() -> None:
+    with pytest.raises(ValueError, match="Unknown approved fold IDs"):
+        builder.selected_approved_folds((1, 9))
+    with pytest.raises(ValueError, match="must be unique"):
+        builder.selected_approved_folds((1, 1))
+
+
 def test_all_store_no_item_cap_configuration_is_locked() -> None:
     config = builder.FoldDatasetBuildConfig()
 
@@ -118,6 +137,7 @@ def _bounded_fold_fixture(tmp_path: Path) -> tuple[
 
 def test_bounded_fold_build_enforces_temporal_and_artifact_contract(
     tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     config, fold, paths, training_origins, source_bytes = _bounded_fold_fixture(
         tmp_path
@@ -128,6 +148,7 @@ def test_bounded_fold_build_enforces_temporal_and_artifact_contract(
         fold,
         paths,
         training_origins=training_origins,
+        log_progress=True,
     )
 
     training = pq.read_table(paths.training).to_pandas()
@@ -149,9 +170,29 @@ def test_bounded_fold_build_enforces_temporal_and_artifact_contract(
     assert manifest["source_not_mutated"] is True
     assert manifest["final_holdout_excluded"] is True
     assert manifest["store_count"] == 1
+    assert manifest["canonical_fold_id"] == 1
+    assert manifest["experiment_subset"] == [1, 3, 6, 8]
+    assert manifest["execution_scope"] == "resource_constrained_four_fold"
+    assert manifest["canonical_validation_design"] == (
+        "eight_fold_expanding_window"
+    )
+    assert manifest["full_eight_fold_executed"] is False
+    assert manifest["configured_store_count"] == 1
+    assert manifest["observed_store_count"] == 1
+    assert manifest["processed_stores"] == [1]
     assert manifest["max_items_per_store"] is None
     assert manifest["ordered_schema"] == list(TRAINING_OUTPUT_COLUMNS)
     assert json.loads(paths.manifest.read_text(encoding="utf-8")) == manifest
+    assert capsys.readouterr().out.splitlines() == [
+        "[Fold 1/8] training origins: 2",
+        "[Fold 1/8] building training.parquet...",
+        "[Fold 1/8] training store 1/1",
+        f"[Fold 1/8] training rows: {manifest['training_row_count']}",
+        "[Fold 1/8] building validation.parquet...",
+        "[Fold 1/8] validation store 1/1",
+        f"[Fold 1/8] validation rows: {manifest['validation_row_count']}",
+        "[Fold 1/8] completed",
+    ]
 
 
 def test_build_rejects_item_cap(tmp_path: Path) -> None:
@@ -175,6 +216,7 @@ def test_build_rejects_item_cap(tmp_path: Path) -> None:
 def test_orchestration_completes_one_fold_before_next(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     source_path = tmp_path / "source.parquet"
     source_path.write_bytes(b"fixture")
@@ -184,6 +226,7 @@ def test_orchestration_completes_one_fold_before_next(
     )
     active = 0
     completed: list[int] = []
+    expected_fold_ids = list(builder.RESOURCE_CONSTRAINED_FOLD_IDS)
 
     def fake_build(
         received_config: builder.FoldDatasetBuildConfig,
@@ -191,12 +234,17 @@ def test_orchestration_completes_one_fold_before_next(
         paths: builder.FoldArtifactPaths,
         *,
         training_origins: tuple | None = None,
+        log_progress: bool = False,
+        experiment_subset: tuple[int, ...] = (),
     ) -> dict[str, int]:
         nonlocal active
         assert received_config is config
         assert training_origins
+        assert log_progress is True
+        assert experiment_subset == builder.RESOURCE_CONSTRAINED_FOLD_IDS
         assert active == 0
-        assert completed == list(range(1, fold.fold_id))
+        fold_index = expected_fold_ids.index(fold.fold_id)
+        assert completed == expected_fold_ids[:fold_index]
         active += 1
         completed.append(paths.fold_id)
         active -= 1
@@ -214,34 +262,154 @@ def test_orchestration_completes_one_fold_before_next(
 
     manifests = builder.build_approved_fold_datasets(config)
 
-    assert completed == list(range(1, 9))
-    assert tuple(item["fold_id"] for item in manifests) == tuple(range(1, 9))
+    assert completed == expected_fold_ids
+    assert tuple(item["fold_id"] for item in manifests) == tuple(
+        expected_fold_ids
+    )
+    output_lines = capsys.readouterr().out.splitlines()
+    assert output_lines == [
+        *[
+            f"[Fold {fold_id}/8] deriving training origins..."
+            for fold_id in expected_fold_ids
+        ],
+        f"Artifact directory: {config.output_dir.as_posix()}",
+    ]
 
 
-def test_overwrite_protection_preflights_all_folds(
+def test_complete_fold_is_validated_and_reused(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config, fold, paths, training_origins, source_bytes = _bounded_fold_fixture(
+        tmp_path
+    )
+    first_manifest = builder.build_one_fold_dataset(
+        config,
+        fold,
+        paths,
+        training_origins=training_origins,
+    )
+    capsys.readouterr()
+
+    def fail_materialization(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("valid fold must not be rebuilt")
+
+    monkeypatch.setattr(
+        builder,
+        "materialize_feature_dataset",
+        fail_materialization,
+    )
+    reused_manifest = builder.build_one_fold_dataset(
+        config,
+        fold,
+        paths,
+        training_origins=training_origins,
+        log_progress=True,
+    )
+
+    assert reused_manifest == first_manifest
+    assert config.source_path.read_bytes() == source_bytes
+    assert capsys.readouterr().out.splitlines() == [
+        "[Fold 1/8] training origins: 2",
+        "[Fold 1/8] validated existing artifacts — reusing",
+    ]
+
+
+def test_sparse_zero_row_store_is_allowed_without_synthetic_rows(
+    tmp_path: Path,
+) -> None:
+    base_config, fold, paths, training_origins, source_bytes = (
+        _bounded_fold_fixture(tmp_path)
+    )
+    config = builder.FoldDatasetBuildConfig(
+        source_path=base_config.source_path,
+        output_dir=base_config.output_dir,
+        store_batches=((1,), (2,)),
+        max_items_per_store=None,
+    )
+
+    manifest = builder.build_one_fold_dataset(
+        config,
+        fold,
+        paths,
+        training_origins=training_origins,
+    )
+
+    source = pq.read_table(config.source_path).to_pandas()
+    observed_targets = {
+        (row.date, int(row.store_nbr), int(row.item_nbr))
+        for row in source[["date", "store_nbr", "item_nbr"]].itertuples(
+            index=False
+        )
+    }
+    for artifact_path in (paths.training, paths.validation):
+        artifact = pq.read_table(
+            artifact_path,
+            columns=["forecast_date", "store_nbr", "item_nbr"],
+        ).to_pandas()
+        artifact_targets = {
+            (row.forecast_date, int(row.store_nbr), int(row.item_nbr))
+            for row in artifact.itertuples(index=False)
+        }
+        assert artifact_targets.issubset(observed_targets)
+        assert set(artifact["store_nbr"]) == {1}
+
+    assert manifest["configured_store_count"] == 2
+    assert manifest["processed_store_count"] == 2
+    assert manifest["processed_stores"] == [1, 2]
+    assert manifest["observed_store_count"] == 1
+    assert manifest["sparse_observed_rows_only"] is True
+    assert config.source_path.read_bytes() == source_bytes
+
+
+def test_skipped_configured_store_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    source_path = tmp_path / "source.parquet"
-    source_path.write_bytes(b"fixture")
+    base_config, fold, paths, training_origins, _ = _bounded_fold_fixture(tmp_path)
     config = builder.FoldDatasetBuildConfig(
-        source_path=source_path,
-        output_dir=tmp_path / "folds",
+        source_path=base_config.source_path,
+        output_dir=base_config.output_dir,
+        store_batches=((1,), (2,)),
+        max_items_per_store=None,
     )
-    occupied = config.output_dir / "fold_08" / "validation.parquet"
-    occupied.parent.mkdir(parents=True)
-    occupied.write_bytes(b"do-not-overwrite")
-    called = False
+    original_materialize = builder.materialize_feature_dataset
 
-    def fake_build(*args: object, **kwargs: object) -> dict[str, int]:
-        nonlocal called
-        called = True
-        return {"fold_id": 1}
+    def skip_store(*args: object, **kwargs: object) -> dict[str, object]:
+        result = original_materialize(*args, **kwargs)
+        result["processed_stores"] = [1]
+        return result
 
-    monkeypatch.setattr(builder, "build_one_fold_dataset", fake_build)
+    monkeypatch.setattr(builder, "materialize_feature_dataset", skip_store)
 
-    with pytest.raises(FileExistsError, match="validation.parquet"):
-        builder.build_approved_fold_datasets(config)
+    with pytest.raises(
+        AssertionError,
+        match="materialization skipped configured stores",
+    ):
+        builder.build_one_fold_dataset(
+            config,
+            fold,
+            paths,
+            training_origins=training_origins,
+        )
 
-    assert called is False
-    assert occupied.read_bytes() == b"do-not-overwrite"
+    assert not paths.manifest.exists()
+
+
+def test_invalid_existing_artifact_requires_overwrite(
+    tmp_path: Path,
+) -> None:
+    config, fold, paths, training_origins, _ = _bounded_fold_fixture(tmp_path)
+    paths.validation.parent.mkdir(parents=True)
+    paths.validation.write_bytes(b"do-not-overwrite")
+
+    with pytest.raises(ValueError, match="Existing fold artifact is invalid"):
+        builder.build_one_fold_dataset(
+            config,
+            fold,
+            paths,
+            training_origins=training_origins,
+        )
+
+    assert paths.validation.read_bytes() == b"do-not-overwrite"
