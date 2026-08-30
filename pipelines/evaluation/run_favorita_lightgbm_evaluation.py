@@ -1,4 +1,4 @@
-"""Serial fold-wise Favorita LightGBM evaluation orchestration."""
+"""Serial four-fold Favorita LightGBM evaluation orchestration."""
 
 from __future__ import annotations
 
@@ -23,11 +23,11 @@ from pipelines.evaluation.favorita_backtesting import (
     BacktestResult,
     EvaluationEvidence,
     FoldBacktestResult,
-    aggregate_fold_backtest_results,
+    aggregate_fold_backtest_results,  # noqa: F401
 )
 from pipelines.evaluation.favorita_metrics import (
-    ForecastMetricResults,
     FavoritaMetricAccumulator,
+    ForecastMetricResults,
     evaluate_favorita_forecasts,
 )
 from pipelines.evaluation.favorita_temporal_validation import (
@@ -37,23 +37,26 @@ from pipelines.evaluation.favorita_temporal_validation import (
     TemporalValidationFold,
     validate_approved_contract,
 )
+from pipelines.features.build_favorita_fold_datasets import (
+    ALL_STORE_BATCHES,
+    FoldDatasetBuildConfig,
+    approved_fold_artifact_paths,
+    build_approved_fold_datasets,
+    validate_canonical_fold_output_dir,
+)
+from pipelines.features.build_favorita_fold_datasets import (
+    DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
+)
 from pipelines.features.favorita_model_ready import (
     MODEL_FEATURE_COLUMNS,
     PARQUET_ROW_GROUP_SIZE,
     TRAINING_OUTPUT_COLUMNS,
     write_json_atomic,
 )
-from pipelines.features.build_favorita_fold_datasets import (
-    ALL_STORE_BATCHES,
-    DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
-    FoldDatasetBuildConfig,
-    approved_fold_artifact_paths,
-    build_approved_fold_datasets,
-)
 from pipelines.models.favorita_lightgbm import (
-    FavoritaLightGBMAdapter,
     LIGHTGBM_PARAMETERS,
     NUM_BOOST_ROUND,
+    FavoritaLightGBMAdapter,
 )
 
 DEFAULT_SOURCE_PATH = Path("data/processed/favorita_cleaned/favorita_cleaned.parquet")
@@ -158,6 +161,7 @@ def validate_evaluation_config(config: FavoritaEvaluationRunConfig) -> None:
     """Reject ambiguous origins, unsafe paths, and any holdout exposure."""
 
     validate_approved_contract()
+    validate_canonical_fold_output_dir(config.fold_output_dir)
     if not config.source_path.is_file():
         raise FileNotFoundError(config.source_path)
     resolved_paths = {
@@ -640,7 +644,7 @@ def _manifest(
             "started_at_utc": started_at.isoformat(),
             "completed_at_utc": completed_at.isoformat(),
             "model": "FavoritaLightGBMAdapter",
-            "evaluation_method": "eight-fold expanding-window backtesting",
+            "evaluation_method": "four-fold expanding-window backtesting",
         },
         "source": {
             "path": config.source_path.as_posix(),
@@ -782,7 +786,7 @@ def run_evaluation(
         )
     )
     if len(fold_build_manifests) != len(APPROVED_FOLDS):
-        raise ValueError("Fold materialization must return exactly 8 manifests")
+        raise ValueError("Fold materialization must return exactly 4 manifests")
 
     paths.run_manifest.parent.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
@@ -875,7 +879,7 @@ def run_evaluation(
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the approved serial Favorita eight-fold LightGBM evaluation."
+            "Run the approved serial Favorita four-fold LightGBM evaluation."
         )
     )
     parser.add_argument("--source-path", type=Path, default=DEFAULT_SOURCE_PATH)

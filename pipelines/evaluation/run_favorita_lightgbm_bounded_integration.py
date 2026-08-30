@@ -25,11 +25,13 @@ from pipelines.evaluation.favorita_temporal_validation import (
 )
 from pipelines.evaluation.run_favorita_lightgbm_evaluation import (
     DEFAULT_FOLD_OUTPUT_DIR,
-    DEFAULT_OUTPUT_DIR as OFFICIAL_EVALUATION_OUTPUT_DIR,
     _StreamingPredictionWriter,
-    _ValidationKeyTracker,
     _validate_validation_batch,
+    _ValidationKeyTracker,
     iter_model_ready_validation_batches,
+)
+from pipelines.evaluation.run_favorita_lightgbm_evaluation import (
+    DEFAULT_OUTPUT_DIR as OFFICIAL_EVALUATION_OUTPUT_DIR,
 )
 from pipelines.features.favorita_model_ready import (
     FeatureBuildConfig,
@@ -37,36 +39,150 @@ from pipelines.features.favorita_model_ready import (
     write_json_atomic,
 )
 from pipelines.models.favorita_lightgbm import (
-    FavoritaLightGBMAdapter,
     LIGHTGBM_PARAMETERS,
     NUM_BOOST_ROUND,
+    FavoritaLightGBMAdapter,
 )
 
 DEFAULT_SOURCE_PATH = Path(
     "data/processed/favorita_cleaned/favorita_cleaned.parquet"
 )
-DEFAULT_OUTPUT_DIR = Path("artifacts/integration/favorita_scrum15_bounded")
-BOUNDED_STORES: tuple[int, ...] = (1, 2)
-BOUNDED_ITEM_CAP = 50
-BOUNDED_TRAINING_ORIGINS: tuple[date, ...] = (
+SMALL_OUTPUT_DIR = Path("artifacts/integration/favorita_scrum15_bounded")
+MEDIUM_OUTPUT_DIR = Path("artifacts/integration/favorita_scrum15_medium")
+LARGE_OUTPUT_DIR = Path("artifacts/integration/favorita_scrum15_large")
+DEFAULT_OUTPUT_DIR = SMALL_OUTPUT_DIR
+SMALL_STORES: tuple[int, ...] = (1, 2)
+SMALL_ITEM_CAP = 50
+SMALL_TRAINING_ORIGINS: tuple[date, ...] = (
     date(2017, 5, 15),
     date(2017, 5, 31),
     date(2017, 6, 14),
 )
+MEDIUM_STORES: tuple[int, ...] = (1, 2, 3, 4, 5)
+MEDIUM_ITEM_CAP = 200
+MEDIUM_TRAINING_ORIGINS: tuple[date, ...] = (
+    date(2017, 1, 15),
+    date(2017, 1, 31),
+    date(2017, 2, 14),
+    date(2017, 2, 28),
+    date(2017, 3, 15),
+    date(2017, 3, 31),
+    date(2017, 4, 14),
+    date(2017, 4, 30),
+    date(2017, 5, 15),
+    date(2017, 5, 31),
+    date(2017, 6, 7),
+    date(2017, 6, 14),
+)
+LARGE_STORES: tuple[int, ...] = tuple(range(1, 11))
+LARGE_ITEM_CAP = 500
+LARGE_TRAINING_ORIGINS: tuple[date, ...] = (
+    date(2017, 1, 2),
+    date(2017, 1, 9),
+    date(2017, 1, 16),
+    date(2017, 1, 23),
+    date(2017, 1, 30),
+    date(2017, 2, 6),
+    date(2017, 2, 13),
+    date(2017, 2, 20),
+    date(2017, 2, 27),
+    date(2017, 3, 6),
+    date(2017, 3, 13),
+    date(2017, 3, 20),
+    date(2017, 3, 27),
+    date(2017, 4, 3),
+    date(2017, 4, 10),
+    date(2017, 4, 17),
+    date(2017, 4, 24),
+    date(2017, 5, 1),
+    date(2017, 5, 8),
+    date(2017, 5, 15),
+    date(2017, 5, 22),
+    date(2017, 5, 29),
+    date(2017, 6, 5),
+    date(2017, 6, 14),
+)
 BOUNDED_VALIDATION_ORIGIN = date(2017, 6, 30)
 BOUNDED_VALIDATION_BATCH_SIZE = 128
+BOUNDED_STORES = SMALL_STORES
+BOUNDED_ITEM_CAP = SMALL_ITEM_CAP
+BOUNDED_TRAINING_ORIGINS = SMALL_TRAINING_ORIGINS
+
+
+@dataclass(frozen=True, slots=True)
+class BoundedIntegrationProfile:
+    name: str
+    output_dir: Path
+    stores: tuple[int, ...]
+    item_cap: int
+    training_origins: tuple[date, ...]
+    validation_origin: date = BOUNDED_VALIDATION_ORIGIN
+
+
+INTEGRATION_PROFILES: dict[str, BoundedIntegrationProfile] = {
+    "small": BoundedIntegrationProfile(
+        name="small",
+        output_dir=SMALL_OUTPUT_DIR,
+        stores=SMALL_STORES,
+        item_cap=SMALL_ITEM_CAP,
+        training_origins=SMALL_TRAINING_ORIGINS,
+    ),
+    "medium": BoundedIntegrationProfile(
+        name="medium",
+        output_dir=MEDIUM_OUTPUT_DIR,
+        stores=MEDIUM_STORES,
+        item_cap=MEDIUM_ITEM_CAP,
+        training_origins=MEDIUM_TRAINING_ORIGINS,
+    ),
+    "large": BoundedIntegrationProfile(
+        name="large",
+        output_dir=LARGE_OUTPUT_DIR,
+        stores=LARGE_STORES,
+        item_cap=LARGE_ITEM_CAP,
+        training_origins=LARGE_TRAINING_ORIGINS,
+    ),
+}
+PROFILE_NAMES: tuple[str, ...] = tuple(INTEGRATION_PROFILES)
 
 
 @dataclass(frozen=True, slots=True)
 class BoundedIntegrationConfig:
+    profile: str = "small"
     source_path: Path = DEFAULT_SOURCE_PATH
     output_dir: Path = DEFAULT_OUTPUT_DIR
-    stores: tuple[int, ...] = BOUNDED_STORES
-    item_cap: int = BOUNDED_ITEM_CAP
-    training_origins: tuple[date, ...] = BOUNDED_TRAINING_ORIGINS
+    stores: tuple[int, ...] = SMALL_STORES
+    item_cap: int = SMALL_ITEM_CAP
+    training_origins: tuple[date, ...] = SMALL_TRAINING_ORIGINS
     validation_origin: date = BOUNDED_VALIDATION_ORIGIN
     validation_batch_size: int = BOUNDED_VALIDATION_BATCH_SIZE
     overwrite: bool = False
+
+
+def integration_config_for_profile(
+    profile: str,
+    *,
+    source_path: Path = DEFAULT_SOURCE_PATH,
+    output_dir: Path | None = None,
+    overwrite: bool = False,
+) -> BoundedIntegrationConfig:
+    try:
+        definition = INTEGRATION_PROFILES[profile]
+    except KeyError as exc:
+        raise ValueError(
+            f"profile must be one of {', '.join(PROFILE_NAMES)}"
+        ) from exc
+    return BoundedIntegrationConfig(
+        profile=definition.name,
+        source_path=source_path,
+        output_dir=(
+            output_dir if output_dir is not None else definition.output_dir
+        ),
+        stores=definition.stores,
+        item_cap=definition.item_cap,
+        training_origins=definition.training_origins,
+        validation_origin=definition.validation_origin,
+        overwrite=overwrite,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,14 +213,14 @@ def _is_within(path: Path, parent: Path) -> bool:
 def validate_integration_config(config: BoundedIntegrationConfig) -> None:
     if not config.source_path.is_file():
         raise FileNotFoundError(config.source_path)
-    if not config.stores or len(config.stores) > 2:
-        raise ValueError("Bounded integration requires one or two explicit stores")
+    if config.profile not in INTEGRATION_PROFILES:
+        raise ValueError(f"profile must be one of {', '.join(PROFILE_NAMES)}")
     if len(set(config.stores)) != len(config.stores):
         raise ValueError("Bounded integration stores must be unique")
     if any(store not in range(1, 55) for store in config.stores):
         raise ValueError("Bounded integration stores must be within 1 through 54")
-    if config.item_cap <= 0 or config.item_cap > 50:
-        raise ValueError("Bounded integration item_cap must be within 1 through 50")
+    if config.item_cap <= 0:
+        raise ValueError("Bounded integration item_cap must be positive")
     if not config.training_origins:
         raise ValueError("Bounded integration requires explicit training origins")
     if tuple(sorted(set(config.training_origins))) != config.training_origins:
@@ -124,6 +240,16 @@ def validate_integration_config(config: BoundedIntegrationConfig) -> None:
         or validation_end >= FINAL_HOLDOUT.holdout_start
     ):
         raise ValueError("Bounded integration must not score the final holdout")
+    definition = INTEGRATION_PROFILES[config.profile]
+    if (
+        config.stores != definition.stores
+        or config.item_cap != definition.item_cap
+        or config.training_origins != definition.training_origins
+        or config.validation_origin != definition.validation_origin
+    ):
+        raise ValueError(
+            "Bounded integration values must match the selected profile"
+        )
     if config.validation_batch_size <= 0:
         raise ValueError("validation_batch_size must be positive")
     for official_path in (
@@ -134,6 +260,15 @@ def validate_integration_config(config: BoundedIntegrationConfig) -> None:
             raise ValueError(
                 "Bounded integration output must be separate from official artifacts"
             )
+    other_profile_paths = (
+        definition.output_dir
+        for name, definition in INTEGRATION_PROFILES.items()
+        if name != config.profile
+    )
+    if any(_is_within(config.output_dir, path) for path in other_profile_paths):
+        raise ValueError(
+            "Bounded integration output must be separate from other profiles"
+        )
     if config.source_path.resolve() == config.output_dir.resolve():
         raise ValueError("Source and integration output paths must be distinct")
 
@@ -351,12 +486,14 @@ def run_bounded_integration(
         total_duration = perf_counter() - total_started
         manifest: dict[str, Any] = {
             "scope": "bounded_real_data_integration_only",
+            "profile": config.profile,
             "source": {
                 "path": config.source_path.as_posix(),
                 "before": source_before,
                 "after": source_after,
             },
             "configuration": {
+                "profile": config.profile,
                 "stores": list(config.stores),
                 "item_cap_per_store": config.item_cap,
                 "training_origins": [
@@ -400,7 +537,10 @@ def run_bounded_integration(
             "official_backtest": False,
             "limitations": [
                 "Infrastructure evidence only; not model selection evidence.",
-                "Two stores and at most 50 items per store.",
+                (
+                    f"{len(config.stores)} stores and at most "
+                    f"{config.item_cap} items per store."
+                ),
                 "Full-data peak RAM and runtime remain unmeasured.",
             ],
         }
@@ -417,8 +557,13 @@ def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run the isolated bounded real-data SCRUM-15 integration."
     )
+    parser.add_argument(
+        "--profile",
+        choices=PROFILE_NAMES,
+        default="small",
+    )
     parser.add_argument("--source-path", type=Path, default=DEFAULT_SOURCE_PATH)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
@@ -426,7 +571,8 @@ def _argument_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _argument_parser().parse_args(argv)
     paths = run_bounded_integration(
-        BoundedIntegrationConfig(
+        integration_config_for_profile(
+            args.profile,
             source_path=args.source_path,
             output_dir=args.output_dir,
             overwrite=args.overwrite,

@@ -1,4 +1,4 @@
-"""Deterministic SCRUM-13 temporal-validation contract for Favorita.
+"""Deterministic SCRUM-15 temporal-validation contract for Favorita.
 
 This module defines date boundaries and validates them. It intentionally does
 not fit models, calculate metrics, or orchestrate multi-fold backtests.
@@ -12,7 +12,8 @@ from datetime import date, timedelta
 
 FORECAST_HORIZONS: tuple[int, ...] = tuple(range(1, 17))
 VALIDATION_WINDOW_DAYS = len(FORECAST_HORIZONS)
-EXPECTED_FOLD_COUNT = 8
+EXPECTED_FOLD_COUNT = 4
+MODELING_TARGET_START = date(2016, 1, 1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,14 +55,10 @@ def _fold(fold_id: int, forecast_origin: date) -> TemporalValidationFold:
 
 
 APPROVED_FOLD_ORIGINS: tuple[date, ...] = (
-    date(2015, 8, 31),
-    date(2015, 12, 8),
-    date(2016, 4, 15),
     date(2016, 6, 30),
-    date(2016, 8, 31),
-    date(2016, 12, 8),
-    date(2017, 4, 15),
-    date(2017, 6, 30),
+    date(2016, 12, 31),
+    date(2017, 4, 30),
+    date(2017, 7, 14),
 )
 
 APPROVED_FOLDS: tuple[TemporalValidationFold, ...] = tuple(
@@ -152,9 +149,9 @@ def validate_fold_contract(
     validate_holdout_contract(holdout)
 
     if len(folds) != EXPECTED_FOLD_COUNT:
-        raise ValueError("The SCRUM-13 contract requires exactly 8 folds")
-    if tuple(fold.fold_id for fold in folds) != tuple(range(1, 9)):
-        raise ValueError("Fold identifiers must be the ordered integers 1 through 8")
+        raise ValueError("The SCRUM-15 contract requires exactly 4 folds")
+    if tuple(fold.fold_id for fold in folds) != tuple(range(1, 5)):
+        raise ValueError("Fold identifiers must be the ordered integers 1 through 4")
 
     origins = tuple(fold.forecast_origin for fold in folds)
     if any(current >= following for current, following in zip(origins, origins[1:])):

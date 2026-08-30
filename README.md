@@ -159,6 +159,7 @@ Open `http://localhost:3000`. The current frontend is an existing baseline and d
 ### Tests and checks
 
 ```bash
+ruff check .
 pytest
 cd ui
 npm run lint
