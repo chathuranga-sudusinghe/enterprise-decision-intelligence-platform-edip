@@ -401,6 +401,71 @@ def _validate_fold_artifact_boundaries(
         raise AssertionError("Final holdout would be exposed")
 
 
+def fold_manifest_payload(
+    *,
+    config: FoldDatasetBuildConfig,
+    fold: TemporalValidationFold,
+    paths: FoldArtifactPaths,
+    training_origins: tuple[date, ...],
+    experiment_subset: tuple[int, ...],
+    configured_stores: tuple[int, ...],
+    observed_stores: set[int],
+    item_count: int,
+    training_validation: dict[str, Any],
+    validation_validation: dict[str, Any],
+    processed_store_evidence: str,
+) -> dict[str, Any]:
+    """Return the shared canonical fold-manifest structure."""
+
+    return {
+        "fold_id": fold.fold_id,
+        "canonical_fold_id": fold.fold_id,
+        "canonical_fold_count": len(APPROVED_FOLDS),
+        "canonical_contract_enforced": config.canonical_contract,
+        "experiment_subset": list(experiment_subset),
+        "execution_scope": (
+            EXECUTION_SCOPE if config.canonical_contract else "synthetic_test_fixture"
+        ),
+        "canonical_validation_design": CANONICAL_VALIDATION_DESIGN,
+        "compute_constraint_reason": COMPUTE_CONSTRAINT_REASON,
+        "forecast_origin": fold.forecast_origin.isoformat(),
+        "validation_start": fold.validation_start.isoformat(),
+        "validation_end": fold.validation_end.isoformat(),
+        "modeling_target_start": MODELING_TARGET_START.isoformat(),
+        "training_target_start": training_validation["forecast_date_min"],
+        "training_target_end": training_validation["forecast_date_max"],
+        "training_row_count": training_validation["rows"],
+        "validation_row_count": validation_validation["rows"],
+        "store_count": len(observed_stores),
+        "configured_store_count": len(configured_stores),
+        "observed_store_count": len(observed_stores),
+        "observed_stores": sorted(observed_stores),
+        "processed_store_count": len(configured_stores),
+        "processed_stores": list(configured_stores),
+        "processed_store_evidence": processed_store_evidence,
+        "item_count": item_count,
+        "horizons": list(FORECAST_HORIZONS),
+        "max_items_per_store": config.max_items_per_store,
+        "source_path": config.source_path.as_posix(),
+        "source_not_mutated": True,
+        "final_holdout_excluded": True,
+        "ordered_schema": list(TRAINING_OUTPUT_COLUMNS),
+        "training_origin_count": len(training_origins),
+        "training_origin_start": min(training_origins).isoformat(),
+        "training_origin_end": max(training_origins).isoformat(),
+        "direct_horizon_aware": True,
+        "recursive_feedback": False,
+        "future_actual_leakage": False,
+        "sparse_observed_rows_only": True,
+        "negative_and_fractional_unit_sales_preserved": True,
+        "configured_stores": list(configured_stores),
+        "artifacts": {
+            "training": paths.training.as_posix(),
+            "validation": paths.validation.as_posix(),
+        },
+    }
+
+
 def _partition_config(
     config: FoldDatasetBuildConfig,
     *,
@@ -632,53 +697,19 @@ def build_one_fold_dataset(
     if source_after != source_before:
         raise AssertionError("Cleaned source changed during fold materialization")
 
-    manifest: dict[str, Any] = {
-        "fold_id": fold.fold_id,
-        "canonical_fold_id": fold.fold_id,
-        "canonical_fold_count": len(APPROVED_FOLDS),
-        "canonical_contract_enforced": config.canonical_contract,
-        "experiment_subset": list(experiment_subset),
-        "execution_scope": (
-            EXECUTION_SCOPE if config.canonical_contract else "synthetic_test_fixture"
-        ),
-        "canonical_validation_design": CANONICAL_VALIDATION_DESIGN,
-        "compute_constraint_reason": COMPUTE_CONSTRAINT_REASON,
-        "forecast_origin": fold.forecast_origin.isoformat(),
-        "validation_start": fold.validation_start.isoformat(),
-        "validation_end": fold.validation_end.isoformat(),
-        "modeling_target_start": MODELING_TARGET_START.isoformat(),
-        "training_target_start": training_validation["forecast_date_min"],
-        "training_target_end": training_validation["forecast_date_max"],
-        "training_row_count": training_validation["rows"],
-        "validation_row_count": validation_validation["rows"],
-        "store_count": len(observed_stores),
-        "configured_store_count": len(configured_stores),
-        "observed_store_count": len(observed_stores),
-        "observed_stores": sorted(observed_stores),
-        "processed_store_count": len(configured_stores),
-        "processed_stores": list(configured_stores),
-        "processed_store_evidence": "materializer_processed_stores",
-        "item_count": len(training_items | validation_items),
-        "horizons": list(FORECAST_HORIZONS),
-        "max_items_per_store": config.max_items_per_store,
-        "source_path": config.source_path.as_posix(),
-        "source_not_mutated": True,
-        "final_holdout_excluded": True,
-        "ordered_schema": list(TRAINING_OUTPUT_COLUMNS),
-        "training_origin_count": len(training_origins),
-        "training_origin_start": min(training_origins).isoformat(),
-        "training_origin_end": max(training_origins).isoformat(),
-        "direct_horizon_aware": True,
-        "recursive_feedback": False,
-        "future_actual_leakage": False,
-        "sparse_observed_rows_only": True,
-        "negative_and_fractional_unit_sales_preserved": True,
-        "configured_stores": list(configured_stores),
-        "artifacts": {
-            "training": paths.training.as_posix(),
-            "validation": paths.validation.as_posix(),
-        },
-    }
+    manifest = fold_manifest_payload(
+        config=config,
+        fold=fold,
+        paths=paths,
+        training_origins=training_origins,
+        experiment_subset=experiment_subset,
+        configured_stores=configured_stores,
+        observed_stores=observed_stores,
+        item_count=len(training_items | validation_items),
+        training_validation=training_validation,
+        validation_validation=validation_validation,
+        processed_store_evidence="materializer_processed_stores",
+    )
     write_json_atomic(
         manifest,
         paths.manifest,
