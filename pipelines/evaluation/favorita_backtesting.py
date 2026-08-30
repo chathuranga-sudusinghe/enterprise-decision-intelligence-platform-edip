@@ -17,8 +17,8 @@ from pipelines.evaluation.favorita_metrics import (
 from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
-    MODELING_TARGET_START,
     FORECAST_HORIZONS,
+    MODELING_TARGET_START,
     TemporalValidationFold,
     is_training_target_eligible,
     validate_approved_contract,

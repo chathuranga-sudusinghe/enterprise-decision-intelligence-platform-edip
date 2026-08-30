@@ -23,11 +23,11 @@ from pipelines.evaluation.favorita_backtesting import (
     BacktestResult,
     EvaluationEvidence,
     FoldBacktestResult,
-    aggregate_fold_backtest_results,
+    aggregate_fold_backtest_results,  # noqa: F401
 )
 from pipelines.evaluation.favorita_metrics import (
-    ForecastMetricResults,
     FavoritaMetricAccumulator,
+    ForecastMetricResults,
     evaluate_favorita_forecasts,
 )
 from pipelines.evaluation.favorita_temporal_validation import (
@@ -37,24 +37,26 @@ from pipelines.evaluation.favorita_temporal_validation import (
     TemporalValidationFold,
     validate_approved_contract,
 )
+from pipelines.features.build_favorita_fold_datasets import (
+    ALL_STORE_BATCHES,
+    FoldDatasetBuildConfig,
+    approved_fold_artifact_paths,
+    build_approved_fold_datasets,
+    validate_canonical_fold_output_dir,
+)
+from pipelines.features.build_favorita_fold_datasets import (
+    DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
+)
 from pipelines.features.favorita_model_ready import (
     MODEL_FEATURE_COLUMNS,
     PARQUET_ROW_GROUP_SIZE,
     TRAINING_OUTPUT_COLUMNS,
     write_json_atomic,
 )
-from pipelines.features.build_favorita_fold_datasets import (
-    ALL_STORE_BATCHES,
-    DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
-    FoldDatasetBuildConfig,
-    approved_fold_artifact_paths,
-    build_approved_fold_datasets,
-    validate_canonical_fold_output_dir,
-)
 from pipelines.models.favorita_lightgbm import (
-    FavoritaLightGBMAdapter,
     LIGHTGBM_PARAMETERS,
     NUM_BOOST_ROUND,
+    FavoritaLightGBMAdapter,
 )
 
 DEFAULT_SOURCE_PATH = Path("data/processed/favorita_cleaned/favorita_cleaned.parquet")

@@ -619,7 +619,6 @@ def test_manifest_configuration_matches_unsampled_contract(
 
 
 def test_cli_exposes_only_execution_options(tmp_path: Path) -> None:
-    config = _config(tmp_path)
     parser = runner._argument_parser()
     option_strings = {
         option for action in parser._actions for option in action.option_strings

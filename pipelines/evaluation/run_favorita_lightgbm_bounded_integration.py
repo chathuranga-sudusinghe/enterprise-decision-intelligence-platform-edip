@@ -25,11 +25,13 @@ from pipelines.evaluation.favorita_temporal_validation import (
 )
 from pipelines.evaluation.run_favorita_lightgbm_evaluation import (
     DEFAULT_FOLD_OUTPUT_DIR,
-    DEFAULT_OUTPUT_DIR as OFFICIAL_EVALUATION_OUTPUT_DIR,
     _StreamingPredictionWriter,
-    _ValidationKeyTracker,
     _validate_validation_batch,
+    _ValidationKeyTracker,
     iter_model_ready_validation_batches,
+)
+from pipelines.evaluation.run_favorita_lightgbm_evaluation import (
+    DEFAULT_OUTPUT_DIR as OFFICIAL_EVALUATION_OUTPUT_DIR,
 )
 from pipelines.features.favorita_model_ready import (
     FeatureBuildConfig,
@@ -37,9 +39,9 @@ from pipelines.features.favorita_model_ready import (
     write_json_atomic,
 )
 from pipelines.models.favorita_lightgbm import (
-    FavoritaLightGBMAdapter,
     LIGHTGBM_PARAMETERS,
     NUM_BOOST_ROUND,
+    FavoritaLightGBMAdapter,
 )
 
 DEFAULT_SOURCE_PATH = Path(
