@@ -17,6 +17,7 @@ import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 
 FORECAST_HORIZONS: tuple[int, ...] = tuple(range(1, 17))
+PARQUET_ROW_GROUP_SIZE = 65_536
 SALES_LAG_OFFSETS: dict[str, int] = {
     "sales_lag_1": 1,
     "sales_lag_7": 7,
@@ -585,6 +586,7 @@ def build_feature_rows_for_origin(
     max_items_per_store: int | None = None,
     allow_assumed_future_promotion: bool = False,
     allow_assumed_future_holidays: bool = False,
+    drop_targets_without_origin_history: bool = False,
 ) -> pd.DataFrame:
     origin = pd.Timestamp(forecast_origin).normalize()
     source = source_slice.copy()
@@ -601,6 +603,14 @@ def build_feature_rows_for_origin(
     target_rows = source.loc[
         source["date"].between(origin + pd.Timedelta(days=1), forecast_end)
     ].copy()
+    if drop_targets_without_origin_history and not target_rows.empty:
+        known_series = history[["store_nbr", "item_nbr"]].drop_duplicates()
+        target_rows = target_rows.merge(
+            known_series,
+            on=["store_nbr", "item_nbr"],
+            how="inner",
+            validate="many_to_one",
+        )
     if target_rows.empty:
         return pd.DataFrame(columns=TRAINING_OUTPUT_COLUMNS)
 
@@ -701,7 +711,10 @@ class AtomicParquetBatchWriter:
                 OUTPUT_ARROW_SCHEMA,
                 compression="zstd",
             )
-        self.writer.write_table(table)
+        self.writer.write_table(
+            table,
+            row_group_size=PARQUET_ROW_GROUP_SIZE,
+        )
         self.rows_written += table.num_rows
 
     def finalize(self) -> None:
@@ -710,10 +723,13 @@ class AtomicParquetBatchWriter:
         self.writer.close()
         self.writer = None
         parquet_file = pq.ParquetFile(self.temp_path)
-        if parquet_file.metadata.num_rows != self.rows_written:
-            raise AssertionError("Temporary Parquet row-count validation failed")
-        if not parquet_file.schema_arrow.equals(OUTPUT_ARROW_SCHEMA):
-            raise AssertionError("Temporary Parquet schema validation failed")
+        try:
+            if parquet_file.metadata.num_rows != self.rows_written:
+                raise AssertionError("Temporary Parquet row-count validation failed")
+            if not parquet_file.schema_arrow.equals(OUTPUT_ARROW_SCHEMA):
+                raise AssertionError("Temporary Parquet schema validation failed")
+        finally:
+            parquet_file.close()
         os.replace(self.temp_path, self.output_path)
 
     def abort(self) -> None:
@@ -723,7 +739,11 @@ class AtomicParquetBatchWriter:
         self.temp_path.unlink(missing_ok=True)
 
 
-def validate_feature_artifact(output_path: Path) -> dict[str, Any]:
+def validate_feature_artifact(
+    output_path: Path,
+    *,
+    bounded_memory: bool = False,
+) -> dict[str, Any]:
     parquet_file = pq.ParquetFile(output_path)
     if not parquet_file.schema_arrow.equals(OUTPUT_ARROW_SCHEMA):
         raise AssertionError("Output Arrow schema differs from declared contract")
@@ -735,7 +755,7 @@ def validate_feature_artifact(output_path: Path) -> dict[str, Any]:
     items: set[int] = set()
     horizons: set[int] = set()
     duplicate_count = 0
-    seen_keys: set[tuple[Any, ...]] = set()
+    seen_keys: set[tuple[Any, ...]] | None = set() if not bounded_memory else None
     for row_group_index in range(parquet_file.metadata.num_row_groups):
         table = parquet_file.read_row_group(row_group_index)
         row_count += table.num_rows
@@ -757,12 +777,19 @@ def validate_feature_artifact(output_path: Path) -> dict[str, Any]:
             raise AssertionError("Artifact horizon/date equation failed")
         if not frame["forecast_horizon"].isin(FORECAST_HORIZONS).all():
             raise AssertionError("Artifact contains an invalid horizon")
-        for key in frame[
-            ["forecast_origin", "forecast_date", "store_nbr", "item_nbr"]
-        ].itertuples(index=False, name=None):
-            if key in seen_keys:
-                duplicate_count += 1
-            seen_keys.add(key)
+        key_columns = [
+            "forecast_origin",
+            "forecast_date",
+            "store_nbr",
+            "item_nbr",
+        ]
+        if seen_keys is None:
+            duplicate_count += int(frame.duplicated(key_columns).sum())
+        else:
+            for key in frame[key_columns].itertuples(index=False, name=None):
+                if key in seen_keys:
+                    duplicate_count += 1
+                seen_keys.add(key)
         stores.update(int(value) for value in frame["store_nbr"].unique())
         items.update(int(value) for value in frame["item_nbr"].unique())
         horizons.update(int(value) for value in frame["forecast_horizon"].unique())
@@ -799,50 +826,125 @@ def validate_feature_artifact(output_path: Path) -> dict[str, Any]:
     }
 
 
-def materialize_feature_dataset(config: FeatureBuildConfig) -> dict[str, Any]:
+def materialize_feature_dataset(
+    config: FeatureBuildConfig,
+    *,
+    forecast_date_cutoff: date | None = None,
+    drop_targets_without_origin_history: bool = False,
+    bounded_memory_validation: bool = False,
+    reuse_source_across_origins: bool = False,
+    progress_prefix: str | None = None,
+    progress_phase: str = "",
+) -> dict[str, Any]:
     validate_build_config(config)
     writer = AtomicParquetBatchWriter(config.output_path, overwrite=config.overwrite)
     expected_target_rows = 0
     batches_written = 0
+    processed_stores: set[int] = set()
+
+    def write_origin_batch(
+        source_slice: pd.DataFrame,
+        *,
+        origin: pd.Timestamp,
+    ) -> None:
+        nonlocal batches_written, expected_target_rows
+        source_slice = _select_bounded_items(
+            source_slice,
+            origin=origin,
+            max_items_per_store=config.max_items_per_store,
+        )
+        feature_rows = build_feature_rows_for_origin(
+            source_slice,
+            forecast_origin=origin,
+            max_items_per_store=None,
+            allow_assumed_future_promotion=(
+                config.allow_assumed_future_promotion
+            ),
+            allow_assumed_future_holidays=(
+                config.allow_assumed_future_holidays
+            ),
+            drop_targets_without_origin_history=(
+                drop_targets_without_origin_history
+            ),
+        )
+        if forecast_date_cutoff is not None:
+            feature_rows = feature_rows.loc[
+                feature_rows["forecast_date"]
+                <= pd.Timestamp(forecast_date_cutoff)
+            ].reset_index(drop=True)
+        if feature_rows.empty:
+            return
+        expected_target_rows += len(feature_rows)
+        writer.write(to_arrow_table(feature_rows))
+        batches_written += 1
+
     try:
-        for origin_date in config.forecast_origins:
-            origin = pd.Timestamp(origin_date)
-            start_date = origin - pd.Timedelta(days=28)
-            end_date = origin + pd.Timedelta(days=max(FORECAST_HORIZONS))
-            for store_batch in config.store_batches:
+        if reuse_source_across_origins:
+            origins = tuple(pd.Timestamp(value) for value in config.forecast_origins)
+            broad_start_date = min(origins) - pd.Timedelta(days=28)
+            broad_end_date = max(origins) + pd.Timedelta(
+                days=max(FORECAST_HORIZONS)
+            )
+            store_batch_count = len(config.store_batches)
+            phase = f" {progress_phase}" if progress_phase else ""
+            for store_batch_index, store_batch in enumerate(
+                config.store_batches,
+                start=1,
+            ):
+                if progress_prefix is not None:
+                    print(
+                        f"{progress_prefix}{phase} store "
+                        f"{store_batch_index}/{store_batch_count}",
+                        flush=True,
+                    )
                 source_slice = _read_filtered_source_slice(
                     config.source_path,
-                    start_date=start_date,
-                    end_date=end_date,
+                    start_date=broad_start_date,
+                    end_date=broad_end_date,
                     store_nbrs=store_batch,
                 )
-                source_slice = _select_bounded_items(
-                    source_slice,
-                    origin=origin,
-                    max_items_per_store=config.max_items_per_store,
-                )
-                expected_target_rows += int(
-                    source_slice["date"]
-                    .between(origin + pd.Timedelta(days=1), end_date)
-                    .sum()
-                )
-                feature_rows = build_feature_rows_for_origin(
-                    source_slice,
-                    forecast_origin=origin,
-                    max_items_per_store=None,
-                    allow_assumed_future_promotion=config.allow_assumed_future_promotion,
-                    allow_assumed_future_holidays=config.allow_assumed_future_holidays,
-                )
-                if feature_rows.empty:
-                    continue
-                writer.write(to_arrow_table(feature_rows))
-                batches_written += 1
+                processed_stores.update(store_batch)
+                source_dates = source_slice["date"]
+                for origin in origins:
+                    origin_start_date = origin - pd.Timedelta(days=28)
+                    origin_end_date = origin + pd.Timedelta(
+                        days=max(FORECAST_HORIZONS)
+                    )
+                    start_index = source_dates.searchsorted(
+                        origin_start_date,
+                        side="left",
+                    )
+                    end_index = source_dates.searchsorted(
+                        origin_end_date,
+                        side="right",
+                    )
+                    origin_source_slice = source_slice.iloc[
+                        start_index:end_index
+                    ].reset_index(drop=True)
+                    write_origin_batch(origin_source_slice, origin=origin)
+        else:
+            for origin_date in config.forecast_origins:
+                origin = pd.Timestamp(origin_date)
+                start_date = origin - pd.Timedelta(days=28)
+                end_date = origin + pd.Timedelta(days=max(FORECAST_HORIZONS))
+                for store_batch in config.store_batches:
+                    source_slice = _read_filtered_source_slice(
+                        config.source_path,
+                        start_date=start_date,
+                        end_date=end_date,
+                        store_nbrs=store_batch,
+                    )
+                    processed_stores.update(store_batch)
+                    write_origin_batch(source_slice, origin=origin)
         writer.finalize()
     except Exception:
         writer.abort()
         raise
 
-    artifact_validation = validate_feature_artifact(config.output_path)
+    artifact_validation = validate_feature_artifact(
+        config.output_path,
+        bounded_memory=bounded_memory_validation,
+    )
     if artifact_validation["rows"] != expected_target_rows:
         raise AssertionError(
             "Output rows differ from observed target rows; synthetic or missing rows detected"
@@ -850,6 +952,7 @@ def materialize_feature_dataset(config: FeatureBuildConfig) -> dict[str, Any]:
     return {
         "creation_status": "created",
         "batches_written": batches_written,
+        "processed_stores": sorted(processed_stores),
         "expected_observed_target_rows": expected_target_rows,
         "artifact_validation": artifact_validation,
     }

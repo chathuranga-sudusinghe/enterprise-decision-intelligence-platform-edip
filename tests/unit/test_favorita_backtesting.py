@@ -47,7 +47,7 @@ def _canonical_examples(
     *,
     duplicate_first_fold_population: bool = False,
 ) -> list[BacktestExample]:
-    examples = [_example(date(2015, 8, 1), 1, item_nbr=900)]
+    examples = [_example(date(2015, 12, 31), 1, item_nbr=900)]
     for fold in APPROVED_FOLDS:
         for horizon in FORECAST_HORIZONS:
             examples.append(
@@ -111,13 +111,13 @@ class RecordingFactory:
         return adapter
 
 
-def test_canonical_eight_fold_definition_is_accepted() -> None:
+def test_canonical_four_fold_definition_is_accepted() -> None:
     result = run_expanding_window_backtest(
         _canonical_examples(),
         RecordingFactory(),
     )
 
-    assert tuple(fold.fold_id for fold in result.fold_results) == tuple(range(1, 9))
+    assert tuple(fold.fold_id for fold in result.fold_results) == tuple(range(1, 5))
     assert tuple(fold.forecast_origin for fold in result.fold_results) == tuple(
         fold.forecast_origin for fold in APPROVED_FOLDS
     )
@@ -194,8 +194,8 @@ def test_factory_creates_one_independently_fitted_adapter_per_fold() -> None:
 
     run_expanding_window_backtest(_canonical_examples(), factory)
 
-    assert len(factory.adapters) == 8
-    assert len({id(adapter) for adapter in factory.adapters}) == 8
+    assert len(factory.adapters) == 4
+    assert len({id(adapter) for adapter in factory.adapters}) == 4
     assert all(adapter.fit_calls == 1 for adapter in factory.adapters)
 
 
@@ -271,12 +271,12 @@ def test_duplicate_validation_keys_are_rejected() -> None:
 
 def test_duplicate_training_keys_are_rejected() -> None:
     examples = _canonical_examples()
-    duplicate = _example(date(2015, 10, 1), 1, item_nbr=777)
+    duplicate = _example(date(2016, 2, 1), 1, item_nbr=777)
     examples.extend((duplicate, duplicate))
 
     with pytest.raises(
         ValueError,
-        match="Fold 2 contains duplicate training keys",
+        match="Fold 1 contains duplicate training keys",
     ):
         build_approved_fold_datasets(examples)
 
@@ -287,10 +287,10 @@ def test_per_fold_metrics_and_row_evidence_are_produced() -> None:
         RecordingFactory(),
     )
 
-    assert len(result.fold_results) == 8
+    assert len(result.fold_results) == 4
     assert all(fold.metrics.mae == 0.0 for fold in result.fold_results)
     assert all(len(fold.predictions) == 16 for fold in result.fold_results)
-    assert len(result.predictions) == 8 * 16
+    assert len(result.predictions) == 4 * 16
     assert all(row.actual_unit_sales == 10.0 for row in result.predictions)
 
 
@@ -304,7 +304,7 @@ def test_per_horizon_metrics_cover_exact_horizons_one_through_sixteen() -> None:
         tuple(horizon.forecast_horizon for horizon in result.horizon_results)
         == FORECAST_HORIZONS
     )
-    assert all(horizon.row_count == 8 for horizon in result.horizon_results)
+    assert all(horizon.row_count == 4 for horizon in result.horizon_results)
     assert all(horizon.metrics.mae == 0.0 for horizon in result.horizon_results)
 
 
@@ -319,8 +319,8 @@ def test_overall_metrics_are_recomputed_from_pooled_row_evidence() -> None:
         result.fold_results
     )
 
-    assert result.overall_metrics.mae == pytest.approx(320.0 / 144.0)
-    assert average_fold_mae == 1.25
+    assert result.overall_metrics.mae == pytest.approx(320.0 / 80.0)
+    assert average_fold_mae == 2.5
     assert result.overall_metrics.mae != average_fold_mae
 
 
@@ -335,8 +335,8 @@ def test_final_untouched_holdout_rows_are_rejected() -> None:
 def test_input_sequence_and_feature_mapping_are_not_mutated() -> None:
     feature_values = {"constant": 1.0}
     first = BacktestExample(
-        forecast_origin=date(2015, 8, 1),
-        forecast_date=date(2015, 8, 2),
+        forecast_origin=date(2015, 12, 31),
+        forecast_date=date(2016, 1, 1),
         forecast_horizon=1,
         store_nbr=1,
         item_nbr=900,

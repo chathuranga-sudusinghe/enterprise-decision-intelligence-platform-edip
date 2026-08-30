@@ -50,6 +50,9 @@ jobs:
         run: |
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
 
+      - name: Run Python lint
+        run: ruff check .
+
       - name: Run unit tests
         run: |
           if [ -d tests/unit ]; then

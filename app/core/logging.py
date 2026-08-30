@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import logging
 import logging.config
-import sys
 from pathlib import Path
 from typing import Optional
-
 
 DEFAULT_LOG_FORMAT = (
     "%(asctime)s | %(levelname)s | %(name)s | %(message)s"

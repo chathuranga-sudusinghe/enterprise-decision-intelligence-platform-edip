@@ -1,0 +1,14 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+extend-exclude = [
+    "artifacts",
+    "data",
+    "notebooks",
+    "tmp",
+    "ui",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

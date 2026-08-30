@@ -7,7 +7,8 @@
 | Forecast origin | End of calendar day `t` |
 | Supported horizon | Exact integers 1 through 16 |
 | Strategy | Direct horizon-aware global forecasting |
-| Validation design | Eight expanding-window folds |
+| Modeling target scope | `2016-01-01` through `2017-07-30` |
+| Validation design | Four expanding-window folds |
 | Final holdout origin | `2017-07-30` |
 | Final holdout dates | `2017-07-31` through `2017-08-15` |
 
@@ -63,18 +64,14 @@ Generated examples include `forecast_origin`, `forecast_date`, and `forecast_hor
 
 | Fold | Forecast origin | Validation start | Validation end |
 |---:|---|---|---|
-| 1 | `2015-08-31` | `2015-09-01` | `2015-09-16` |
-| 2 | `2015-12-08` | `2015-12-09` | `2015-12-24` |
-| 3 | `2016-04-15` | `2016-04-16` | `2016-05-01` |
-| 4 | `2016-06-30` | `2016-07-01` | `2016-07-16` |
-| 5 | `2016-08-31` | `2016-09-01` | `2016-09-16` |
-| 6 | `2016-12-08` | `2016-12-09` | `2016-12-24` |
-| 7 | `2017-04-15` | `2017-04-16` | `2017-05-01` |
-| 8 | `2017-06-30` | `2017-07-01` | `2017-07-16` |
+| 1 | `2016-06-30` | `2016-07-01` | `2016-07-16` |
+| 2 | `2016-12-31` | `2017-01-01` | `2017-01-16` |
+| 3 | `2017-04-30` | `2017-05-01` | `2017-05-16` |
+| 4 | `2017-07-14` | `2017-07-15` | `2017-07-30` |
 
 The executable fold contract requires:
 
-- exactly eight folds with identifiers 1 through 8;
+- exactly four folds with identifiers 1 through 4;
 - strictly increasing origins;
 - `validation_start = origin + 1 day`;
 - `validation_end = origin + 16 days`;
@@ -86,10 +83,12 @@ Only canonical origins need to be stored; validation starts and ends should be d
 
 ## 5. Expanding-window training-label eligibility
 
+Each fold uses all eligible model-ready training records whose target dates begin on `2016-01-01` and are available on or before that fold's forecast origin. SCRUM-15 implements serial fold-wise Parquet materialization and evaluation orchestration while preserving the full cleaned source, the existing leakage-safe feature definitions, and final holdout separation. The canonical four-fold artifacts use `artifacts/features/favorita_four_fold/`; superseded eight-fold artifacts under `artifacts/features/favorita_folds/` are historical evidence and are not overwritten or reused by this experiment. No canonical four-fold real-data artifact build or model run is claimed by this contract update.
+
 For fold origin `O`, a training example is eligible only when:
 
 ```text
-forecast_date <= O
+2016-01-01 <= forecast_date <= O
 ```
 
 An earlier example origin alone is insufficient because its labelled target may still occur after `O`.
@@ -133,7 +132,7 @@ The protected holdout is:
 - target end: `2017-08-15`;
 - duration: 16 calendar days.
 
-The latest validation window ends on `2017-07-16`, leaving `2017-07-17` through `2017-07-30` outside approved validation windows.
+The latest validation window ends on `2017-07-30`, immediately before the protected holdout begins.
 
 The holdout remains unavailable for model selection, preprocessing decisions, metric policy, threshold selection, hyperparameter tuning, sensitivity-design selection, or workflow tuning. Scoring requires a separately approved later work item after all such decisions are frozen.
 
@@ -179,11 +178,11 @@ The current implementation provides deterministic structures and functions that:
 - validate fold identifiers, chronology, duration, and non-overlap;
 - determine training-label eligibility;
 - reject a post-origin training target;
-- build the canonical eight fold datasets from the approved boundaries;
+- locate or build the canonical four fold datasets from the approved boundaries in a separate artifact root;
 - require a fresh model-agnostic adapter and target-free prediction inputs for each fold;
 - validate prediction counts, finiteness, audit-key alignment, and unique validation keys;
 - provide a reusable fold-local global LightGBM adapter with training-only categorical state, native missing-value handling, and the approved direct-horizon feature contract;
-- calculate SCRUM-17 metrics per fold, per horizon, and from pooled row-level evidence;
+- stream row-level prediction evidence to Parquet and calculate SCRUM-17 metrics incrementally per fold, per horizon, and over the pooled rows;
 - validate the exact holdout dates and separation; and
 - validate the canonical contract on demand.
 

@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import tempfile
+from bisect import bisect_right
 from collections.abc import Mapping, Sequence
 from math import isfinite
 from numbers import Integral
+from pathlib import Path
 from types import MappingProxyType
 
 import lightgbm as lgb
+import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from pipelines.evaluation.favorita_backtesting import (
     BacktestExample,
@@ -19,7 +25,9 @@ from pipelines.evaluation.favorita_temporal_validation import FORECAST_HORIZONS
 from pipelines.features.favorita_model_ready import (
     FORBIDDEN_MODEL_COLUMNS,
     MODEL_FEATURE_COLUMNS,
+    PARQUET_ROW_GROUP_SIZE,
     TARGET_COLUMN,
+    TRAINING_OUTPUT_COLUMNS,
 )
 
 DEFAULT_FEATURE_COLUMNS: tuple[str, ...] = (
@@ -123,6 +131,147 @@ def _ordered_categories(series: pd.Series) -> tuple[object, ...]:
     return tuple(sorted(values, key=lambda value: (type(value).__name__, repr(value))))
 
 
+class _ParquetFeatureSequence(lgb.Sequence):
+    """Provide LightGBM bounded Parquet row-group feature batches."""
+
+    batch_size = PARQUET_ROW_GROUP_SIZE
+
+    def __init__(
+        self,
+        path: Path,
+        *,
+        columns: tuple[str, ...],
+        categorical_levels: Mapping[str, tuple[object, ...]],
+    ) -> None:
+        self._parquet_file = pq.ParquetFile(path)
+        self._columns = columns
+        self._categorical_levels = categorical_levels
+        self._row_group_starts = [0]
+        for row_group_index in range(self._parquet_file.metadata.num_row_groups):
+            row_count = self._parquet_file.metadata.row_group(
+                row_group_index
+            ).num_rows
+            self._row_group_starts.append(
+                self._row_group_starts[-1] + row_count
+            )
+        self._cached_row_group_index: int | None = None
+        self._cached_values: np.ndarray | None = None
+
+    def __len__(self) -> int:
+        return self._row_group_starts[-1]
+
+    def close(self) -> None:
+        self._cached_values = None
+        self._parquet_file.close()
+
+    def _convert(self, table: pa.Table) -> np.ndarray:
+        frame = table.to_pandas()
+        for column in self._columns:
+            if column in self._categorical_levels:
+                frame[column] = pd.Categorical(
+                    frame[column],
+                    categories=self._categorical_levels[column],
+                ).codes.astype("float64")
+            else:
+                frame[column] = pd.to_numeric(frame[column], errors="raise")
+                if pd.api.types.is_bool_dtype(frame[column].dtype):
+                    frame[column] = frame[column].astype("float64")
+        return frame.loc[:, self._columns].to_numpy(
+            dtype="float64",
+            copy=False,
+        )
+
+    def _row_group_values(self, row_group_index: int) -> np.ndarray:
+        if self._cached_row_group_index != row_group_index:
+            table = self._parquet_file.read_row_group(
+                row_group_index,
+                columns=list(self._columns),
+            )
+            self._cached_values = self._convert(table)
+            self._cached_row_group_index = row_group_index
+        if self._cached_values is None:
+            raise AssertionError("Parquet row-group cache was not populated")
+        return self._cached_values
+
+    def _range(self, start: int, stop: int) -> np.ndarray:
+        if start < 0 or stop < start or stop > len(self):
+            raise IndexError("Parquet feature sequence range is out of bounds")
+        if start == stop:
+            return np.empty((0, len(self._columns)), dtype="float64")
+        blocks: list[np.ndarray] = []
+        cursor = start
+        while cursor < stop:
+            row_group_index = bisect_right(
+                self._row_group_starts,
+                cursor,
+            ) - 1
+            row_group_start = self._row_group_starts[row_group_index]
+            row_group_stop = self._row_group_starts[row_group_index + 1]
+            local_start = cursor - row_group_start
+            local_stop = min(stop, row_group_stop) - row_group_start
+            blocks.append(
+                self._row_group_values(row_group_index)[
+                    local_start:local_stop
+                ]
+            )
+            cursor = min(stop, row_group_stop)
+        return blocks[0] if len(blocks) == 1 else np.concatenate(blocks)
+
+    def __getitem__(
+        self,
+        index: int | slice | list[int],
+    ) -> np.ndarray:
+        if isinstance(index, Integral):
+            normalized = int(index)
+            if normalized < 0:
+                normalized += len(self)
+            return self._range(normalized, normalized + 1)[0]
+        if isinstance(index, slice):
+            start, stop, step = index.indices(len(self))
+            if step != 1:
+                return self._range(start, stop)[::step]
+            return self._range(start, stop)
+        if isinstance(index, list):
+            return np.stack([self[item] for item in index])
+        raise TypeError(
+            f"Sequence index must be integer, slice or list, got "
+            f"{type(index).__name__}"
+        )
+
+
+class _LabelMemmapContext:
+    """Close a Windows memmap before deleting its temporary directory."""
+
+    def __init__(self, row_count: int) -> None:
+        self._row_count = row_count
+        self._temporary_directory: tempfile.TemporaryDirectory[str] | None = None
+        self._labels: np.memmap | None = None
+
+    def __enter__(self) -> np.memmap:
+        self._temporary_directory = tempfile.TemporaryDirectory(
+            prefix="favorita-lightgbm-labels-"
+        )
+        label_path = Path(self._temporary_directory.name) / "labels.float64"
+        self._labels = np.memmap(
+            label_path,
+            dtype="float64",
+            mode="w+",
+            shape=(self._row_count,),
+        )
+        return self._labels
+
+    def __exit__(self, *args: object) -> None:
+        if self._labels is not None:
+            self._labels.flush()
+            memory_map = self._labels._mmap
+            self._labels = None
+            if memory_map is not None:
+                memory_map.close()
+        if self._temporary_directory is not None:
+            self._temporary_directory.cleanup()
+            self._temporary_directory = None
+
+
 class FavoritaLightGBMAdapter:
     """One independently fitted global LightGBM model for one validation fold."""
 
@@ -190,6 +339,54 @@ class FavoritaLightGBMAdapter:
                 if pd.api.types.is_bool_dtype(frame[column].dtype):
                     frame[column] = frame[column].astype(float)
 
+    @staticmethod
+    def _validate_model_ready_frame(frame: pd.DataFrame) -> None:
+        if tuple(frame.columns) != TRAINING_OUTPUT_COLUMNS:
+            raise ValueError(
+                "Model-ready frame must match the ordered training schema"
+            )
+        if frame.empty:
+            raise ValueError("Model-ready frame must not be empty")
+        if not frame["forecast_horizon"].isin(FORECAST_HORIZONS).all():
+            raise ValueError("forecast_horizon must be an integer from 1 through 16")
+
+    @classmethod
+    def _prepare_feature_frame(
+        cls,
+        frame: pd.DataFrame,
+        *,
+        fitted: tuple[str, ...],
+        categorical: tuple[str, ...],
+        levels: Mapping[str, tuple[object, ...]],
+    ) -> pd.DataFrame:
+        prepared = frame.loc[:, fitted].copy()
+        for column in categorical:
+            values = prepared[column]
+            known_or_missing = values.isna() | values.isin(levels[column])
+            prepared[column] = pd.Categorical(
+                values.where(known_or_missing),
+                categories=levels[column],
+            ).codes.astype("float64")
+        cls._coerce_numeric(prepared, set(categorical))
+        return prepared
+
+    def _record_fitted_state(
+        self,
+        *,
+        booster: lgb.Booster,
+        fitted: tuple[str, ...],
+        excluded: tuple[str, ...],
+        categorical: tuple[str, ...],
+        levels: Mapping[str, tuple[object, ...]],
+        missing_counts: Mapping[str, int],
+    ) -> None:
+        self._booster = booster
+        self._fitted_feature_columns = fitted
+        self._excluded_all_null_features = excluded
+        self._categorical_feature_columns = categorical
+        self._categorical_levels = MappingProxyType(dict(levels))
+        self._training_missing_counts = MappingProxyType(dict(missing_counts))
+
     def fit(self, training_rows: Sequence[BacktestExample]) -> None:
         if self.is_fitted:
             raise RuntimeError("FavoritaLightGBMAdapter instances cannot be refitted")
@@ -210,15 +407,16 @@ class FavoritaLightGBMAdapter:
         )
         if not fitted:
             raise ValueError("No usable training features remain after null inspection")
-        frame = frame.loc[:, fitted].copy()
-
         categorical = tuple(
             column for column in CATEGORICAL_FEATURE_CANDIDATES if column in fitted
         )
         levels = {column: _ordered_categories(frame[column]) for column in categorical}
-        for column in categorical:
-            frame[column] = pd.Categorical(frame[column], categories=levels[column])
-        self._coerce_numeric(frame, set(categorical))
+        model_frame = self._prepare_feature_frame(
+            frame,
+            fitted=fitted,
+            categorical=categorical,
+            levels=levels,
+        )
 
         targets = pd.Series(
             [row.unit_sales for row in rows], dtype="float64", name=TARGET_COLUMN
@@ -227,7 +425,7 @@ class FavoritaLightGBMAdapter:
             raise ValueError("Training targets must be finite")
 
         dataset = lgb.Dataset(
-            frame,
+            model_frame,
             label=targets,
             feature_name=list(fitted),
             categorical_feature=list(categorical),
@@ -239,14 +437,173 @@ class FavoritaLightGBMAdapter:
             num_boost_round=NUM_BOOST_ROUND,
         )
 
-        self._booster = booster
-        self._fitted_feature_columns = fitted
-        self._excluded_all_null_features = excluded
-        self._categorical_feature_columns = categorical
-        self._categorical_levels = MappingProxyType(levels)
-        self._training_missing_counts = MappingProxyType(
-            {column: int(frame[column].isna().sum()) for column in fitted}
+        self._record_fitted_state(
+            booster=booster,
+            fitted=fitted,
+            excluded=excluded,
+            categorical=categorical,
+            levels=levels,
+            missing_counts={
+                column: int(frame[column].isna().sum()) for column in fitted
+            },
         )
+
+    def fit_parquet(self, training_path: Path) -> None:
+        """Fit from batched Parquet features without row-object materialization."""
+
+        if self.is_fitted:
+            raise RuntimeError("FavoritaLightGBMAdapter instances cannot be refitted")
+        if not training_path.is_file():
+            raise FileNotFoundError(training_path)
+        parquet_file = pq.ParquetFile(training_path)
+        try:
+            if tuple(parquet_file.schema_arrow.names) != TRAINING_OUTPUT_COLUMNS:
+                raise ValueError(
+                    "Parquet must match the ordered training schema"
+                )
+            row_count = parquet_file.metadata.num_rows
+            if row_count <= 0:
+                raise ValueError("Training Parquet must not be empty")
+        finally:
+            parquet_file.close()
+
+        missing_counts = {
+            column: 0 for column in self._candidate_feature_columns
+        }
+        category_values: dict[str, set[object]] = {
+            column: set()
+            for column in CATEGORICAL_FEATURE_CANDIDATES
+            if column in self._candidate_feature_columns
+        }
+        observed_horizons: set[int] = set()
+        with _LabelMemmapContext(row_count) as labels:
+            parquet_file = pq.ParquetFile(training_path)
+            cursor = 0
+            try:
+                for batch in parquet_file.iter_batches(
+                    batch_size=131_072,
+                    columns=[
+                        *self._candidate_feature_columns,
+                        TARGET_COLUMN,
+                    ],
+                ):
+                    frame = batch.to_pandas()
+                    batch_rows = len(frame)
+                    for column in self._candidate_feature_columns:
+                        missing_counts[column] += int(
+                            frame[column].isna().sum()
+                        )
+                    for column in category_values:
+                        category_values[column].update(
+                            frame[column].dropna().unique().tolist()
+                        )
+                    observed_horizons.update(
+                        int(value)
+                        for value in frame["forecast_horizon"].dropna().unique()
+                    )
+                    targets = pd.to_numeric(
+                        frame[TARGET_COLUMN],
+                        errors="raise",
+                    ).to_numpy(dtype="float64", copy=False)
+                    if not np.isfinite(targets).all():
+                        raise ValueError("Training targets must be finite")
+                    labels[cursor : cursor + batch_rows] = targets
+                    cursor += batch_rows
+            finally:
+                parquet_file.close()
+            if cursor != row_count:
+                raise AssertionError("Training label scan row count changed")
+            if not observed_horizons.issubset(set(FORECAST_HORIZONS)):
+                raise ValueError(
+                    "forecast_horizon must be an integer from 1 through 16"
+                )
+            labels.flush()
+
+            excluded = tuple(
+                column
+                for column in self._candidate_feature_columns
+                if missing_counts[column] == row_count
+            )
+            fitted = tuple(
+                column
+                for column in self._candidate_feature_columns
+                if column not in excluded
+            )
+            if not fitted:
+                raise ValueError(
+                    "No usable training features remain after null inspection"
+                )
+            categorical = tuple(
+                column
+                for column in CATEGORICAL_FEATURE_CANDIDATES
+                if column in fitted
+            )
+            levels = {
+                column: tuple(
+                    sorted(
+                        category_values[column],
+                        key=lambda value: (
+                            type(value).__name__,
+                            repr(value),
+                        ),
+                    )
+                )
+                for column in categorical
+            }
+            sequence = _ParquetFeatureSequence(
+                training_path,
+                columns=fitted,
+                categorical_levels=levels,
+            )
+            try:
+                dataset = lgb.Dataset(
+                    sequence,
+                    label=labels,
+                    feature_name=list(fitted),
+                    categorical_feature=list(categorical),
+                    free_raw_data=True,
+                )
+                booster = lgb.train(
+                    dict(LIGHTGBM_PARAMETERS),
+                    dataset,
+                    num_boost_round=NUM_BOOST_ROUND,
+                )
+            finally:
+                sequence.close()
+            self._record_fitted_state(
+                booster=booster,
+                fitted=fitted,
+                excluded=excluded,
+                categorical=categorical,
+                levels=levels,
+                missing_counts={
+                    column: missing_counts[column] for column in fitted
+                },
+            )
+
+    def _predict_frame_values(self, frame: pd.DataFrame) -> np.ndarray:
+        if self._booster is None:
+            raise RuntimeError(
+                "FavoritaLightGBMAdapter must be fitted before prediction"
+            )
+        prepared = self._prepare_feature_frame(
+            frame,
+            fitted=self._fitted_feature_columns,
+            categorical=self._categorical_feature_columns,
+            levels=self._categorical_levels,
+        )
+        values = np.asarray(self._booster.predict(prepared), dtype="float64")
+        if len(values) != len(frame):
+            raise ValueError("LightGBM returned an unexpected prediction count")
+        if not np.isfinite(values).all():
+            raise ValueError("LightGBM returned a non-finite prediction")
+        return values
+
+    def predict_frame(self, validation_frame: pd.DataFrame) -> np.ndarray:
+        """Predict a model-ready validation frame while excluding its target."""
+
+        self._validate_model_ready_frame(validation_frame)
+        return self._predict_frame_values(validation_frame)
 
     def predict(
         self,
@@ -265,22 +622,7 @@ class FavoritaLightGBMAdapter:
             )
 
         frame = self._materialize_frame(rows)
-        frame = frame.loc[:, self._fitted_feature_columns].copy()
-        categorical = set(self._categorical_feature_columns)
-        for column in self._categorical_feature_columns:
-            levels = self._categorical_levels[column]
-            values = frame[column]
-            known_or_missing = values.isna() | values.isin(levels)
-            frame[column] = pd.Categorical(
-                values.where(known_or_missing), categories=levels
-            )
-        self._coerce_numeric(frame, categorical)
-
-        values = self._booster.predict(frame)
-        if len(values) != len(rows):
-            raise ValueError("LightGBM returned an unexpected prediction count")
-        if not all(isfinite(float(value)) for value in values):
-            raise ValueError("LightGBM returned a non-finite prediction")
+        values = self._predict_frame_values(frame)
 
         return tuple(
             ForecastPrediction(
