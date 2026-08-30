@@ -25,20 +25,22 @@ from pipelines.evaluation.favorita_temporal_validation import (
     validate_approved_contract,
 )
 from pipelines.evaluation.run_favorita_lightgbm_evaluation import (
-    _ValidationKeyTracker,
     _validate_validation_batch,
+    _ValidationKeyTracker,
     iter_model_ready_validation_batches,
 )
 from pipelines.features.build_favorita_fold_datasets import (
     ALL_FAVORITA_STORES,
     CANONICAL_FOLD_IDS,
     CANONICAL_VALIDATION_DESIGN,
-    DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
     EXECUTION_SCOPE,
     FoldArtifactPaths,
     approved_fold_artifact_paths,
     canonical_training_origins,
     validate_canonical_fold_output_dir,
+)
+from pipelines.features.build_favorita_fold_datasets import (
+    DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
 )
 from pipelines.features.favorita_model_ready import (
     OUTPUT_ARROW_SCHEMA,
@@ -90,6 +92,7 @@ class ValidatedFoldArtifacts:
     manifest: Mapping[str, Any]
     training_rows: int
     validation_rows: int
+    observed_stores: tuple[int, ...]
 
 
 def _result_paths(output_dir: Path) -> SingleFoldResultPaths:
@@ -146,11 +149,44 @@ def _positive_row_count(manifest: Mapping[str, Any], key: str) -> int:
     return value
 
 
+def _manifest_observed_stores(
+    manifest: Mapping[str, Any],
+    fold: TemporalValidationFold,
+) -> tuple[int, ...]:
+    value = manifest.get("observed_stores")
+    if not isinstance(value, list) or not value:
+        raise ValueError(
+            f"Fold {fold.fold_id} manifest observed_stores must be a non-empty list"
+        )
+    if any(isinstance(store, bool) or not isinstance(store, int) for store in value):
+        raise ValueError(
+            f"Fold {fold.fold_id} manifest observed_stores must contain integers"
+        )
+    observed_stores = tuple(value)
+    if observed_stores != tuple(sorted(set(observed_stores))):
+        raise ValueError(
+            f"Fold {fold.fold_id} manifest observed_stores must be sorted and unique"
+        )
+    if not set(observed_stores).issubset(ALL_FAVORITA_STORES):
+        raise ValueError(
+            f"Fold {fold.fold_id} manifest observed_stores must be a subset of "
+            "configured stores 1 through 54"
+        )
+    return observed_stores
+
+
 def _validate_manifest(
     manifest: Mapping[str, Any],
     fold: TemporalValidationFold,
-) -> tuple[int, int]:
+) -> tuple[int, int, tuple[int, ...]]:
     training_origins = canonical_training_origins(fold)
+    observed_stores = _manifest_observed_stores(manifest, fold)
+    for key in ("store_count", "observed_store_count"):
+        value = manifest.get(key)
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(
+                f"Fold {fold.fold_id} manifest {key} must be an integer"
+            )
     expected: tuple[tuple[str, object], ...] = (
         ("fold_id", fold.fold_id),
         ("canonical_fold_id", fold.fold_id),
@@ -169,9 +205,9 @@ def _validate_manifest(
         ("training_origin_count", len(training_origins)),
         ("training_origin_start", training_origins[0].isoformat()),
         ("training_origin_end", training_origins[-1].isoformat()),
-        ("store_count", len(ALL_FAVORITA_STORES)),
+        ("store_count", len(observed_stores)),
         ("configured_store_count", len(ALL_FAVORITA_STORES)),
-        ("observed_store_count", len(ALL_FAVORITA_STORES)),
+        ("observed_store_count", len(observed_stores)),
         ("processed_store_count", len(ALL_FAVORITA_STORES)),
         ("configured_stores", list(ALL_FAVORITA_STORES)),
         ("processed_stores", list(ALL_FAVORITA_STORES)),
@@ -195,6 +231,7 @@ def _validate_manifest(
     return (
         _positive_row_count(manifest, "training_row_count"),
         _positive_row_count(manifest, "validation_row_count"),
+        observed_stores,
     )
 
 
@@ -282,6 +319,20 @@ def _validate_parquet_footer(
         parquet_file.close()
 
 
+def _parquet_store_set(path: Path) -> set[int]:
+    stores: set[int] = set()
+    parquet_file = pq.ParquetFile(path)
+    try:
+        for batch in parquet_file.iter_batches(
+            batch_size=131_072,
+            columns=["store_nbr"],
+        ):
+            stores.update(int(value) for value in batch.column(0).unique().to_pylist())
+    finally:
+        parquet_file.close()
+    return stores
+
+
 def validate_existing_fold(
     config: SingleFoldEvaluationConfig,
 ) -> ValidatedFoldArtifacts:
@@ -295,7 +346,10 @@ def validate_existing_fold(
     paths = _fold_artifact_paths(fold.fold_id, config.fold_output_dir)
     _require_existing_artifacts(paths)
     manifest = _read_json_object(paths.manifest, description="Fold manifest")
-    training_rows, validation_rows = _validate_manifest(manifest, fold)
+    training_rows, validation_rows, observed_stores = _validate_manifest(
+        manifest,
+        fold,
+    )
     _validate_parquet_footer(
         paths.training,
         partition="Training",
@@ -308,12 +362,21 @@ def validate_existing_fold(
         expected_rows=validation_rows,
         fold=fold,
     )
+    parquet_observed_stores = _parquet_store_set(paths.training) | _parquet_store_set(
+        paths.validation
+    )
+    if parquet_observed_stores != set(observed_stores):
+        raise ValueError(
+            f"Fold {fold.fold_id} manifest observed_stores do not match its Parquet "
+            "artifacts"
+        )
     return ValidatedFoldArtifacts(
         fold=fold,
         paths=paths,
         manifest=manifest,
         training_rows=training_rows,
         validation_rows=validation_rows,
+        observed_stores=observed_stores,
     )
 
 

@@ -315,6 +315,7 @@ def _manifest_matches_reusable_fold(
     training_origins: tuple[date, ...],
     experiment_subset: tuple[int, ...],
     configured_stores: tuple[int, ...],
+    observed_stores: tuple[int, ...],
     training_validation: dict[str, Any],
     validation_validation: dict[str, Any],
 ) -> bool:
@@ -349,17 +350,12 @@ def _manifest_matches_reusable_fold(
             manifest.get("configured_stores") == list(configured_stores),
             manifest.get("processed_store_count") == len(configured_stores),
             manifest.get("processed_stores") == list(configured_stores),
+            manifest.get("store_count") == len(observed_stores),
+            manifest.get("observed_store_count") == len(observed_stores),
+            manifest.get("observed_stores") == list(observed_stores),
             (
                 not config.canonical_contract
                 or manifest.get("configured_store_count") == len(ALL_FAVORITA_STORES)
-            ),
-            (
-                not config.canonical_contract
-                or manifest.get("store_count") == len(ALL_FAVORITA_STORES)
-            ),
-            (
-                not config.canonical_contract
-                or manifest.get("observed_store_count") == len(ALL_FAVORITA_STORES)
             ),
             (
                 not config.canonical_contract
@@ -520,25 +516,31 @@ def build_one_fold_dataset(
             training_result is not None
             and validation_result is not None
             and existing_manifest is not None
-            and _manifest_matches_reusable_fold(
+        ):
+            training_stores, _ = _entity_sets(paths.training)
+            validation_stores, _ = _entity_sets(paths.validation)
+            observed_stores = tuple(sorted(training_stores | validation_stores))
+            if _manifest_matches_reusable_fold(
                 existing_manifest,
                 fold=fold,
                 config=config,
                 training_origins=training_origins,
                 experiment_subset=experiment_subset,
                 configured_stores=configured_stores,
+                observed_stores=observed_stores,
                 training_validation=training_validation,
                 validation_validation=validation_validation,
-            )
-        ):
-            if _source_state(config.source_path) != source_before:
-                raise AssertionError("Cleaned source changed during fold validation")
-            if log_progress:
-                print(
-                    f"{progress_prefix} validated existing artifacts — reusing",
-                    flush=True,
-                )
-            return existing_manifest
+            ):
+                if _source_state(config.source_path) != source_before:
+                    raise AssertionError(
+                        "Cleaned source changed during fold validation"
+                    )
+                if log_progress:
+                    print(
+                        f"{progress_prefix} validated existing artifacts — reusing",
+                        flush=True,
+                    )
+                return existing_manifest
         if not config.overwrite:
             raise ValueError(
                 "Existing fold manifest does not match the complete canonical "
@@ -626,10 +628,6 @@ def build_one_fold_dataset(
     observed_stores = training_stores | validation_stores
     if not observed_stores.issubset(configured_store_set):
         raise AssertionError("Fold artifacts contain an unconfigured store")
-    if config.canonical_contract and observed_stores != set(ALL_FAVORITA_STORES):
-        raise AssertionError(
-            "Canonical fold artifacts must contain observed rows for stores 1 through 54"
-        )
     source_after = _source_state(config.source_path)
     if source_after != source_before:
         raise AssertionError("Cleaned source changed during fold materialization")
@@ -656,6 +654,7 @@ def build_one_fold_dataset(
         "store_count": len(observed_stores),
         "configured_store_count": len(configured_stores),
         "observed_store_count": len(observed_stores),
+        "observed_stores": sorted(observed_stores),
         "processed_store_count": len(configured_stores),
         "processed_stores": list(configured_stores),
         "processed_store_evidence": "materializer_processed_stores",

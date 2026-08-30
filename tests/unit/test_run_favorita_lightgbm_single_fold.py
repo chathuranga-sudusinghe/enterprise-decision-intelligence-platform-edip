@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import timedelta
 from pathlib import Path
 
 import numpy as np
@@ -12,9 +11,9 @@ import pytest
 from pipelines.evaluation import run_favorita_lightgbm_single_fold as runner
 from pipelines.evaluation.favorita_metrics import FavoritaMetricAccumulator
 from pipelines.evaluation.favorita_temporal_validation import (
-    MODELING_TARGET_START,
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
+    MODELING_TARGET_START,
 )
 from pipelines.features.favorita_model_ready import (
     TRAINING_OUTPUT_COLUMNS,
@@ -82,9 +81,10 @@ def _write_existing_fold(root: Path, fold_id: int) -> runner.FoldArtifactPaths:
         "training_origin_count": len(training_origins),
         "training_origin_start": training_origins[0].isoformat(),
         "training_origin_end": training_origins[-1].isoformat(),
-        "store_count": len(runner.ALL_FAVORITA_STORES),
+        "store_count": 1,
         "configured_store_count": len(runner.ALL_FAVORITA_STORES),
-        "observed_store_count": len(runner.ALL_FAVORITA_STORES),
+        "observed_store_count": 1,
+        "observed_stores": [1],
         "processed_store_count": len(runner.ALL_FAVORITA_STORES),
         "configured_stores": list(runner.ALL_FAVORITA_STORES),
         "processed_stores": list(runner.ALL_FAVORITA_STORES),
@@ -199,6 +199,7 @@ def test_missing_artifact_fails_without_any_builder_or_model_call(
         ("execution_scope", "other", "execution_scope"),
         ("experiment_subset", [1], "experiment_subset"),
         ("configured_stores", [1], "configured_stores"),
+        ("observed_store_count", True, "observed_store_count"),
         ("processed_store_count", 1, "processed_store_count"),
         ("forecast_origin", "2017-07-30", "forecast_origin"),
         ("final_holdout_excluded", False, "final_holdout_excluded"),
@@ -216,6 +217,43 @@ def test_existing_manifest_contract_is_enforced(
     paths = _write_existing_fold(tmp_path / "folds", 1)
     manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
     manifest[key] = value
+    paths.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        runner.validate_existing_fold(_config(tmp_path))
+
+
+def test_sparse_observed_stores_are_accepted_when_all_stores_were_processed(
+    tmp_path: Path,
+) -> None:
+    _write_existing_fold(tmp_path / "folds", 1)
+
+    validated = runner.validate_existing_fold(_config(tmp_path))
+
+    assert validated.observed_stores == (1,)
+    assert validated.manifest["configured_stores"] == list(runner.ALL_FAVORITA_STORES)
+    assert validated.manifest["processed_stores"] == list(runner.ALL_FAVORITA_STORES)
+
+
+@pytest.mark.parametrize(
+    ("observed_stores", "store_count", "message"),
+    (
+        ([1, 52], 2, "do not match its Parquet artifacts"),
+        ([55], 1, "subset of configured stores"),
+        ([1, 1], 2, "sorted and unique"),
+    ),
+)
+def test_observed_store_manifest_evidence_fails_closed(
+    tmp_path: Path,
+    observed_stores: list[int],
+    store_count: int,
+    message: str,
+) -> None:
+    paths = _write_existing_fold(tmp_path / "folds", 1)
+    manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
+    manifest["observed_stores"] = observed_stores
+    manifest["observed_store_count"] = store_count
+    manifest["store_count"] = store_count
     paths.manifest.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(ValueError, match=message):

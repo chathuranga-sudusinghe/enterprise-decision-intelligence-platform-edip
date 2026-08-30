@@ -10,10 +10,10 @@ import pytest
 
 from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLD_ORIGINS,
-    MODELING_TARGET_START,
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
     FORECAST_HORIZONS,
+    MODELING_TARGET_START,
     TemporalValidationFold,
     derive_target_window,
 )
@@ -354,7 +354,34 @@ def test_sparse_zero_row_store_is_allowed_without_synthetic_rows(
     assert manifest["processed_store_count"] == 2
     assert manifest["processed_stores"] == [1, 2]
     assert manifest["observed_store_count"] == 1
+    assert manifest["observed_stores"] == [1]
     assert manifest["sparse_observed_rows_only"] is True
+    assert config.source_path.read_bytes() == source_bytes
+
+
+def test_canonical_fold_allows_configured_stores_without_observed_rows(
+    tmp_path: Path,
+) -> None:
+    base_config, fold, paths, _, source_bytes = _bounded_fold_fixture(tmp_path)
+    config = builder.FoldDatasetBuildConfig(
+        source_path=base_config.source_path,
+        output_dir=base_config.output_dir,
+    )
+
+    manifest = builder.build_one_fold_dataset(
+        config,
+        fold,
+        paths,
+        training_origins=builder.canonical_training_origins(fold),
+    )
+
+    assert manifest["configured_stores"] == list(builder.ALL_FAVORITA_STORES)
+    assert manifest["processed_stores"] == list(builder.ALL_FAVORITA_STORES)
+    assert manifest["configured_store_count"] == 54
+    assert manifest["processed_store_count"] == 54
+    assert manifest["observed_stores"] == [1]
+    assert manifest["observed_store_count"] == 1
+    assert manifest["store_count"] == 1
     assert config.source_path.read_bytes() == source_bytes
 
 
