@@ -1,4 +1,4 @@
-"""Build the eight approved Favorita fold datasets without fitting a model."""
+"""Build the four canonical Favorita fold datasets without fitting a model."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
     FORECAST_HORIZONS,
+    MODELING_TARGET_START,
     TemporalValidationFold,
     validate_approved_contract,
 )
@@ -31,20 +32,18 @@ from pipelines.features.favorita_model_ready import (
 DEFAULT_SOURCE_PATH = Path(
     "data/processed/favorita_cleaned/favorita_cleaned.parquet"
 )
-DEFAULT_OUTPUT_DIR = Path("artifacts/features/favorita_folds")
+DEFAULT_OUTPUT_DIR = Path("artifacts/features/favorita_four_fold")
+HISTORICAL_OUTPUT_DIR = Path("artifacts/features/favorita_folds")
 ALL_FAVORITA_STORES: tuple[int, ...] = tuple(range(1, 55))
 ALL_STORE_BATCHES: tuple[tuple[int, ...], ...] = tuple(
     (store_nbr,) for store_nbr in ALL_FAVORITA_STORES
 )
-RESOURCE_CONSTRAINED_FOLD_IDS: tuple[int, ...] = (1, 3, 6, 8)
-EXECUTION_SCOPE = "resource_constrained_four_fold"
-CANONICAL_VALIDATION_DESIGN = "eight_fold_expanding_window"
+CANONICAL_FOLD_IDS: tuple[int, ...] = (1, 2, 3, 4)
+EXECUTION_SCOPE = "canonical_four_fold"
+CANONICAL_VALIDATION_DESIGN = "four_fold_expanding_window"
 COMPUTE_CONSTRAINT_REASON = (
-    "The full eight-fold feature-materialization and model-training workload "
-    "exceeds the current local compute/time budget."
+    "Canonical four-fold resource use must be measured before real execution."
 )
-LEGACY_FOLD_1_TRAINING_ROWS = 864_315_309
-LEGACY_FOLD_1_VALIDATION_ROWS = 1_359_626
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +55,7 @@ class FoldDatasetBuildConfig:
     store_batches: tuple[tuple[int, ...], ...] = ALL_STORE_BATCHES
     max_items_per_store: int | None = None
     overwrite: bool = False
+    canonical_contract: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,7 +72,7 @@ class FoldArtifactPaths:
 def approved_fold_artifact_paths(
     output_dir: Path = DEFAULT_OUTPUT_DIR,
 ) -> tuple[FoldArtifactPaths, ...]:
-    """Return the exact ordered eight-fold output definition."""
+    """Return the exact ordered four-fold output definition."""
 
     validate_approved_contract()
     return tuple(
@@ -80,17 +80,27 @@ def approved_fold_artifact_paths(
             fold_id=fold.fold_id,
             directory=output_dir / f"fold_{fold.fold_id:02d}",
             training=output_dir / f"fold_{fold.fold_id:02d}" / "training.parquet",
-            validation=output_dir
-            / f"fold_{fold.fold_id:02d}"
-            / "validation.parquet",
+            validation=output_dir / f"fold_{fold.fold_id:02d}" / "validation.parquet",
             manifest=output_dir / f"fold_{fold.fold_id:02d}" / "manifest.json",
         )
         for fold in APPROVED_FOLDS
     )
 
 
+def validate_canonical_fold_output_dir(output_dir: Path) -> None:
+    """Reject the historical eight-fold root and anything nested beneath it."""
+
+    resolved = output_dir.resolve()
+    historical = HISTORICAL_OUTPUT_DIR.resolve()
+    if resolved == historical or historical in resolved.parents:
+        raise ValueError(
+            "Canonical four-fold artifacts must not use the historical "
+            f"artifact root: {HISTORICAL_OUTPUT_DIR.as_posix()}"
+        )
+
+
 def selected_approved_folds(
-    fold_ids: Sequence[int] = RESOURCE_CONSTRAINED_FOLD_IDS,
+    fold_ids: Sequence[int] = CANONICAL_FOLD_IDS,
 ) -> tuple[TemporalValidationFold, ...]:
     """Resolve an explicit execution subset without changing APPROVED_FOLDS."""
 
@@ -138,14 +148,17 @@ def derive_training_origins(
     source_start: date,
     fold: TemporalValidationFold,
 ) -> tuple[date, ...]:
-    """Return every historical origin with at least a t+1 label by the fold cutoff."""
+    """Return daily origins whose targets start at the canonical 2016 boundary."""
 
+    first_origin = MODELING_TARGET_START - timedelta(days=min(FORECAST_HORIZONS))
     last_origin = fold.forecast_origin - timedelta(days=min(FORECAST_HORIZONS))
-    if source_start > last_origin:
-        raise ValueError(f"Fold {fold.fold_id} has no eligible historical origins")
+    if source_start > first_origin:
+        raise ValueError(
+            "Cleaned source must begin before the first canonical training origin"
+        )
     return tuple(
-        source_start + timedelta(days=offset)
-        for offset in range((last_origin - source_start).days + 1)
+        first_origin + timedelta(days=offset)
+        for offset in range((last_origin - first_origin).days + 1)
     )
 
 
@@ -159,6 +172,27 @@ def _configured_stores(config: FoldDatasetBuildConfig) -> tuple[int, ...]:
     if not stores or len(stores) != len(set(stores)):
         raise ValueError("store_batches must contain unique non-empty stores")
     return stores
+
+
+def canonical_training_origins(
+    fold: TemporalValidationFold,
+) -> tuple[date, ...]:
+    """Return the exact complete daily origin sequence for one canonical fold."""
+
+    return derive_training_origins(
+        MODELING_TARGET_START - timedelta(days=min(FORECAST_HORIZONS)),
+        fold,
+    )
+
+
+def _require_canonical_build_config(config: FoldDatasetBuildConfig) -> None:
+    validate_canonical_fold_output_dir(config.output_dir)
+    if not config.canonical_contract:
+        return
+    if _configured_stores(config) != ALL_FAVORITA_STORES:
+        raise ValueError("Canonical fold builds require exactly stores 1 through 54")
+    if config.max_items_per_store is not None:
+        raise ValueError("Canonical fold builds require max_items_per_store=None")
 
 
 def _require_available_outputs(
@@ -214,17 +248,17 @@ def _artifact_footer_validation(path: Path) -> dict[str, Any]:
             minima: list[Any] = []
             maxima: list[Any] = []
             for row_group_index in range(parquet_file.metadata.num_row_groups):
-                statistics = parquet_file.metadata.row_group(row_group_index).column(
-                    column_index
-                ).statistics
+                statistics = (
+                    parquet_file.metadata.row_group(row_group_index)
+                    .column(column_index)
+                    .statistics
+                )
                 if statistics is None or not statistics.has_min_max:
                     raise AssertionError(
                         f"Reusable artifact lacks {column} footer statistics"
                     )
                 if statistics.null_count:
-                    raise AssertionError(
-                        f"Reusable artifact has null {column} values"
-                    )
+                    raise AssertionError(f"Reusable artifact has null {column} values")
                 minima.append(statistics.min)
                 maxima.append(statistics.max)
             bounds[column] = (min(minima), max(maxima))
@@ -241,9 +275,7 @@ def _artifact_footer_validation(path: Path) -> dict[str, Any]:
             "forecast_origin_max": iso_date(bounds["forecast_origin"][1]),
             "forecast_date_min": iso_date(bounds["forecast_date"][0]),
             "forecast_date_max": iso_date(bounds["forecast_date"][1]),
-            "horizons": list(
-                range(int(minimum_horizon), int(maximum_horizon) + 1)
-            ),
+            "horizons": list(range(int(minimum_horizon), int(maximum_horizon) + 1)),
             "schema": {
                 field.name: str(field.type) for field in parquet_file.schema_arrow
             },
@@ -279,6 +311,8 @@ def _manifest_matches_reusable_fold(
     manifest: dict[str, Any],
     *,
     fold: TemporalValidationFold,
+    config: FoldDatasetBuildConfig,
+    training_origins: tuple[date, ...],
     experiment_subset: tuple[int, ...],
     configured_stores: tuple[int, ...],
     training_validation: dict[str, Any],
@@ -287,39 +321,57 @@ def _manifest_matches_reusable_fold(
     return all(
         (
             manifest.get("canonical_fold_id") == fold.fold_id,
+            manifest.get("canonical_fold_count") == len(APPROVED_FOLDS),
             manifest.get("forecast_origin") == fold.forecast_origin.isoformat(),
             manifest.get("validation_start") == fold.validation_start.isoformat(),
             manifest.get("validation_end") == fold.validation_end.isoformat(),
+            manifest.get("modeling_target_start") == MODELING_TARGET_START.isoformat(),
+            manifest.get("training_target_start") == MODELING_TARGET_START.isoformat(),
+            manifest.get("training_target_end") == fold.forecast_origin.isoformat(),
+            manifest.get("canonical_contract_enforced") == config.canonical_contract,
             manifest.get("training_row_count") == training_validation["rows"],
             manifest.get("validation_row_count") == validation_validation["rows"],
             manifest.get("experiment_subset") == list(experiment_subset),
-            manifest.get("execution_scope") == EXECUTION_SCOPE,
-            manifest.get("canonical_validation_design")
-            == CANONICAL_VALIDATION_DESIGN,
-            manifest.get("full_eight_fold_executed") is False,
+            manifest.get("execution_scope")
+            == (
+                EXECUTION_SCOPE
+                if config.canonical_contract
+                else "synthetic_test_fixture"
+            ),
+            manifest.get("canonical_validation_design") == CANONICAL_VALIDATION_DESIGN,
+            manifest.get("training_origin_count") == len(training_origins),
+            manifest.get("training_origin_start")
+            == training_origins[0].isoformat(),
+            manifest.get("training_origin_end")
+            == training_origins[-1].isoformat(),
             manifest.get("configured_store_count") == len(configured_stores),
+            manifest.get("max_items_per_store") is None,
+            manifest.get("configured_stores") == list(configured_stores),
+            manifest.get("processed_store_count") == len(configured_stores),
             manifest.get("processed_stores") == list(configured_stores),
+            (
+                not config.canonical_contract
+                or manifest.get("configured_store_count") == len(ALL_FAVORITA_STORES)
+            ),
+            (
+                not config.canonical_contract
+                or manifest.get("store_count") == len(ALL_FAVORITA_STORES)
+            ),
+            (
+                not config.canonical_contract
+                or manifest.get("observed_store_count") == len(ALL_FAVORITA_STORES)
+            ),
+            (
+                not config.canonical_contract
+                or manifest.get("processed_store_count") == len(ALL_FAVORITA_STORES)
+            ),
+            (
+                not config.canonical_contract
+                or manifest.get("configured_stores") == list(ALL_FAVORITA_STORES)
+            ),
             manifest.get("final_holdout_excluded") is True,
+            manifest.get("future_actual_leakage") is False,
             manifest.get("ordered_schema") == list(TRAINING_OUTPUT_COLUMNS),
-        )
-    )
-
-
-def _is_confirmed_legacy_fold_1(
-    *,
-    fold: TemporalValidationFold,
-    configured_stores: tuple[int, ...],
-    training_validation: dict[str, Any],
-    validation_validation: dict[str, Any],
-) -> bool:
-    """Recognize only the manifest-less Fold 1 run confirmed by the user."""
-
-    return all(
-        (
-            fold == APPROVED_FOLDS[0],
-            configured_stores == ALL_FAVORITA_STORES,
-            training_validation["rows"] == LEGACY_FOLD_1_TRAINING_ROWS,
-            validation_validation["rows"] == LEGACY_FOLD_1_VALIDATION_ROWS,
         )
     )
 
@@ -329,16 +381,18 @@ def _validate_fold_artifact_boundaries(
     validation_validation: dict[str, Any],
     fold: TemporalValidationFold,
 ) -> None:
-    if training_validation["forecast_date_max"] > fold.forecast_origin.isoformat():
-        raise AssertionError("Training labels extend beyond the fold origin")
-    if (
-        validation_validation.get("forecast_origin_min")
-        not in (None, fold.forecast_origin.isoformat())
+    if training_validation["forecast_date_min"] != MODELING_TARGET_START.isoformat():
+        raise AssertionError("Training labels do not start at 2016-01-01")
+    if training_validation["forecast_date_max"] != fold.forecast_origin.isoformat():
+        raise AssertionError("Training labels do not end at the fold origin")
+    if validation_validation.get("forecast_origin_min") not in (
+        None,
+        fold.forecast_origin.isoformat(),
     ):
         raise AssertionError("Validation forecast origin is not canonical")
-    if (
-        validation_validation.get("forecast_origin_max")
-        not in (None, fold.forecast_origin.isoformat())
+    if validation_validation.get("forecast_origin_max") not in (
+        None,
+        fold.forecast_origin.isoformat(),
     ):
         raise AssertionError("Validation includes a non-canonical forecast origin")
     if validation_validation["forecast_date_min"] != fold.validation_start.isoformat():
@@ -378,18 +432,25 @@ def build_one_fold_dataset(
     *,
     training_origins: tuple[date, ...] | None = None,
     log_progress: bool = False,
-    experiment_subset: tuple[int, ...] = RESOURCE_CONSTRAINED_FOLD_IDS,
+    experiment_subset: tuple[int, ...] = CANONICAL_FOLD_IDS,
 ) -> dict[str, Any]:
     """Build one fold completely before the caller advances to the next fold."""
 
+    _require_canonical_build_config(config)
     if config.max_items_per_store is not None:
-        raise ValueError("Approved fold builds require max_items_per_store=None")
+        raise ValueError("Fold builds require max_items_per_store=None")
     configured_stores = _configured_stores(config)
     if training_origins is None:
         source_start, _ = _source_date_bounds(config.source_path)
         training_origins = derive_training_origins(source_start, fold)
     if not training_origins:
         raise ValueError("At least one historical training origin is required")
+    if config.canonical_contract and training_origins != canonical_training_origins(
+        fold
+    ):
+        raise ValueError(
+            "Canonical fold training_origins must be the complete daily sequence"
+        )
     if max(training_origins) >= fold.forecast_origin:
         raise ValueError("Training origins must precede the fold forecast origin")
     if fold.fold_id not in experiment_subset:
@@ -403,6 +464,18 @@ def build_one_fold_dataset(
         )
     source_before = _source_state(config.source_path)
     existing_manifest = _load_manifest(paths.manifest)
+    artifact_presence = (
+        paths.training.exists(),
+        paths.validation.exists(),
+        paths.manifest.exists(),
+    )
+    if any(artifact_presence) and not all(artifact_presence):
+        if not config.overwrite:
+            raise ValueError(
+                "Existing canonical fold artifacts are incomplete; both Parquet "
+                "files and manifest.json are required"
+            )
+        existing_manifest = None
     if existing_manifest is not None:
         reuse_processed_stores = tuple(existing_manifest.get("processed_stores", ()))
     else:
@@ -423,21 +496,6 @@ def build_one_fold_dataset(
 
     training_result = reusable_result(paths.training)
     validation_result = reusable_result(paths.validation)
-    legacy_manifest_recovery = False
-    if (
-        training_result is not None
-        and validation_result is not None
-        and existing_manifest is None
-        and _is_confirmed_legacy_fold_1(
-            fold=fold,
-            configured_stores=configured_stores,
-            training_validation=training_result["artifact_validation"],
-            validation_validation=validation_result["artifact_validation"],
-        )
-    ):
-        legacy_manifest_recovery = True
-        training_result["processed_stores"] = list(configured_stores)
-        validation_result["processed_stores"] = list(configured_stores)
     if (
         training_result is not None
         and validation_result is not None
@@ -445,18 +503,33 @@ def build_one_fold_dataset(
     ):
         training_validation = training_result["artifact_validation"]
         validation_validation = validation_result["artifact_validation"]
-        _validate_fold_artifact_boundaries(
-            training_validation,
-            validation_validation,
-            fold,
-        )
-        if _manifest_matches_reusable_fold(
-            existing_manifest,
-            fold=fold,
-            experiment_subset=experiment_subset,
-            configured_stores=configured_stores,
-            training_validation=training_validation,
-            validation_validation=validation_validation,
+        try:
+            _validate_fold_artifact_boundaries(
+                training_validation,
+                validation_validation,
+                fold,
+            )
+        except AssertionError as error:
+            if not config.overwrite:
+                raise ValueError(
+                    "Existing fold artifacts do not match canonical boundaries"
+                ) from error
+            training_result = None
+            validation_result = None
+        if (
+            training_result is not None
+            and validation_result is not None
+            and existing_manifest is not None
+            and _manifest_matches_reusable_fold(
+                existing_manifest,
+                fold=fold,
+                config=config,
+                training_origins=training_origins,
+                experiment_subset=experiment_subset,
+                configured_stores=configured_stores,
+                training_validation=training_validation,
+                validation_validation=validation_validation,
+            )
         ):
             if _source_state(config.source_path) != source_before:
                 raise AssertionError("Cleaned source changed during fold validation")
@@ -466,6 +539,21 @@ def build_one_fold_dataset(
                     flush=True,
                 )
             return existing_manifest
+        if not config.overwrite:
+            raise ValueError(
+                "Existing fold manifest does not match the complete canonical "
+                "four-fold contract"
+            )
+        training_result = None
+        validation_result = None
+    elif any(artifact_presence):
+        if not config.overwrite:
+            raise ValueError(
+                "Existing fold artifacts cannot be reused without a matching "
+                "canonical manifest"
+            )
+        training_result = None
+        validation_result = None
 
     if training_result is None:
         training_config = _partition_config(
@@ -538,6 +626,10 @@ def build_one_fold_dataset(
     observed_stores = training_stores | validation_stores
     if not observed_stores.issubset(configured_store_set):
         raise AssertionError("Fold artifacts contain an unconfigured store")
+    if config.canonical_contract and observed_stores != set(ALL_FAVORITA_STORES):
+        raise AssertionError(
+            "Canonical fold artifacts must contain observed rows for stores 1 through 54"
+        )
     source_after = _source_state(config.source_path)
     if source_after != source_before:
         raise AssertionError("Cleaned source changed during fold materialization")
@@ -545,14 +637,20 @@ def build_one_fold_dataset(
     manifest: dict[str, Any] = {
         "fold_id": fold.fold_id,
         "canonical_fold_id": fold.fold_id,
+        "canonical_fold_count": len(APPROVED_FOLDS),
+        "canonical_contract_enforced": config.canonical_contract,
         "experiment_subset": list(experiment_subset),
-        "execution_scope": EXECUTION_SCOPE,
+        "execution_scope": (
+            EXECUTION_SCOPE if config.canonical_contract else "synthetic_test_fixture"
+        ),
         "canonical_validation_design": CANONICAL_VALIDATION_DESIGN,
-        "full_eight_fold_executed": False,
         "compute_constraint_reason": COMPUTE_CONSTRAINT_REASON,
         "forecast_origin": fold.forecast_origin.isoformat(),
         "validation_start": fold.validation_start.isoformat(),
         "validation_end": fold.validation_end.isoformat(),
+        "modeling_target_start": MODELING_TARGET_START.isoformat(),
+        "training_target_start": training_validation["forecast_date_min"],
+        "training_target_end": training_validation["forecast_date_max"],
         "training_row_count": training_validation["rows"],
         "validation_row_count": validation_validation["rows"],
         "store_count": len(observed_stores),
@@ -560,11 +658,7 @@ def build_one_fold_dataset(
         "observed_store_count": len(observed_stores),
         "processed_store_count": len(configured_stores),
         "processed_stores": list(configured_stores),
-        "processed_store_evidence": (
-            "user_confirmed_manifestless_fold_1_recovery"
-            if legacy_manifest_recovery
-            else "materializer_processed_stores"
-        ),
+        "processed_store_evidence": "materializer_processed_stores",
         "item_count": len(training_items | validation_items),
         "horizons": list(FORECAST_HORIZONS),
         "max_items_per_store": config.max_items_per_store,
@@ -609,7 +703,7 @@ def build_one_fold_dataset(
 def build_approved_fold_datasets(
     config: FoldDatasetBuildConfig,
     *,
-    fold_ids: Sequence[int] = RESOURCE_CONSTRAINED_FOLD_IDS,
+    fold_ids: Sequence[int] = CANONICAL_FOLD_IDS,
 ) -> tuple[dict[str, Any], ...]:
     """Build selected canonical folds serially, retaining only manifest metadata."""
 
@@ -617,7 +711,6 @@ def build_approved_fold_datasets(
     if not config.source_path.is_file():
         raise FileNotFoundError(config.source_path)
     selected_folds = selected_approved_folds(fold_ids)
-    experiment_subset = tuple(fold.fold_id for fold in selected_folds)
     paths_by_id = {
         paths.fold_id: paths
         for paths in approved_fold_artifact_paths(config.output_dir)
@@ -637,7 +730,7 @@ def build_approved_fold_datasets(
                 fold_paths,
                 training_origins=derive_training_origins(source_start, fold),
                 log_progress=True,
-                experiment_subset=experiment_subset,
+                experiment_subset=CANONICAL_FOLD_IDS,
             )
         )
     print(f"Artifact directory: {config.output_dir.as_posix()}", flush=True)
@@ -656,7 +749,7 @@ def _argument_parser() -> argparse.ArgumentParser:
         "--folds",
         nargs="+",
         type=int,
-        default=list(RESOURCE_CONSTRAINED_FOLD_IDS),
+        default=list(CANONICAL_FOLD_IDS),
         help="Approved canonical fold IDs to materialize or reuse.",
     )
     parser.add_argument("--overwrite", action="store_true")

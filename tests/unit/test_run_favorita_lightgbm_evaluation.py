@@ -35,6 +35,18 @@ def _config(tmp_path: Path) -> runner.FavoritaEvaluationRunConfig:
     )
 
 
+def test_historical_eight_fold_artifact_root_is_rejected(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    historical_config = runner.FavoritaEvaluationRunConfig(
+        source_path=config.source_path,
+        output_dir=config.output_dir,
+        fold_output_dir=Path("artifacts/features/favorita_folds"),
+    )
+
+    with pytest.raises(ValueError, match="historical artifact root"):
+        runner.validate_evaluation_config(historical_config)
+
+
 def _metrics() -> ForecastMetricResults:
     return ForecastMetricResults(
         mae=1.0,
@@ -62,7 +74,7 @@ def _streaming_summary() -> runner.StreamingEvaluationSummary:
         runner.StreamingHorizonMetricRecord(
             forecast_horizon=horizon,
             metrics=_metrics(),
-            row_count=8,
+            row_count=len(APPROVED_FOLDS),
         )
         for horizon in FORECAST_HORIZONS
     )
@@ -70,7 +82,7 @@ def _streaming_summary() -> runner.StreamingEvaluationSummary:
         overall_metrics=_metrics(),
         fold_metrics=fold_metrics,
         horizon_metrics=horizon_metrics,
-        prediction_row_count=128,
+        prediction_row_count=len(APPROVED_FOLDS) * len(FORECAST_HORIZONS),
     )
 
 
@@ -350,7 +362,7 @@ def _install_serial_fakes(
     return events, models
 
 
-def test_runner_processes_eight_fold_artifacts_serially(
+def test_runner_processes_four_fold_artifacts_serially(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -360,8 +372,8 @@ def test_runner_processes_eight_fold_artifacts_serially(
 
     paths = runner.run_evaluation(config)
 
-    assert len(models) == 8
-    assert len({id(model) for model in models}) == 8
+    assert len(models) == 4
+    assert len({id(model) for model in models}) == 4
     assert events[0] == ("build", 0)
     cursor = 1
     for fold_id, model in enumerate(models, start=1):
@@ -382,7 +394,7 @@ def test_runner_processes_eight_fold_artifacts_serially(
     assert not hasattr(paths, "feature_examples")
     assert config.source_path.read_bytes() == source_before
     manifest = json.loads(paths.run_manifest.read_text(encoding="utf-8"))
-    assert manifest["evaluation"]["fold_count"] == 8
+    assert manifest["evaluation"]["fold_count"] == 4
     assert manifest["evaluation"]["horizon_count"] == 16
     assert manifest["final_holdout"]["scored"] is False
     assert manifest["final_holdout"]["materialized"] is False
@@ -411,9 +423,9 @@ def test_runner_processes_eight_fold_artifacts_serially(
     finally:
         prediction_file.close()
     assert tuple(predictions.columns) == runner.PREDICTION_COLUMNS
-    assert len(predictions) == 8 * len(FORECAST_HORIZONS)
+    assert len(predictions) == 4 * len(FORECAST_HORIZONS)
     assert manifest["evaluation"]["prediction_rows"] == len(predictions)
-    assert tuple(sorted(predictions["fold_id"].unique())) == tuple(range(1, 9))
+    assert tuple(sorted(predictions["fold_id"].unique())) == tuple(range(1, 5))
     assert tuple(sorted(predictions["forecast_horizon"].unique())) == (
         FORECAST_HORIZONS
     )
@@ -440,8 +452,8 @@ def test_runner_processes_eight_fold_artifacts_serially(
         )
     fold_metrics = pd.read_csv(paths.fold_metrics)
     horizon_metrics = pd.read_csv(paths.horizon_metrics)
-    assert tuple(fold_metrics["validation_rows"]) == (16,) * 8
-    assert tuple(horizon_metrics["validation_rows"]) == (8,) * 16
+    assert tuple(fold_metrics["validation_rows"]) == (16,) * 4
+    assert tuple(horizon_metrics["validation_rows"]) == (4,) * 16
     for fold_id, group in predictions.groupby("fold_id", sort=True):
         expected_fold = evaluate_favorita_forecasts(
             group["actual_unit_sales"],
@@ -509,9 +521,8 @@ def test_fold_failure_writes_no_completed_evaluation_artifacts(
 
     assert events[-1] == ("fit_parquet", 4)
     assert not any(
-        path.exists() for path in runner._path_values(
-            runner._artifact_paths(config.output_dir)
-        )
+        path.exists()
+        for path in runner._path_values(runner._artifact_paths(config.output_dir))
     )
     assert config.source_path.read_bytes() == source_before
 
@@ -563,9 +574,8 @@ def test_artifact_staging_failure_publishes_no_completed_outputs(
         runner.run_evaluation(config)
 
     assert not any(
-        path.exists() for path in runner._path_values(
-            runner._artifact_paths(config.output_dir)
-        )
+        path.exists()
+        for path in runner._path_values(runner._artifact_paths(config.output_dir))
     )
 
 
@@ -604,7 +614,7 @@ def test_manifest_configuration_matches_unsampled_contract(
     assert manifest["configuration"]["max_items_per_store"] is None
     assert manifest["final_holdout"]["scored"] is False
     assert manifest["final_holdout"]["materialized"] is False
-    assert manifest["evaluation"]["prediction_rows"] == 128
+    assert manifest["evaluation"]["prediction_rows"] == 64
     assert manifest["validation_memory"]["validation_input"] == "Parquet batches"
 
 

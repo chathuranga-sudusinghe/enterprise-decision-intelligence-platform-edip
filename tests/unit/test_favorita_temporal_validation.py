@@ -9,6 +9,7 @@ from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLD_ORIGINS,
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
+    MODELING_TARGET_START,
     FORECAST_HORIZONS,
     HoldoutWindow,
     TemporalValidationFold,
@@ -23,34 +24,26 @@ from pipelines.evaluation.favorita_temporal_validation import (
 )
 
 EXPECTED_ORIGINS = (
-    date(2015, 8, 31),
-    date(2015, 12, 8),
-    date(2016, 4, 15),
     date(2016, 6, 30),
-    date(2016, 8, 31),
-    date(2016, 12, 8),
-    date(2017, 4, 15),
-    date(2017, 6, 30),
+    date(2016, 12, 31),
+    date(2017, 4, 30),
+    date(2017, 7, 14),
 )
 
 EXPECTED_WINDOWS = (
-    (date(2015, 9, 1), date(2015, 9, 16)),
-    (date(2015, 12, 9), date(2015, 12, 24)),
-    (date(2016, 4, 16), date(2016, 5, 1)),
     (date(2016, 7, 1), date(2016, 7, 16)),
-    (date(2016, 9, 1), date(2016, 9, 16)),
-    (date(2016, 12, 9), date(2016, 12, 24)),
-    (date(2017, 4, 16), date(2017, 5, 1)),
-    (date(2017, 7, 1), date(2017, 7, 16)),
+    (date(2017, 1, 1), date(2017, 1, 16)),
+    (date(2017, 5, 1), date(2017, 5, 16)),
+    (date(2017, 7, 15), date(2017, 7, 30)),
 )
 
 
-def test_exact_eight_approved_origins() -> None:
+def test_exact_four_approved_origins() -> None:
     assert APPROVED_FOLD_ORIGINS == EXPECTED_ORIGINS
     assert tuple(fold.forecast_origin for fold in APPROVED_FOLDS) == EXPECTED_ORIGINS
 
 
-def test_exact_eight_approved_validation_windows() -> None:
+def test_exact_four_approved_validation_windows() -> None:
     assert (
         tuple((fold.validation_start, fold.validation_end) for fold in APPROVED_FOLDS)
         == EXPECTED_WINDOWS
@@ -105,6 +98,11 @@ def test_exact_final_holdout_definition() -> None:
     assert (FINAL_HOLDOUT.holdout_end - FINAL_HOLDOUT.holdout_start).days + 1 == 16
 
 
+def test_exact_modeling_target_start() -> None:
+    assert MODELING_TARGET_START == date(2016, 1, 1)
+
+
+
 def test_training_target_on_origin_is_eligible() -> None:
     origin = APPROVED_FOLDS[0].forecast_origin
     assert is_training_target_eligible(origin, origin)
@@ -149,7 +147,7 @@ def test_holdout_overlap_is_rejected() -> None:
     overlapping_origin = date(2017, 7, 20)
     start, end = derive_target_window(overlapping_origin)
     invalid_folds = list(APPROVED_FOLDS)
-    invalid_folds[-1] = TemporalValidationFold(8, overlapping_origin, start, end)
+    invalid_folds[-1] = TemporalValidationFold(4, overlapping_origin, start, end)
     with pytest.raises(ValueError, match="before the final holdout"):
         validate_fold_contract(invalid_folds)
 

@@ -1,4 +1,4 @@
-"""Serial fold-wise Favorita LightGBM evaluation orchestration."""
+"""Serial four-fold Favorita LightGBM evaluation orchestration."""
 
 from __future__ import annotations
 
@@ -49,6 +49,7 @@ from pipelines.features.build_favorita_fold_datasets import (
     FoldDatasetBuildConfig,
     approved_fold_artifact_paths,
     build_approved_fold_datasets,
+    validate_canonical_fold_output_dir,
 )
 from pipelines.models.favorita_lightgbm import (
     FavoritaLightGBMAdapter,
@@ -158,6 +159,7 @@ def validate_evaluation_config(config: FavoritaEvaluationRunConfig) -> None:
     """Reject ambiguous origins, unsafe paths, and any holdout exposure."""
 
     validate_approved_contract()
+    validate_canonical_fold_output_dir(config.fold_output_dir)
     if not config.source_path.is_file():
         raise FileNotFoundError(config.source_path)
     resolved_paths = {
@@ -640,7 +642,7 @@ def _manifest(
             "started_at_utc": started_at.isoformat(),
             "completed_at_utc": completed_at.isoformat(),
             "model": "FavoritaLightGBMAdapter",
-            "evaluation_method": "eight-fold expanding-window backtesting",
+            "evaluation_method": "four-fold expanding-window backtesting",
         },
         "source": {
             "path": config.source_path.as_posix(),
@@ -782,7 +784,7 @@ def run_evaluation(
         )
     )
     if len(fold_build_manifests) != len(APPROVED_FOLDS):
-        raise ValueError("Fold materialization must return exactly 8 manifests")
+        raise ValueError("Fold materialization must return exactly 4 manifests")
 
     paths.run_manifest.parent.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
@@ -875,7 +877,7 @@ def run_evaluation(
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the approved serial Favorita eight-fold LightGBM evaluation."
+            "Run the approved serial Favorita four-fold LightGBM evaluation."
         )
     )
     parser.add_argument("--source-path", type=Path, default=DEFAULT_SOURCE_PATH)

@@ -20,6 +20,7 @@ from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
     FORECAST_HORIZONS,
+    MODELING_TARGET_START,
     TemporalValidationFold,
     validate_approved_contract,
 )
@@ -29,12 +30,15 @@ from pipelines.evaluation.run_favorita_lightgbm_evaluation import (
     iter_model_ready_validation_batches,
 )
 from pipelines.features.build_favorita_fold_datasets import (
+    ALL_FAVORITA_STORES,
+    CANONICAL_FOLD_IDS,
     CANONICAL_VALIDATION_DESIGN,
     DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
     EXECUTION_SCOPE,
-    RESOURCE_CONSTRAINED_FOLD_IDS,
     FoldArtifactPaths,
     approved_fold_artifact_paths,
+    canonical_training_origins,
+    validate_canonical_fold_output_dir,
 )
 from pipelines.features.favorita_model_ready import (
     OUTPUT_ARROW_SCHEMA,
@@ -46,9 +50,9 @@ from pipelines.models.favorita_lightgbm import FavoritaLightGBMAdapter
 DEFAULT_OUTPUT_DIR = Path("artifacts/evaluation/favorita_lightgbm")
 EXPERIMENT_RESULTS_FILENAME = "experiment_results.json"
 MARKDOWN_SUMMARY_FILENAME = "lightgbm_evaluation_summary.md"
-EXPERIMENT_NAME = "Favorita SCRUM-15 resource-constrained four-fold evaluation"
+EXPERIMENT_NAME = "Favorita SCRUM-15 canonical four-fold expanding-window evaluation"
 MODEL_NAME = "LightGBM"
-SUPPORTED_FOLD_IDS: tuple[int, ...] = RESOURCE_CONSTRAINED_FOLD_IDS
+SUPPORTED_FOLD_IDS: tuple[int, ...] = CANONICAL_FOLD_IDS
 METRIC_NAMES: tuple[str, ...] = (
     "mae",
     "rmse",
@@ -146,16 +150,31 @@ def _validate_manifest(
     manifest: Mapping[str, Any],
     fold: TemporalValidationFold,
 ) -> tuple[int, int]:
+    training_origins = canonical_training_origins(fold)
     expected: tuple[tuple[str, object], ...] = (
         ("fold_id", fold.fold_id),
         ("canonical_fold_id", fold.fold_id),
+        ("canonical_fold_count", len(APPROVED_FOLDS)),
         ("canonical_validation_design", CANONICAL_VALIDATION_DESIGN),
         ("execution_scope", EXECUTION_SCOPE),
         ("experiment_subset", list(SUPPORTED_FOLD_IDS)),
+        ("canonical_contract_enforced", True),
         ("forecast_origin", fold.forecast_origin.isoformat()),
         ("validation_start", fold.validation_start.isoformat()),
         ("validation_end", fold.validation_end.isoformat()),
+        ("modeling_target_start", MODELING_TARGET_START.isoformat()),
+        ("training_target_start", MODELING_TARGET_START.isoformat()),
+        ("training_target_end", fold.forecast_origin.isoformat()),
         ("max_items_per_store", None),
+        ("training_origin_count", len(training_origins)),
+        ("training_origin_start", training_origins[0].isoformat()),
+        ("training_origin_end", training_origins[-1].isoformat()),
+        ("store_count", len(ALL_FAVORITA_STORES)),
+        ("configured_store_count", len(ALL_FAVORITA_STORES)),
+        ("observed_store_count", len(ALL_FAVORITA_STORES)),
+        ("processed_store_count", len(ALL_FAVORITA_STORES)),
+        ("configured_stores", list(ALL_FAVORITA_STORES)),
+        ("processed_stores", list(ALL_FAVORITA_STORES)),
         ("ordered_schema", list(TRAINING_OUTPUT_COLUMNS)),
     )
     for key, value in expected:
@@ -184,6 +203,7 @@ def _validate_parquet_footer(
     *,
     partition: str,
     expected_rows: int,
+    fold: TemporalValidationFold,
 ) -> None:
     parquet_file = pq.ParquetFile(path)
     try:
@@ -195,6 +215,65 @@ def _validate_parquet_footer(
             raise ValueError(
                 f"{partition} Parquet must match the ordered training columns"
             )
+        bounds: dict[str, tuple[Any, Any]] = {}
+        for column in (
+            "forecast_origin",
+            "forecast_date",
+            "forecast_horizon",
+        ):
+            column_index = parquet_file.schema_arrow.get_field_index(column)
+            minima: list[Any] = []
+            maxima: list[Any] = []
+            for row_group_index in range(parquet_file.metadata.num_row_groups):
+                statistics = (
+                    parquet_file.metadata.row_group(row_group_index)
+                    .column(column_index)
+                    .statistics
+                )
+                if statistics is None or not statistics.has_min_max:
+                    raise ValueError(
+                        f"{partition} Parquet lacks {column} footer statistics"
+                    )
+                if statistics.null_count:
+                    raise ValueError(f"{partition} Parquet has null {column} values")
+                minima.append(statistics.min)
+                maxima.append(statistics.max)
+            bounds[column] = (min(minima), max(maxima))
+
+        def as_date(value: Any):
+            return value.date() if hasattr(value, "date") else value
+
+        origin_min, origin_max = map(as_date, bounds["forecast_origin"])
+        target_min, target_max = map(as_date, bounds["forecast_date"])
+        horizon_min, horizon_max = bounds["forecast_horizon"]
+        if (int(horizon_min), int(horizon_max)) != (
+            min(FORECAST_HORIZONS),
+            max(FORECAST_HORIZONS),
+        ):
+            raise ValueError(f"{partition} Parquet horizons must span 1 through 16")
+        if partition == "Training":
+            if (
+                target_min != MODELING_TARGET_START
+                or target_max != fold.forecast_origin
+            ):
+                raise ValueError(
+                    "Training Parquet target dates must span the canonical fold range"
+                )
+            if origin_max >= fold.forecast_origin:
+                raise ValueError(
+                    "Training Parquet origins must precede the fold origin"
+                )
+        else:
+            if (origin_min, origin_max) != (
+                fold.forecast_origin,
+                fold.forecast_origin,
+            ):
+                raise ValueError("Validation Parquet forecast origin is not canonical")
+            if (target_min, target_max) != (
+                fold.validation_start,
+                fold.validation_end,
+            ):
+                raise ValueError("Validation Parquet dates are not canonical")
         if parquet_file.metadata.num_rows != expected_rows:
             raise ValueError(
                 f"{partition} Parquet row count does not match its fold manifest"
@@ -211,6 +290,7 @@ def validate_existing_fold(
     validate_approved_contract()
     if config.validation_batch_size <= 0:
         raise ValueError("validation_batch_size must be positive")
+    validate_canonical_fold_output_dir(config.fold_output_dir)
     fold = _resolve_fold(config.fold_id)
     paths = _fold_artifact_paths(fold.fold_id, config.fold_output_dir)
     _require_existing_artifacts(paths)
@@ -220,11 +300,13 @@ def validate_existing_fold(
         paths.training,
         partition="Training",
         expected_rows=training_rows,
+        fold=fold,
     )
     _validate_parquet_footer(
         paths.validation,
         partition="Validation",
         expected_rows=validation_rows,
+        fold=fold,
     )
     return ValidatedFoldArtifacts(
         fold=fold,
@@ -471,7 +553,7 @@ def _argument_parser() -> argparse.ArgumentParser:
         type=int,
         required=True,
         choices=SUPPORTED_FOLD_IDS,
-        help="Canonical existing fold to evaluate (1, 3, 6, or 8).",
+        help="Canonical existing fold to evaluate (1, 2, 3, or 4).",
     )
     return parser
 

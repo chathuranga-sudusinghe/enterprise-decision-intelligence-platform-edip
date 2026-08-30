@@ -12,6 +12,7 @@ import pytest
 from pipelines.evaluation import run_favorita_lightgbm_single_fold as runner
 from pipelines.evaluation.favorita_metrics import FavoritaMetricAccumulator
 from pipelines.evaluation.favorita_temporal_validation import (
+    MODELING_TARGET_START,
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
 )
@@ -36,11 +37,23 @@ def _model_ready_frame(fold_id: int, *, validation: bool) -> pd.DataFrame:
         allow_assumed_future_holidays=True,
     )
     fold = _fold(fold_id)
-    origin = (
-        fold.forecast_origin
-        if validation
-        else fold.forecast_origin - timedelta(days=32)
-    )
+    if not validation:
+        early = frame.copy()
+        early["forecast_origin"] = pd.Timestamp(MODELING_TARGET_START) - pd.Timedelta(
+            days=1
+        )
+        early["forecast_date"] = early["forecast_origin"] + pd.to_timedelta(
+            early["forecast_horizon"], unit="D"
+        )
+        late = frame.loc[frame["forecast_horizon"] == 1].copy()
+        late["forecast_origin"] = pd.Timestamp(fold.forecast_origin) - pd.Timedelta(
+            days=1
+        )
+        late["forecast_date"] = pd.Timestamp(fold.forecast_origin)
+        return pd.concat((early, late), ignore_index=True).loc[
+            :, TRAINING_OUTPUT_COLUMNS
+        ]
+    origin = fold.forecast_origin
     frame["forecast_origin"] = pd.Timestamp(origin)
     frame["forecast_date"] = frame["forecast_origin"] + pd.to_timedelta(
         frame["forecast_horizon"],
@@ -57,15 +70,30 @@ def _write_existing_fold(root: Path, fold_id: int) -> runner.FoldArtifactPaths:
     validation = _model_ready_frame(fold_id, validation=True)
     pq.write_table(to_arrow_table(training), paths.training, row_group_size=5)
     pq.write_table(to_arrow_table(validation), paths.validation, row_group_size=5)
+    training_origins = runner.canonical_training_origins(fold)
     manifest = {
+        "canonical_fold_count": len(APPROVED_FOLDS),
         "fold_id": fold_id,
         "canonical_fold_id": fold_id,
+        "canonical_contract_enforced": True,
         "canonical_validation_design": runner.CANONICAL_VALIDATION_DESIGN,
         "execution_scope": runner.EXECUTION_SCOPE,
         "experiment_subset": list(runner.SUPPORTED_FOLD_IDS),
+        "training_origin_count": len(training_origins),
+        "training_origin_start": training_origins[0].isoformat(),
+        "training_origin_end": training_origins[-1].isoformat(),
+        "store_count": len(runner.ALL_FAVORITA_STORES),
+        "configured_store_count": len(runner.ALL_FAVORITA_STORES),
+        "observed_store_count": len(runner.ALL_FAVORITA_STORES),
+        "processed_store_count": len(runner.ALL_FAVORITA_STORES),
+        "configured_stores": list(runner.ALL_FAVORITA_STORES),
+        "processed_stores": list(runner.ALL_FAVORITA_STORES),
         "forecast_origin": fold.forecast_origin.isoformat(),
         "validation_start": fold.validation_start.isoformat(),
         "validation_end": fold.validation_end.isoformat(),
+        "modeling_target_start": MODELING_TARGET_START.isoformat(),
+        "training_target_start": MODELING_TARGET_START.isoformat(),
+        "training_target_end": fold.forecast_origin.isoformat(),
         "final_holdout_excluded": True,
         "future_actual_leakage": False,
         "max_items_per_store": None,
@@ -116,9 +144,9 @@ def test_supported_fold_selection_uses_canonical_definition(fold_id: int) -> Non
     assert runner._resolve_fold(fold_id) == _fold(fold_id)
 
 
-@pytest.mark.parametrize("fold_id", (0, 2, 4, 5, 7, 9, True))
+@pytest.mark.parametrize("fold_id", (0, 5, 6, 7, 8, 9, True))
 def test_unsupported_fold_selection_is_rejected(fold_id: int) -> None:
-    with pytest.raises(ValueError, match="supported folds are 1, 3, 6, 8"):
+    with pytest.raises(ValueError, match="supported folds are 1, 2, 3, 4"):
         runner._resolve_fold(fold_id)
 
 
@@ -158,10 +186,20 @@ def test_missing_artifact_fails_without_any_builder_or_model_call(
 @pytest.mark.parametrize(
     ("key", "value", "message"),
     (
+        ("canonical_fold_count", 8, "canonical_fold_count"),
+        ("canonical_contract_enforced", False, "canonical_contract_enforced"),
+        ("modeling_target_start", "2015-01-01", "modeling_target_start"),
+        ("training_target_start", "2015-01-01", "training_target_start"),
+        ("training_target_end", "2016-06-29", "training_target_end"),
+        ("training_origin_count", 2, "training_origin_count"),
+        ("training_origin_start", "2016-01-01", "training_origin_start"),
+        ("training_origin_end", "2016-06-27", "training_origin_end"),
         ("canonical_fold_id", 3, "canonical_fold_id"),
         ("canonical_validation_design", "other", "canonical_validation_design"),
         ("execution_scope", "other", "execution_scope"),
         ("experiment_subset", [1], "experiment_subset"),
+        ("configured_stores", [1], "configured_stores"),
+        ("processed_store_count", 1, "processed_store_count"),
         ("forecast_origin", "2017-07-30", "forecast_origin"),
         ("final_holdout_excluded", False, "final_holdout_excluded"),
         ("final_holdout_excluded", 1, "final_holdout_excluded"),
@@ -184,14 +222,25 @@ def test_existing_manifest_contract_is_enforced(
         runner.validate_existing_fold(_config(tmp_path))
 
 
+def test_historical_eight_fold_root_is_rejected_before_artifact_access() -> None:
+    config = runner.SingleFoldEvaluationConfig(
+        fold_id=1,
+        fold_output_dir=Path("artifacts/features/favorita_folds"),
+        output_dir=Path("artifacts/evaluation/favorita_lightgbm"),
+    )
+
+    with pytest.raises(ValueError, match="historical artifact root"):
+        runner.validate_existing_fold(config)
+
+
 def test_manifest_validation_window_cannot_enter_final_holdout(tmp_path: Path) -> None:
-    paths = _write_existing_fold(tmp_path / "folds", 8)
+    paths = _write_existing_fold(tmp_path / "folds", 4)
     manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
     manifest["validation_end"] = FINAL_HOLDOUT.holdout_start.isoformat()
     paths.manifest.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(ValueError, match="validation_end"):
-        runner.validate_existing_fold(_config(tmp_path, fold_id=8))
+        runner.validate_existing_fold(_config(tmp_path, fold_id=4))
 
 
 def test_parquet_footer_must_match_manifest_without_training(

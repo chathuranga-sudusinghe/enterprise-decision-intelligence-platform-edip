@@ -395,8 +395,8 @@ def test_fixed_training_configuration_is_exposed() -> None:
     assert adapter.num_boost_round == NUM_BOOST_ROUND == 150
 
 
-def test_adapter_integrates_with_approved_eight_fold_backtester() -> None:
-    examples = [_example(9000, origin=date(2015, 8, 1), horizon=1)]
+def test_adapter_integrates_with_approved_four_fold_backtester() -> None:
+    examples = [_example(9000, origin=date(2015, 12, 31), horizon=1)]
     for fold in APPROVED_FOLDS:
         for horizon in FORECAST_HORIZONS:
             examples.append(
@@ -413,6 +413,6 @@ def test_adapter_integrates_with_approved_eight_fold_backtester() -> None:
         lambda fold: FavoritaLightGBMAdapter(),
     )
 
-    assert len(result.fold_results) == 8
+    assert len(result.fold_results) == 4
     assert len(result.horizon_results) == 16
     assert all(isfinite(row.prediction) for row in result.predictions)

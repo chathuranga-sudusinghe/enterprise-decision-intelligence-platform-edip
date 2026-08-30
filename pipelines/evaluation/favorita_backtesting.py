@@ -17,6 +17,7 @@ from pipelines.evaluation.favorita_metrics import (
 from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
+    MODELING_TARGET_START,
     FORECAST_HORIZONS,
     TemporalValidationFold,
     is_training_target_eligible,
@@ -258,7 +259,7 @@ def _require_unique_example_keys(
 def build_approved_fold_datasets(
     examples: Sequence[BacktestExample],
 ) -> tuple[FoldBacktestDataset, ...]:
-    """Build the canonical eight chronological fold datasets without mutation."""
+    """Build the canonical four chronological fold datasets without mutation."""
 
     validate_approved_contract()
     rows = _validated_examples(examples)
@@ -270,7 +271,8 @@ def build_approved_fold_datasets(
                 (
                     row
                     for row in rows
-                    if is_training_target_eligible(
+                    if row.forecast_date >= MODELING_TARGET_START
+                    and is_training_target_eligible(
                         row.forecast_date,
                         fold.forecast_origin,
                     )
@@ -371,6 +373,12 @@ def run_fold_backtest(
         raise ValueError("dataset must use one canonical approved fold")
     training_rows = _validated_examples(dataset.training_rows)
     validation_rows = _validated_examples(dataset.validation_rows)
+    if any(row.forecast_date < MODELING_TARGET_START for row in training_rows):
+        raise ValueError(
+            f"Fold {dataset.fold.fold_id} training targets must start on or after "
+            f"{MODELING_TARGET_START.isoformat()}"
+        )
+
     if any(
         not is_training_target_eligible(
             row.forecast_date,
@@ -440,11 +448,12 @@ def run_fold_backtest(
 def aggregate_fold_backtest_results(
     fold_results: Sequence[FoldBacktestResult],
 ) -> BacktestResult:
-    """Aggregate eight completed fold results without retaining fold training rows."""
+    """Aggregate four completed fold results without retaining fold training rows."""
 
     results = tuple(fold_results)
-    if tuple(result.fold_id for result in results) != tuple(range(1, 9)):
-        raise ValueError("Fold results must be the ordered canonical folds 1 through 8")
+    expected_fold_ids = tuple(fold.fold_id for fold in APPROVED_FOLDS)
+    if tuple(result.fold_id for result in results) != expected_fold_ids:
+        raise ValueError("Fold results must be the ordered canonical folds 1 through 4")
     for result, fold in zip(results, APPROVED_FOLDS, strict=True):
         if (
             result.forecast_origin != fold.forecast_origin
@@ -488,7 +497,7 @@ def run_expanding_window_backtest(
     examples: Sequence[BacktestExample],
     adapter_factory: FoldAdapterFactory,
 ) -> BacktestResult:
-    """Run eight independent fits and return fold, horizon, and pooled metrics."""
+    """Run four independent fits and return fold, horizon, and pooled metrics."""
 
     fold_datasets = build_approved_fold_datasets(examples)
     adapters: list[FoldModelAdapter] = []

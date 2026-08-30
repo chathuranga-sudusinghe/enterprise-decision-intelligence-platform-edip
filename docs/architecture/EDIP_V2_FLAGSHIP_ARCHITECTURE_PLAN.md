@@ -124,7 +124,7 @@ External providers remain adapters behind typed interfaces. Business behavior mu
 
 The forecasting capability uses the governed Favorita foundation for current research. Its approved near-term model direction is LightGBM with selected alternatives and credible naive/statistical baselines evaluated under identical temporal splits and metrics.
 
-The current temporal contract uses direct horizon-aware global forecasting for `unit_sales`, exact horizons 1 through 16, and no recursive prediction feedback. The approved eight-fold design and protected final holdout are defined in the linked research documents.
+The current temporal contract uses direct horizon-aware global forecasting for `unit_sales`, exact horizons 1 through 16, and no recursive prediction feedback. The approved four-fold expanding-window design and protected final holdout are defined in the linked research documents.
 
 Forecast artifacts must identify their dataset, feature schema, model, baseline, training window, evaluation protocol, generation time, compatibility status, uncertainty representation, and checksum. Online services resolve approved immutable artifacts rather than developer-local “latest” files.
 
@@ -259,7 +259,7 @@ Claims such as “reliable,” “trustworthy,” “adaptive,” or “multi-ag
 
 ## 12. Current state and target-state boundary
 
-Confirmed repository evidence includes the Favorita governed source record, leakage-safe feature contract, exact 16-day forecast horizon, approved eight-fold temporal design, executable temporal-boundary validation, and bounded smoke evidence.
+Confirmed repository evidence includes the Favorita governed source record, leakage-safe feature contract, exact 16-day forecast horizon, approved four-fold expanding-window temporal design, executable temporal-boundary validation, and bounded smoke evidence.
 
 The following remain target work unless separately evidenced:
 
