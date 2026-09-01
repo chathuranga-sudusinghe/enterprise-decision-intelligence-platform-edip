@@ -20,6 +20,7 @@ It consolidates the original source/governance record and post-download verifica
 Related current records:
 
 - [EDIP Architecture Plan](../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md);
+- [Favorita Research Hypothesis and Experiment Design](../research/favorita/FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md);
 - [Favorita Temporal Validation Design](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md); and
 - [Favorita Temporal Validation Contract](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
 
@@ -137,7 +138,7 @@ The current forecast target is `unit_sales`. Labelled history ends on `2017-08-1
 
 EDIP therefore uses an approved maximum direct forecast horizon of 16 days. The redesigned temporal methodology uses four expanding-window validation folds across modeling and evaluation targets from `2017-01-01` through `2017-07-30`. It protects the final labelled holdout with origin `2017-07-30` and dates `2017-07-31` through `2017-08-15`. Earlier eight-fold and superseded four-fold schedules are historical context only.
 
-The exact leakage, fold, horizon, and holdout rules are defined in the linked temporal design and contract. Kaggle `test.csv` has no `unit_sales` and is not local metric evidence.
+The model-comparison and hypothesis logic are governed by the linked research hypothesis and experiment design; model-feature definitions are maintained in their dedicated feature and experiment authorities rather than duplicated here. The exact leakage, fold, horizon, and holdout rules are defined in the linked temporal design and contract. Kaggle `test.csv` has no `unit_sales` and is not local metric evidence.
 
 ## 10. Provenance and governance gaps
 

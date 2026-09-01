@@ -20,6 +20,7 @@ Supporting authorities are:
 
 - [Research and Engineering Delivery Workflow](../governance/EDIP_RESEARCH_ENGINEERING_DELIVERY_WORKFLOW.md);
 - [Favorita Dataset Source and Governance](../governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md);
+- [Favorita Research Hypothesis and Experiment Design](../research/favorita/FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md);
 - [Favorita Temporal Validation Design](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md); and
 - [Favorita Temporal Validation Contract](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
 
@@ -122,7 +123,7 @@ External providers remain adapters behind typed interfaces. Business behavior mu
 
 ### 7.1 Forecasting and inventory risk
 
-The forecasting capability uses the governed Favorita foundation for current research. Its approved near-term model direction is LightGBM with selected alternatives and credible naive/statistical baselines evaluated under identical temporal splits and metrics.
+The forecasting capability uses the governed Favorita foundation for the primary MSc research contribution. The principal hypothesis comparison is a Basic LightGBM model using mainly contextual/basic features against a Proposed time-aware LightGBM model from the same model family using the existing full leakage-safe temporal/history-derived feature set. Both approaches use the same experimental conditions so the independent difference is the availability of leakage-safe temporal/history information. Credible naive or statistical baselines may provide secondary reference evidence, but they are not the principal hypothesis comparison.
 
 The current temporal contract uses direct horizon-aware global forecasting for `unit_sales`, exact horizons 1 through 16, and no recursive prediction feedback. The approved four-fold expanding-window design covers modeling and evaluation targets from `2017-01-01` through `2017-07-30`; the protected final holdout covers `2017-07-31` through `2017-08-15`. The linked research documents define the exact boundaries.
 
@@ -251,7 +252,7 @@ Application Insights and Azure Monitor are the target operational telemetry laye
 
 ## 11. Evaluation and research positioning
 
-EDIP is an engineering and research platform, not a production-readiness claim. Its research themes include temporal forecasting, governed retrieval, evidence sufficiency, uncertainty, abstention, bounded agentic workflows, deterministic safety, and Human-in-the-Loop decision quality.
+EDIP is an engineering and research platform, not a production-readiness claim. The Favorita forecasting experiment is the primary MSc research contribution. RAG, LangGraph orchestration, Human-in-the-Loop approval, deterministic controls, external evidence, MCP integration, and the production decision-support workflow are applied EDIP system contributions, not a second independent MSc hypothesis unless a separately approved research protocol introduces another research question.
 
 Academic evidence requires a defensible question, governed data, justified methodology, declared baselines, reproducible experiments, quantitative and qualitative evaluation, negative results, uncertainty, threats to validity, ethics/licensing review, and critical discussion.
 
@@ -259,14 +260,15 @@ Claims such as “reliable,” “trustworthy,” “adaptive,” or “multi-ag
 
 ## 12. Current state and target-state boundary
 
-Confirmed repository evidence includes the Favorita governed source record, leakage-safe feature contract, exact 16-day forecast horizon, redesigned four-fold expanding-window contract, executable validation, bounded smoke evidence, and successful canonical Fold 4 execution. Fold 4 used 313,475,735 training rows, 1,672,872 validation rows, an approximately 2.6 GiB training Parquet, approximately 26 minutes elapsed time, approximately 34.7 GiB peak process RAM, zero swap, and the unchanged LightGBM adapter on a 64 GB CPU machine.
+Confirmed repository evidence includes the Favorita governed source record, leakage-safe feature contract, exact 16-day forecast horizon, redesigned four-fold expanding-window contract, executable validation, bounded smoke evidence, and completed Proposed LightGBM execution for all four canonical folds (`completed_folds = [1, 2, 3, 4]`). Fold 4, the largest approved fold, used 313,475,735 training rows, 1,672,872 validation rows, an approximately 2.6 GiB training Parquet, approximately 26 minutes elapsed time, approximately 34.7 GiB peak process RAM, zero swap, and the unchanged LightGBM adapter on a 64 GB CPU machine. The final protected holdout remains unscored.
 
 The following remain target work unless separately evidenced:
 
-- redesigned canonical forecasting baseline and model evaluation;
-- remaining Fold 1 through 3 fitting, scoring, and final four-fold result review;
-- metric selection and negative-target policy;
-- final holdout scoring;
+- SCRUM-18 definition of the Basic LightGBM feature boundary without intentionally weakening the comparator;
+- controlled Basic-versus-Proposed LightGBM execution and the predeclared accuracy/consistency interpretation;
+- candidate selection from the canonical four-fold evidence;
+- optional sensitivity or uncertainty analysis under separate approval;
+- later final-holdout promotion criteria and scoring after all selection decisions are frozen;
 - governed production RAG and approved corpus;
 - durable identity, HITL, workflow, and audit persistence;
 - controlled enterprise/MCP integrations;
