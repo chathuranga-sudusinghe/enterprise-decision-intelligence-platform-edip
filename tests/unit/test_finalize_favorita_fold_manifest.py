@@ -41,7 +41,7 @@ def _existing_parquet_fixture(
 
     source_path = tmp_path / "cleaned.parquet"
     source.to_parquet(source_path, index=False, row_group_size=37)
-    output_dir = tmp_path / "favorita_four_fold"
+    output_dir = tmp_path / "favorita_2017_four_fold"
     paths = builder.approved_fold_artifact_paths(output_dir)[0]
     config = builder.FoldDatasetBuildConfig(
         source_path=source_path,
@@ -119,6 +119,9 @@ def test_finalizer_writes_only_missing_manifest(
     )
     assert validated.manifest == manifest
     assert manifest["canonical_fold_id"] == 1
+    assert manifest["artifact_root"] == output_dir.as_posix()
+    assert manifest["modeling_target_start"] == "2017-01-01"
+    assert manifest["modeling_target_end"] == "2017-07-30"
     assert manifest["configured_stores"] == list(range(1, 55))
     assert manifest["processed_stores"] == list(range(1, 55))
     assert manifest["observed_stores"] == [1]

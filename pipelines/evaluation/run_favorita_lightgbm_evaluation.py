@@ -39,6 +39,7 @@ from pipelines.evaluation.favorita_temporal_validation import (
 )
 from pipelines.features.build_favorita_fold_datasets import (
     ALL_STORE_BATCHES,
+    EXECUTION_SCOPE,
     FoldDatasetBuildConfig,
     approved_fold_artifact_paths,
     build_approved_fold_datasets,
@@ -60,7 +61,12 @@ from pipelines.models.favorita_lightgbm import (
 )
 
 DEFAULT_SOURCE_PATH = Path("data/processed/favorita_cleaned/favorita_cleaned.parquet")
-DEFAULT_OUTPUT_DIR = Path("artifacts/evaluation/favorita_lightgbm")
+DEFAULT_OUTPUT_DIR = Path("artifacts/evaluation/favorita_2017_four_fold_lightgbm")
+HISTORICAL_EVALUATION_OUTPUT_DIR = Path("artifacts/evaluation/favorita_lightgbm")
+EXPERIMENTAL_FEASIBILITY_FOLD_OUTPUT_DIR = Path(
+    "artifacts/experiments/favorita_six_month_lightgbm_feasibility"
+)
+ACCUMULATED_RESULTS_FILENAME = "experiment_results.json"
 ALL_FAVORITA_STORES: tuple[int, ...] = tuple(range(1, 55))
 _FEATURE_MAPPING_COLUMNS: tuple[str, ...] = tuple(
     column
@@ -157,11 +163,47 @@ def _artifact_paths(output_dir: Path) -> EvaluationArtifactPaths:
     )
 
 
+def _is_root_or_descendant(path: Path, root: Path) -> bool:
+    resolved = path.resolve()
+    resolved_root = root.resolve()
+    return resolved == resolved_root or resolved_root in resolved.parents
+
+
+def validate_evaluation_fold_output_dir(output_dir: Path) -> None:
+    """Reject historical and feasibility-only fold artifact roots."""
+
+    validate_canonical_fold_output_dir(output_dir)
+    if _is_root_or_descendant(
+        output_dir,
+        EXPERIMENTAL_FEASIBILITY_FOLD_OUTPUT_DIR,
+    ):
+        raise ValueError(
+            "Canonical evaluation must not consume the experimental six-month "
+            "feasibility artifact root"
+        )
+
+
+def validate_evaluation_result_output_dir(output_dir: Path) -> None:
+    """Keep redesigned evaluation results separate from historical results."""
+
+    if _is_root_or_descendant(output_dir, HISTORICAL_EVALUATION_OUTPUT_DIR):
+        raise ValueError(
+            "Redesigned evaluation must not use the historical result root"
+        )
+
+
 def validate_evaluation_config(config: FavoritaEvaluationRunConfig) -> None:
     """Reject ambiguous origins, unsafe paths, and any holdout exposure."""
 
     validate_approved_contract()
-    validate_canonical_fold_output_dir(config.fold_output_dir)
+    validate_evaluation_fold_output_dir(config.fold_output_dir)
+    validate_evaluation_result_output_dir(config.output_dir)
+    accumulated_results = config.output_dir / ACCUMULATED_RESULTS_FILENAME
+    if accumulated_results.exists():
+        raise FileExistsError(
+            "Full evaluation refuses to retrain folds when accumulated "
+            f"single-fold results exist: {accumulated_results}"
+        )
     if not config.source_path.is_file():
         raise FileNotFoundError(config.source_path)
     resolved_paths = {
@@ -639,6 +681,11 @@ def _manifest(
     source_state: dict[str, int],
 ) -> dict[str, Any]:
     return {
+        "namespace": {
+            "execution_scope": EXECUTION_SCOPE,
+            "fold_artifact_root": config.fold_output_dir.as_posix(),
+            "result_root": config.output_dir.as_posix(),
+        },
         "run": {
             "status": "completed",
             "started_at_utc": started_at.isoformat(),

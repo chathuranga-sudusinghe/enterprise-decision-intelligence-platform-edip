@@ -17,6 +17,7 @@ from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
     FORECAST_HORIZONS,
+    MODELING_TARGET_END,
     MODELING_TARGET_START,
     TemporalValidationFold,
     validate_approved_contract,
@@ -32,17 +33,23 @@ from pipelines.features.favorita_model_ready import (
 DEFAULT_SOURCE_PATH = Path(
     "data/processed/favorita_cleaned/favorita_cleaned.parquet"
 )
-DEFAULT_OUTPUT_DIR = Path("artifacts/features/favorita_four_fold")
+DEFAULT_OUTPUT_DIR = Path("artifacts/features/favorita_2017_four_fold")
+SUPERSEDED_FOUR_FOLD_OUTPUT_DIR = Path("artifacts/features/favorita_four_fold")
 HISTORICAL_OUTPUT_DIR = Path("artifacts/features/favorita_folds")
+INCOMPATIBLE_OUTPUT_DIRS: tuple[Path, ...] = (
+    SUPERSEDED_FOUR_FOLD_OUTPUT_DIR,
+    HISTORICAL_OUTPUT_DIR,
+)
 ALL_FAVORITA_STORES: tuple[int, ...] = tuple(range(1, 55))
 ALL_STORE_BATCHES: tuple[tuple[int, ...], ...] = tuple(
     (store_nbr,) for store_nbr in ALL_FAVORITA_STORES
 )
 CANONICAL_FOLD_IDS: tuple[int, ...] = (1, 2, 3, 4)
-EXECUTION_SCOPE = "canonical_four_fold"
+EXECUTION_SCOPE = "canonical_2017_four_fold"
 CANONICAL_VALIDATION_DESIGN = "four_fold_expanding_window"
 COMPUTE_CONSTRAINT_REASON = (
-    "Canonical four-fold resource use must be measured before real execution."
+    "Fold 4 materialization and existing-adapter training succeeded on the "
+    "approved 64 GB CPU machine without swap."
 )
 
 
@@ -88,15 +95,16 @@ def approved_fold_artifact_paths(
 
 
 def validate_canonical_fold_output_dir(output_dir: Path) -> None:
-    """Reject the historical eight-fold root and anything nested beneath it."""
+    """Reject incompatible historical roots and anything nested beneath them."""
 
     resolved = output_dir.resolve()
-    historical = HISTORICAL_OUTPUT_DIR.resolve()
-    if resolved == historical or historical in resolved.parents:
-        raise ValueError(
-            "Canonical four-fold artifacts must not use the historical "
-            f"artifact root: {HISTORICAL_OUTPUT_DIR.as_posix()}"
-        )
+    for incompatible_output_dir in INCOMPATIBLE_OUTPUT_DIRS:
+        incompatible = incompatible_output_dir.resolve()
+        if resolved == incompatible or incompatible in resolved.parents:
+            raise ValueError(
+                "Redesigned canonical artifacts must not use an incompatible "
+                f"artifact root: {incompatible_output_dir.as_posix()}"
+            )
 
 
 def selected_approved_folds(
@@ -148,7 +156,7 @@ def derive_training_origins(
     source_start: date,
     fold: TemporalValidationFold,
 ) -> tuple[date, ...]:
-    """Return daily origins whose targets start at the canonical 2016 boundary."""
+    """Return daily origins whose targets start at the canonical scope boundary."""
 
     first_origin = MODELING_TARGET_START - timedelta(days=min(FORECAST_HORIZONS))
     last_origin = fold.forecast_origin - timedelta(days=min(FORECAST_HORIZONS))
@@ -326,7 +334,9 @@ def _manifest_matches_reusable_fold(
             manifest.get("forecast_origin") == fold.forecast_origin.isoformat(),
             manifest.get("validation_start") == fold.validation_start.isoformat(),
             manifest.get("validation_end") == fold.validation_end.isoformat(),
+            manifest.get("artifact_root") == config.output_dir.as_posix(),
             manifest.get("modeling_target_start") == MODELING_TARGET_START.isoformat(),
+            manifest.get("modeling_target_end") == MODELING_TARGET_END.isoformat(),
             manifest.get("training_target_start") == MODELING_TARGET_START.isoformat(),
             manifest.get("training_target_end") == fold.forecast_origin.isoformat(),
             manifest.get("canonical_contract_enforced") == config.canonical_contract,
@@ -378,7 +388,10 @@ def _validate_fold_artifact_boundaries(
     fold: TemporalValidationFold,
 ) -> None:
     if training_validation["forecast_date_min"] != MODELING_TARGET_START.isoformat():
-        raise AssertionError("Training labels do not start at 2016-01-01")
+        raise AssertionError(
+            "Training labels do not start at "
+            f"{MODELING_TARGET_START.isoformat()}"
+        )
     if training_validation["forecast_date_max"] != fold.forecast_origin.isoformat():
         raise AssertionError("Training labels do not end at the fold origin")
     if validation_validation.get("forecast_origin_min") not in (
@@ -426,12 +439,14 @@ def fold_manifest_payload(
         "execution_scope": (
             EXECUTION_SCOPE if config.canonical_contract else "synthetic_test_fixture"
         ),
+        "artifact_root": config.output_dir.as_posix(),
         "canonical_validation_design": CANONICAL_VALIDATION_DESIGN,
         "compute_constraint_reason": COMPUTE_CONSTRAINT_REASON,
         "forecast_origin": fold.forecast_origin.isoformat(),
         "validation_start": fold.validation_start.isoformat(),
         "validation_end": fold.validation_end.isoformat(),
         "modeling_target_start": MODELING_TARGET_START.isoformat(),
+        "modeling_target_end": MODELING_TARGET_END.isoformat(),
         "training_target_start": training_validation["forecast_date_min"],
         "training_target_end": training_validation["forecast_date_max"],
         "training_row_count": training_validation["rows"],

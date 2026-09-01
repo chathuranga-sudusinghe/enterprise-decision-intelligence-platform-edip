@@ -33,7 +33,7 @@ from pipelines.features.build_favorita_fold_datasets import (
 from pipelines.features.favorita_model_ready import write_json_atomic
 
 PROCESSED_STORE_EVIDENCE = (
-    "operator_confirmed_original_canonical_materialization"
+    "operator_confirmed_redesigned_canonical_materialization"
 )
 
 
@@ -95,7 +95,7 @@ def finalize_existing_fold_manifest(
     fold = selected_approved_folds((fold_id,))[0]
     if not confirm_all_stores_processed:
         raise ValueError(
-            "Manifest recovery requires explicit confirmation that the original "
+            "Manifest recovery requires explicit confirmation that the redesigned "
             "canonical materialization processed all stores 1 through 54"
         )
     if not source_path.is_file():
@@ -246,7 +246,7 @@ def _argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         required=True,
         help=(
-            "Confirm that the original canonical materialization processed "
+            "Confirm that the redesigned canonical materialization processed "
             "stores 1 through 54, including stores with zero observed rows."
         ),
     )

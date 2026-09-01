@@ -135,7 +135,7 @@ The source is sparse. An absent store-item-date row is not evidence of zero dema
 
 The current forecast target is `unit_sales`. Labelled history ends on `2017-08-15`; the official unlabelled competition test period covers `2017-08-16` through `2017-08-31`, an inclusive 16-day inference window.
 
-EDIP therefore uses an approved maximum direct forecast horizon of 16 days. The temporal design uses eight expanding-window validation folds and protects the final labelled holdout with origin `2017-07-30` and dates `2017-07-31` through `2017-08-15`.
+EDIP therefore uses an approved maximum direct forecast horizon of 16 days. The redesigned temporal methodology uses four expanding-window validation folds across modeling and evaluation targets from `2017-01-01` through `2017-07-30`. It protects the final labelled holdout with origin `2017-07-30` and dates `2017-07-31` through `2017-08-15`. Earlier eight-fold and superseded four-fold schedules are historical context only.
 
 The exact leakage, fold, horizon, and holdout rules are defined in the linked temporal design and contract. Kaggle `test.csv` has no `unit_sales` and is not local metric evidence.
 
