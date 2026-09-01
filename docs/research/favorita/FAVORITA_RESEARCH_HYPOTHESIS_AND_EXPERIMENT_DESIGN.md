@@ -14,33 +14,41 @@ EDIP applies the forecasting result inside a broader production-oriented decisio
 
 ## 4. Research Question
 
-Does incorporating leakage-safe historical time-series information into a global LightGBM forecasting approach improve grocery-sales forecast accuracy and consistency compared with a Basic LightGBM model primarily using contextual features?
+Does adding leakage-safe temporal and time-series features to a Contextual LightGBM model improve grocery-sales forecast accuracy and consistency over the same model without those features?
 
 ## 5. Hypotheses
 
-### H0
+### H1 (Alternative)
 
-The time-aware LightGBM forecasting approach does not provide more accurate or consistent grocery-sales forecasts than the Basic LightGBM baseline.
+Adding leakage-safe temporal and time-series features to a contextual LightGBM model improves forecast accuracy and consistency over the same model without those features.
 
-### H1
+### H0 (Null)
 
-A time-aware LightGBM forecasting approach using leakage-safe temporal features provides more accurate and consistent grocery-sales forecasts than a Basic LightGBM baseline using mainly contextual features.
+Adding leakage-safe temporal and time-series features to a contextual LightGBM model does not improve forecast accuracy or consistency over the same model without those features.
 
 ## 6. Experimental Comparison
 
-### Basic LightGBM
+### Contextual LightGBM
 
-The Basic LightGBM comparator uses the same LightGBM model family and retains relevant contextual/basic information. It excludes the advanced temporal/history-derived feature group that defines the independent experimental difference. It must not be intentionally weakened through removal of useful shared context, inferior preprocessing, reduced training scope, or less favorable model configuration.
+The Contextual LightGBM comparator uses the approved contextual feature groups without the leakage-safe temporal and time-series feature group being tested. It must not be intentionally weakened through removal of useful contextual information, inferior preprocessing, reduced training scope, or less favorable model configuration. Its exact feature-column list is not frozen by this document and remains the next SCRUM-18 design step.
 
 ### Proposed Time-Aware LightGBM
 
-The Proposed time-aware LightGBM uses the existing full leakage-safe feature set, including temporal/history-derived information available at each forecast origin. Its current canonical execution is complete for all four folds: `completed_folds = [1, 2, 3, 4]`.
+The Proposed Time-Aware LightGBM uses the same Contextual LightGBM features plus leakage-safe temporal and time-series features available at each forecast origin. Its current canonical execution is complete for all four folds: `completed_folds = [1, 2, 3, 4]`.
 
-Naive or statistical baselines may be reported as secondary reference evidence. They do not replace the Basic-versus-Proposed LightGBM hypothesis comparison.
+Naive or statistical baselines may be reported as secondary reference evidence. They do not replace the Contextual-versus-Proposed Time-Aware LightGBM hypothesis comparison.
 
 ## 7. Feature Groups
 
-Both models retain relevant contextual information under a frozen SCRUM-18 feature schema. The Basic model removes only the approved advanced temporal/history-derived feature group; the Proposed model retains that group under the existing leakage-safe feature contract. SCRUM-18 must record the exact included and excluded columns and their feature-group rationale without redefining feature calculations in this document.
+The intended relationship is:
+
+```text
+Proposed Time-Aware LightGBM features
+= Contextual LightGBM features
++ leakage-safe temporal and time-series features
+```
+
+The feature-group boundary is frozen, but the exact feature-column lists are not. The next SCRUM-18 design step must record and approve the precise contextual columns and added temporal/time-series columns without redefining feature calculations in this document.
 
 ## 8. Controlled Variables
 
@@ -60,7 +68,7 @@ One approach must not receive more aggressive tuning than the other for this hyp
 
 ## 9. Independent Variable
 
-The independent variable is the availability of the approved leakage-safe temporal/history-derived feature group. All other material experimental conditions are held equivalent as far as practicable.
+The independent variable is the addition of the approved leakage-safe temporal and time-series feature group to the same Contextual LightGBM baseline. All other material experimental conditions are held equivalent as far as practicable.
 
 ## 10. Dependent Variables and Metrics
 
@@ -82,7 +90,7 @@ The final holdout has origin `2017-07-30` and target dates `2017-07-31` through 
 
 ## 14. Reproducibility and Artifact Evidence
 
-Each approach must preserve its code revision, environment, exact feature schema, model configuration, fold identifiers, training scope, row counts, seeds where meaningful, runtime evidence, predictions, complete metrics, and immutable artifact identifiers or checksums. Artifact namespaces must distinguish Basic and Proposed results and must not overwrite historical or protected evidence.
+Each approach must preserve its code revision, environment, exact feature schema, model configuration, fold identifiers, training scope, row counts, seeds where meaningful, runtime evidence, predictions, complete metrics, and immutable artifact identifiers or checksums. Artifact namespaces must distinguish Contextual and Proposed Time-Aware results and must not overwrite historical or protected evidence.
 
 ## 15. Threats to Validity
 
@@ -92,8 +100,8 @@ Threats include imperfect isolation of the feature-group difference, unequal tun
 
 SCRUM-18 is acceptable when:
 
-- the Basic LightGBM feature boundary is explicit, reviewed, and does not intentionally weaken the comparator;
-- shared contextual features and excluded temporal/history features are recorded precisely;
+- the Contextual LightGBM feature boundary is explicit, reviewed, and does not intentionally weaken the comparator;
+- the shared contextual features and added leakage-safe temporal/time-series features are recorded precisely;
 - both approaches use the same target, four folds, horizons, fold training scopes, metric contract, LightGBM family, and controlled model configuration;
 - tuning effort is equivalent and holdout outcomes remain unavailable;
 - both approaches report complete pooled-overall, per-fold, and per-horizon evidence;

@@ -15,7 +15,7 @@
 
 This document records the redesigned canonical four-fold temporal validation design for Favorita forecasting. It defines the approved windows, the `2017-01-01` modeling-target boundary, expanding training histories, leakage prevention, and limitations that must accompany later model results. It replaces both the earlier eight-fold paired-season design and the superseded four-fold schedule that began on `2016-01-01`.
 
-The fold boundaries remain a research design contract. All four canonical Proposed LightGBM folds have completed successfully, while the final holdout remains unscored.
+The fold boundaries remain a research design contract. All four canonical Proposed Time-Aware LightGBM folds have completed successfully, while the final holdout remains unscored.
 
 Related authorities:
 
@@ -52,13 +52,13 @@ The full cleaned Favorita dataset remains unchanged. Its verified source contrac
 
 The new modeling target boundary does not truncate or rewrite the cleaned source. Existing leakage-safe feature engineering is reused unchanged so observations before `2017-01-01` can still supply origin-available historical context for features whose supervised target dates start on `2017-01-01`.
 
-All four canonical Proposed LightGBM folds have been materialized and trained/evaluated successfully (`completed_folds = [1, 2, 3, 4]`). Earlier feasibility artifacts remain historical evidence, not canonical fold artifacts.
+All four canonical Proposed Time-Aware LightGBM folds have been materialized and trained/evaluated successfully (`completed_folds = [1, 2, 3, 4]`). Earlier feasibility artifacts remain historical evidence, not canonical fold artifacts.
 
 ## 4. Validation method
 
 EDIP uses expanding-window backtesting. Training targets begin on `2017-01-01` and the eligible history grows through each fold origin, while each validation window remains 16 calendar days. This preserves temporal order and prevents future-label leakage.
 
-All four folds are canonical and complete for the Proposed time-aware LightGBM. This four-fold design is the common experimental framework for the SCRUM-18 Basic LightGBM versus Proposed time-aware LightGBM comparison; each comparator must use the same fold boundaries, training scope per fold, horizons, and holdout separation.
+All four folds are canonical and complete for the Proposed Time-Aware LightGBM. This four-fold design is the common experimental framework for the SCRUM-18 Contextual LightGBM versus Proposed Time-Aware LightGBM comparison; each comparator must use the same fold boundaries, training scope per fold, horizons, and holdout separation.
 
 ```text
 Fold 1: 2017-01-01 through 2017-02-28 -> 2017-03-01 through 2017-03-16 validation
@@ -138,7 +138,7 @@ Limitations include changing store/item populations, sparse target coverage, inc
 
 The unresolved controls include:
 
-- the Basic LightGBM feature schema and boundary between shared contextual information and removed advanced temporal/history features;
+- the Contextual LightGBM feature schema and the leakage-safe temporal/time-series feature group added by the Proposed Time-Aware LightGBM;
 - controlled model configuration and other experimental conditions for a fair feature-information comparison;
 - the predeclared comparison and consistency interpretation;
 - candidate selection from complete four-fold evidence;
