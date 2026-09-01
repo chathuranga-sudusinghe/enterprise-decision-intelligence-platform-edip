@@ -26,8 +26,10 @@ from pipelines.features.favorita_model_ready import (
     to_arrow_table,
 )
 from pipelines.models.favorita_lightgbm import (
+    CONTEXTUAL_FEATURE_COLUMNS,
     DEFAULT_FEATURE_COLUMNS,
     NUM_BOOST_ROUND,
+    TIME_AWARE_FEATURE_COLUMNS,
     FavoritaLightGBMAdapter,
 )
 
@@ -416,3 +418,58 @@ def test_adapter_integrates_with_approved_four_fold_backtester() -> None:
     assert len(result.fold_results) == 4
     assert len(result.horizon_results) == 16
     assert all(isfinite(row.prediction) for row in result.predictions)
+
+
+def test_approved_feature_contracts_are_exact_and_default_is_time_aware() -> None:
+    assert len(CONTEXTUAL_FEATURE_COLUMNS) == 22
+    assert len(TIME_AWARE_FEATURE_COLUMNS) == 40
+    assert TIME_AWARE_FEATURE_COLUMNS[:22] == CONTEXTUAL_FEATURE_COLUMNS
+    assert DEFAULT_FEATURE_COLUMNS is TIME_AWARE_FEATURE_COLUMNS
+
+
+@pytest.mark.parametrize(
+    "feature_columns", (CONTEXTUAL_FEATURE_COLUMNS, TIME_AWARE_FEATURE_COLUMNS)
+)
+def test_adapter_accepts_only_each_approved_ordered_contract(
+    feature_columns: tuple[str, ...],
+) -> None:
+    adapter = FavoritaLightGBMAdapter(feature_columns=feature_columns)
+    assert adapter.candidate_feature_columns == feature_columns
+
+
+def test_contextual_parquet_fit_projects_only_contextual_columns(
+    tmp_path: Path,
+) -> None:
+    frame = _model_ready_frame()
+    training_path = tmp_path / "training.parquet"
+    _write_model_ready_parquet(frame, training_path)
+    adapter = FavoritaLightGBMAdapter(
+        feature_columns=CONTEXTUAL_FEATURE_COLUMNS
+    )
+    adapter.fit_parquet(training_path)
+    assert adapter.fitted_feature_columns == CONTEXTUAL_FEATURE_COLUMNS
+    assert not any(column.startswith("sales_lag_") for column in adapter.fitted_feature_columns)
+
+
+@pytest.mark.parametrize(
+    "feature_columns",
+    (
+        CONTEXTUAL_FEATURE_COLUMNS[:-1],
+        (*CONTEXTUAL_FEATURE_COLUMNS, "sales_lag_1"),
+        (*CONTEXTUAL_FEATURE_COLUMNS[1:], CONTEXTUAL_FEATURE_COLUMNS[0]),
+    ),
+)
+def test_arbitrary_subset_superset_and_reordered_contract_are_rejected(
+    feature_columns: tuple[str, ...],
+) -> None:
+    with pytest.raises(ValueError, match="exactly match an approved ordered"):
+        FavoritaLightGBMAdapter(feature_columns=feature_columns)
+
+
+@pytest.mark.parametrize(
+    "forbidden", ("unit_sales", "forecast_origin", "forecast_date")
+)
+def test_feature_contract_rejects_target_and_audit_columns(forbidden: str) -> None:
+    invalid = (*CONTEXTUAL_FEATURE_COLUMNS[:-1], forbidden)
+    with pytest.raises(ValueError, match="forbidden audit/target"):
+        FavoritaLightGBMAdapter(feature_columns=invalid)

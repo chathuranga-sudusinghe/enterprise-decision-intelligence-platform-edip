@@ -125,6 +125,15 @@ def _config(tmp_path: Path, fold_id: int = 1) -> runner.SingleFoldEvaluationConf
 
 class _FakeAdapter:
     prediction_value = 2.0
+
+    def __init__(self, *, feature_columns) -> None:
+        self.candidate_feature_columns = tuple(feature_columns)
+        self.feature_contract_name = "time-aware"
+        self.fitted_feature_columns = tuple(feature_columns)
+        self.excluded_all_null_features = ()
+        self.categorical_feature_columns = ()
+        self.model_parameters = {}
+        self.num_boost_round = 150
     fitted_paths: list[Path] = []
     prediction_batch_sizes: list[int] = []
 
@@ -160,8 +169,11 @@ def test_default_namespaces_belong_to_the_2017_redesign() -> None:
     assert runner.DEFAULT_FOLD_OUTPUT_DIR == Path(
         "artifacts/features/favorita_2017_four_fold"
     )
-    assert runner.DEFAULT_OUTPUT_DIR == Path(
-        "artifacts/evaluation/favorita_2017_four_fold_lightgbm"
+    assert runner.CONTEXTUAL_OUTPUT_DIR == Path(
+        "artifacts/evaluation/favorita_2017_four_fold_lightgbm_contextual"
+    )
+    assert runner.DEFAULT_OUTPUT_DIR == runner.TIME_AWARE_OUTPUT_DIR == Path(
+        "artifacts/evaluation/favorita_2017_four_fold_lightgbm_time_aware"
     )
 
 
@@ -172,7 +184,12 @@ def test_cli_has_only_required_single_fold_selection() -> None:
     }
     fold_action = next(action for action in parser._actions if action.dest == "fold")
 
-    assert option_strings == {"-h", "--help", "--fold"}
+    contract_action = next(
+        action for action in parser._actions if action.dest == "feature_contract"
+    )
+    assert option_strings == {"-h", "--help", "--fold", "--feature-contract"}
+    assert contract_action.required is True
+    assert tuple(contract_action.choices) == ("contextual", "time-aware")
     assert fold_action.required is True
     assert tuple(fold_action.choices) == runner.SUPPORTED_FOLD_IDS
 
@@ -184,7 +201,7 @@ def test_missing_artifact_fails_without_any_builder_or_model_call(
     constructed = False
 
     class RejectAdapter:
-        def __init__(self) -> None:
+        def __init__(self, **kwargs: object) -> None:
             nonlocal constructed
             constructed = True
 
@@ -415,6 +432,9 @@ def test_fit_heartbeat_stops_cleanly_when_fit_fails(
     class FailingAdapter:
         fit_calls = 0
 
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
         def fit_parquet(self, path: Path) -> None:
             assert path == training_path
             self.fit_calls += 1
@@ -481,13 +501,18 @@ def test_invalid_accumulated_result_fails_before_model_construction(
         training_rows=10,
         validation_rows=10,
         metrics={name: 0.0 for name in runner.METRIC_NAMES},
+        model=_FakeAdapter(
+            feature_columns=runner.resolve_feature_contract("time-aware")
+        ),
+        training_path=Path("fold_04/training.parquet"),
+        validation_path=Path("fold_04/validation.parquet"),
     )
     existing["folds"]["4"]["validation_end"] = "2017-07-31"
     paths.experiment_results.write_text(json.dumps(existing), encoding="utf-8")
     constructed = False
 
     class RejectAdapter:
-        def __init__(self) -> None:
+        def __init__(self, **kwargs: object) -> None:
             nonlocal constructed
             constructed = True
 
@@ -513,6 +538,9 @@ def test_failed_fold_preserves_existing_json_and_markdown(
 
     class FailingAdapter:
         fit_calls = 0
+
+        def __init__(self, **kwargs: object) -> None:
+            pass
 
         def fit_parquet(self, path: Path) -> None:
             type(self).fit_calls += 1

@@ -30,9 +30,59 @@ from pipelines.features.favorita_model_ready import (
     TRAINING_OUTPUT_COLUMNS,
 )
 
-DEFAULT_FEATURE_COLUMNS: tuple[str, ...] = (
+CONTEXTUAL_FEATURE_CONTRACT = "contextual"
+TIME_AWARE_FEATURE_CONTRACT = "time-aware"
+CONTEXTUAL_FEATURE_COLUMNS: tuple[str, ...] = (
     "forecast_horizon",
-    *MODEL_FEATURE_COLUMNS,
+    "store_nbr",
+    "item_nbr",
+    "family",
+    "class",
+    "perishable",
+    "city",
+    "state",
+    "store_type",
+    "cluster",
+    "onpromotion",
+    "is_holiday",
+    "holiday_type",
+    "holiday_locale",
+    "holiday_transferred",
+    "holiday_event_count",
+    "day_of_week",
+    "day_of_month",
+    "week_of_year",
+    "month",
+    "quarter",
+    "is_weekend",
+)
+TIME_AWARE_FEATURE_COLUMNS: tuple[str, ...] = (
+    *CONTEXTUAL_FEATURE_COLUMNS,
+    "sales_lag_1",
+    "sales_lag_7",
+    "sales_lag_14",
+    "sales_lag_28",
+    "sales_rolling_mean_7",
+    "sales_rolling_mean_14",
+    "sales_rolling_mean_28",
+    "sales_rolling_std_7",
+    "sales_rolling_std_28",
+    "transactions_at_origin",
+    "transactions_mean_7d",
+    "transactions_mean_14d",
+    "transactions_lag_7",
+    "transactions_lag_14",
+    "oil_pct_change_1d",
+    "oil_pct_change_7d",
+    "oil_rolling_change_7d",
+    "oil_rolling_volatility_7d",
+)
+DEFAULT_FEATURE_COLUMNS = TIME_AWARE_FEATURE_COLUMNS
+FEATURE_CONTRACTS: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        CONTEXTUAL_FEATURE_CONTRACT: CONTEXTUAL_FEATURE_COLUMNS,
+        TIME_AWARE_FEATURE_CONTRACT: TIME_AWARE_FEATURE_COLUMNS,
+    }
 )
 CATEGORICAL_FEATURE_CANDIDATES: tuple[str, ...] = (
     "store_nbr",
@@ -75,11 +125,41 @@ def _validate_feature_contract(feature_columns: Sequence[str]) -> tuple[str, ...
         raise ValueError("feature_columns must not be empty")
     if len(columns) != len(set(columns)):
         raise ValueError("feature_columns contains duplicate feature names")
-    if columns != DEFAULT_FEATURE_COLUMNS:
+    prohibited = set(columns) & (
+        FORBIDDEN_MODEL_COLUMNS | {TARGET_COLUMN, "forecast_origin", "forecast_date"}
+    )
+    if prohibited:
         raise ValueError(
-            "feature_columns must match the ordered Favorita model feature contract"
+            "feature_columns contains forbidden audit/target columns: "
+            + ", ".join(sorted(prohibited))
+        )
+    if columns not in FEATURE_CONTRACTS.values():
+        raise ValueError(
+            "feature_columns must exactly match an approved ordered Favorita "
+            "feature contract"
         )
     return columns
+
+
+def resolve_feature_contract(name: str) -> tuple[str, ...]:
+    """Return one approved ordered contract by its stable machine name."""
+
+    try:
+        return FEATURE_CONTRACTS[name]
+    except KeyError as exc:
+        supported = ", ".join(FEATURE_CONTRACTS)
+        raise ValueError(
+            f"Unsupported feature contract {name!r}; use {supported}"
+        ) from exc
+
+
+def feature_contract_name(feature_columns: Sequence[str]) -> str:
+    """Resolve an exact approved ordered tuple to its stable machine name."""
+
+    columns = _validate_feature_contract(feature_columns)
+    return next(
+        name for name, approved in FEATURE_CONTRACTS.items() if columns == approved
+    )
 
 
 def _validate_feature_mapping(features: Mapping[str, object]) -> None:
@@ -281,6 +361,9 @@ class FavoritaLightGBMAdapter:
         feature_columns: Sequence[str] = DEFAULT_FEATURE_COLUMNS,
     ) -> None:
         self._candidate_feature_columns = _validate_feature_contract(feature_columns)
+        self._feature_contract_name = feature_contract_name(
+            self._candidate_feature_columns
+        )
         self._booster: lgb.Booster | None = None
         self._fitted_feature_columns: tuple[str, ...] = ()
         self._excluded_all_null_features: tuple[str, ...] = ()
@@ -293,6 +376,14 @@ class FavoritaLightGBMAdapter:
     @property
     def is_fitted(self) -> bool:
         return self._booster is not None
+
+    @property
+    def feature_contract_name(self) -> str:
+        return self._feature_contract_name
+
+    @property
+    def candidate_feature_columns(self) -> tuple[str, ...]:
+        return self._candidate_feature_columns
 
     @property
     def fitted_feature_columns(self) -> tuple[str, ...]:

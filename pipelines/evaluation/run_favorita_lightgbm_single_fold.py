@@ -50,9 +50,24 @@ from pipelines.features.favorita_model_ready import (
     TRAINING_OUTPUT_COLUMNS,
     write_json_atomic,
 )
-from pipelines.models.favorita_lightgbm import FavoritaLightGBMAdapter
+from pipelines.models.favorita_lightgbm import (
+    FEATURE_CONTRACTS,
+    TIME_AWARE_FEATURE_CONTRACT,
+    FavoritaLightGBMAdapter,
+    resolve_feature_contract,
+)
 
-DEFAULT_OUTPUT_DIR = Path("artifacts/evaluation/favorita_2017_four_fold_lightgbm")
+CONTEXTUAL_OUTPUT_DIR = Path(
+    "artifacts/evaluation/favorita_2017_four_fold_lightgbm_contextual"
+)
+TIME_AWARE_OUTPUT_DIR = Path(
+    "artifacts/evaluation/favorita_2017_four_fold_lightgbm_time_aware"
+)
+DEFAULT_OUTPUT_DIR = TIME_AWARE_OUTPUT_DIR
+FEATURE_CONTRACT_OUTPUT_DIRS = {
+    "contextual": CONTEXTUAL_OUTPUT_DIR,
+    "time-aware": TIME_AWARE_OUTPUT_DIR,
+}
 EXPERIMENT_RESULTS_FILENAME = "experiment_results.json"
 MARKDOWN_SUMMARY_FILENAME = "lightgbm_evaluation_summary.md"
 EXPERIMENT_NAME = "Favorita 2017 canonical four-fold expanding-window evaluation"
@@ -75,6 +90,7 @@ class SingleFoldEvaluationConfig:
     """Inputs for one consumption-only fold evaluation."""
 
     fold_id: int
+    feature_contract: str = TIME_AWARE_FEATURE_CONTRACT
     fold_output_dir: Path = DEFAULT_FOLD_OUTPUT_DIR
     output_dir: Path = DEFAULT_OUTPUT_DIR
     validation_batch_size: int = 65_536
@@ -390,10 +406,15 @@ def validate_existing_fold(
     )
 
 
-def _empty_results() -> dict[str, Any]:
+def _empty_results(
+    feature_contract: str = TIME_AWARE_FEATURE_CONTRACT,
+) -> dict[str, Any]:
+    feature_columns = resolve_feature_contract(feature_contract)
     return {
         "experiment": EXPERIMENT_NAME,
         "model": MODEL_NAME,
+        "feature_contract": feature_contract,
+        "candidate_feature_columns": list(feature_columns),
         "execution_scope": EXECUTION_SCOPE,
         "completed_folds": [],
         "folds": {},
@@ -401,14 +422,20 @@ def _empty_results() -> dict[str, Any]:
     }
 
 
-def _load_existing_results(path: Path) -> dict[str, Any]:
+def _load_existing_results(path: Path, *, feature_contract: str) -> dict[str, Any]:
     if not path.exists():
-        return _empty_results()
+        return _empty_results(feature_contract)
     payload = _read_json_object(path, description="Experiment results")
     if payload.get("experiment") != EXPERIMENT_NAME:
         raise ValueError("Existing experiment results use a different experiment")
     if payload.get("model") != MODEL_NAME:
         raise ValueError("Existing experiment results use a different model")
+    if payload.get("feature_contract") != feature_contract:
+        raise ValueError("Existing experiment results use a different feature contract")
+    if payload.get("candidate_feature_columns") != list(
+        resolve_feature_contract(feature_contract)
+    ):
+        raise ValueError("Existing results use a different ordered feature contract")
     if payload.get("execution_scope") != EXECUTION_SCOPE:
         raise ValueError("Existing experiment results use a different execution scope")
     if payload.get("final_holdout_scored") is not False:
@@ -481,6 +508,9 @@ def _merge_fold_result(
     training_rows: int,
     validation_rows: int,
     metrics: Mapping[str, float],
+    model: FavoritaLightGBMAdapter,
+    training_path: Path,
+    validation_path: Path,
 ) -> dict[str, Any]:
     folds = dict(existing["folds"])
     folds[str(fold.fold_id)] = {
@@ -492,6 +522,14 @@ def _merge_fold_result(
         "training_rows": training_rows,
         "validation_rows": validation_rows,
         "metrics": {name: float(metrics[name]) for name in METRIC_NAMES},
+        "training_artifact": training_path.as_posix(),
+        "validation_artifact": validation_path.as_posix(),
+        "candidate_feature_columns": list(model.candidate_feature_columns),
+        "fitted_feature_columns": list(model.fitted_feature_columns),
+        "excluded_all_null_features": list(model.excluded_all_null_features),
+        "categorical_feature_columns": list(model.categorical_feature_columns),
+        "model_parameters": dict(model.model_parameters),
+        "num_boost_round": model.num_boost_round,
     }
     ordered_folds = {
         key: folds[key] for key in sorted(folds, key=lambda value: int(value))
@@ -499,6 +537,8 @@ def _merge_fold_result(
     return {
         "experiment": EXPERIMENT_NAME,
         "model": MODEL_NAME,
+        "feature_contract": existing["feature_contract"],
+        "candidate_feature_columns": existing["candidate_feature_columns"],
         "execution_scope": EXECUTION_SCOPE,
         "completed_folds": [int(key) for key in ordered_folds],
         "folds": ordered_folds,
@@ -661,7 +701,10 @@ def run_single_fold(
     validated = validate_existing_fold(config)
     _log_progress(fold_id, "artifact validation complete")
     paths = _result_paths(config.output_dir)
-    existing = _load_existing_results(paths.experiment_results)
+    feature_columns = resolve_feature_contract(config.feature_contract)
+    existing = _load_existing_results(
+        paths.experiment_results, feature_contract=config.feature_contract
+    )
     _log_progress(fold_id, f"training rows: {validated.training_rows:,}")
     _log_progress(fold_id, f"validation rows: {validated.validation_rows:,}")
     _log_progress(
@@ -670,7 +713,7 @@ def run_single_fold(
     )
 
     started = perf_counter()
-    model = FavoritaLightGBMAdapter()
+    model = FavoritaLightGBMAdapter(feature_columns=feature_columns)
     _log_progress(fold_id, "LightGBM fit started")
     fit_elapsed = _fit_with_heartbeat(
         model,
@@ -739,6 +782,9 @@ def run_single_fold(
         training_rows=validated.training_rows,
         validation_rows=validated.validation_rows,
         metrics=asdict(metrics),
+        model=model,
+        training_path=validated.paths.training,
+        validation_path=validated.paths.validation,
     )
     _log_progress(fold_id, "result publication started")
     _publish_results(merged, paths)
@@ -755,6 +801,12 @@ def _argument_parser() -> argparse.ArgumentParser:
         description="Run one existing Favorita LightGBM validation fold."
     )
     parser.add_argument(
+        "--feature-contract",
+        required=True,
+        choices=tuple(FEATURE_CONTRACTS),
+        help="Approved model arm: contextual or time-aware.",
+    )
+    parser.add_argument(
         "--fold",
         type=int,
         required=True,
@@ -766,7 +818,13 @@ def _argument_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _argument_parser().parse_args(argv)
-    paths = run_single_fold(SingleFoldEvaluationConfig(fold_id=args.fold))
+    paths = run_single_fold(
+        SingleFoldEvaluationConfig(
+            fold_id=args.fold,
+            feature_contract=args.feature_contract,
+            output_dir=FEATURE_CONTRACT_OUTPUT_DIRS[args.feature_contract],
+        )
+    )
     print(paths.experiment_results.as_posix())
     return 0
 
