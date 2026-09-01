@@ -16,11 +16,12 @@
 
 This document is the current source of truth for Favorita forecast-horizon semantics, temporal validation boundaries, training-label eligibility, fold separation, leakage protection, bounded feature evidence, and final holdout protection.
 
-It consolidates the completed 16-day horizon alignment and executable temporal-validation definition. Canonical Fold 4 has now been materialized and trained/evaluated successfully with the unchanged `FavoritaLightGBMAdapter` on the approved 64 GB CPU machine. The protected final holdout remains unscored.
+It consolidates the completed 16-day horizon alignment and executable temporal-validation definition. All four canonical Proposed LightGBM folds have been materialized and trained/evaluated successfully (`completed_folds = [1, 2, 3, 4]`) with the unchanged `FavoritaLightGBMAdapter`. The protected final holdout remains unscored.
 
 Related authorities:
 
 - [Favorita Dataset Source and Governance](../../governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md);
+- [Favorita Research Hypothesis and Experiment Design](FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md);
 - [Favorita Temporal Validation Design](FAVORITA_TEMPORAL_VALIDATION_DESIGN.md);
 - [Favorita Forecasting Evaluation Metric Contract](FAVORITA_FORECASTING_EVALUATION_METRICS.md); and
 - [EDIP Architecture Plan](../../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md).
@@ -204,29 +205,19 @@ The redesigned executable boundary requires deterministic structures and functio
 
 The archived temporal-definition notebook at `notebooks/favorita/archive/09_define_temporal_validation_and_backtesting.ipynb` records the superseded eight-fold design and is not the current canonical authority. The executable Python contract and these aligned research documents define the redesigned boundaries.
 
-## 11. Canonical execution and remaining work
+## 11. Current execution status and remaining work
 
-The canonical resumable execution path is:
+SCRUM-15 is complete. All four canonical Proposed LightGBM folds have completed, and their persisted result namespace records `completed_folds = [1, 2, 3, 4]`. The final protected holdout remains unscored.
 
-```bash
-.venv/bin/python -m pipelines.features.build_favorita_fold_datasets --folds 1 2 3
-.venv/bin/python -m pipelines.evaluation.run_favorita_lightgbm_single_fold --fold 1
-.venv/bin/python -m pipelines.evaluation.run_favorita_lightgbm_single_fold --fold 2
-.venv/bin/python -m pipelines.evaluation.run_favorita_lightgbm_single_fold --fold 3
-```
+SCRUM-18 comparators must reuse these exact four canonical folds, training scopes, horizons, leakage rules, and metric contract. Remaining work includes:
 
-These commands leave existing compatible Fold 4 artifacts untouched and accumulate Fold 1 through 3 results into the existing Fold 4 result namespace. The expected final outputs are `artifacts/evaluation/favorita_2017_four_fold_lightgbm/experiment_results.json` and `artifacts/evaluation/favorita_2017_four_fold_lightgbm/lightgbm_evaluation_summary.md`. No completed fold is trained unless that fold is explicitly selected.
-
-Remaining work outside SCRUM-15 includes:
-
-- naive, statistical, or alternative-model evaluation runs;
-- final review of persisted four-fold metric evidence;
-- entity eligibility and population policy;
-- model comparison or selection;
-- hyperparameter tuning;
-- uncertainty evaluation;
-- final holdout scoring;
-- Kaggle prediction or submission; or
+- defining the Basic LightGBM feature boundary;
+- controlling model configuration and all non-feature experimental conditions for the Basic-versus-Proposed comparison;
+- applying the predeclared comparison and consistency interpretation;
+- selecting a candidate from complete four-fold evidence;
+- optional uncertainty or sensitivity analysis under separate approval;
+- defining later final-holdout promotion criteria after selection decisions are frozen;
+- Kaggle prediction or submission; and
 - model serving and Azure deployment.
 
 Those activities require separate approved Jira/SCRUM work items and must consume this contract without weakening its training cutoff, fold isolation, direct 1-through-16 horizon semantics, sparse-row policy, or holdout protection.
