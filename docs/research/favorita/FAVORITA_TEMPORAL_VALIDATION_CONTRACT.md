@@ -7,7 +7,7 @@
 | Forecast origin | End of calendar day `t` |
 | Supported horizon | Exact integers 1 through 16 |
 | Strategy | Direct horizon-aware global forecasting |
-| Modeling target scope | `2016-01-01` through `2017-07-30` |
+| Modeling/evaluation scope | `2017-01-01` through `2017-07-30` |
 | Validation design | Four expanding-window folds |
 | Final holdout origin | `2017-07-30` |
 | Final holdout dates | `2017-07-31` through `2017-08-15` |
@@ -16,7 +16,7 @@
 
 This document is the current source of truth for Favorita forecast-horizon semantics, temporal validation boundaries, training-label eligibility, fold separation, leakage protection, bounded feature evidence, and final holdout protection.
 
-It consolidates the completed 16-day horizon alignment and the executable temporal-validation definition. It does not claim that a forecasting model was trained, a model backtest ran, metrics were compared, a model was selected, or the final holdout was scored.
+It consolidates the completed 16-day horizon alignment and executable temporal-validation definition. Canonical Fold 4 has now been materialized and trained/evaluated successfully with the unchanged `FavoritaLightGBMAdapter` on the approved 64 GB CPU machine. The protected final holdout remains unscored.
 
 Related authorities:
 
@@ -64,9 +64,9 @@ Generated examples include `forecast_origin`, `forecast_date`, and `forecast_hor
 
 | Fold | Forecast origin | Validation start | Validation end |
 |---:|---|---|---|
-| 1 | `2016-06-30` | `2016-07-01` | `2016-07-16` |
-| 2 | `2016-12-31` | `2017-01-01` | `2017-01-16` |
-| 3 | `2017-04-30` | `2017-05-01` | `2017-05-16` |
+| 1 | `2017-02-28` | `2017-03-01` | `2017-03-16` |
+| 2 | `2017-04-14` | `2017-04-15` | `2017-04-30` |
+| 3 | `2017-05-31` | `2017-06-01` | `2017-06-16` |
 | 4 | `2017-07-14` | `2017-07-15` | `2017-07-30` |
 
 The executable fold contract requires:
@@ -83,12 +83,12 @@ Only canonical origins need to be stored; validation starts and ends should be d
 
 ## 5. Expanding-window training-label eligibility
 
-Each fold uses all eligible model-ready training records whose target dates begin on `2016-01-01` and are available on or before that fold's forecast origin. SCRUM-15 implements serial fold-wise Parquet materialization and evaluation orchestration while preserving the full cleaned source, the existing leakage-safe feature definitions, and final holdout separation. The canonical four-fold artifacts use `artifacts/features/favorita_four_fold/`; superseded eight-fold artifacts under `artifacts/features/favorita_folds/` are historical evidence and are not overwritten or reused by this experiment. No canonical four-fold real-data artifact build or model run is claimed by this contract update.
+Each fold uses all eligible model-ready training records whose target dates begin on `2017-01-01` and are available on or before that fold's forecast origin. The full cleaned source, leakage-safe feature definitions, all 54 configured stores, no-item-cap policy, sparse observed-row semantics, fixed LightGBM adapter and parameters, metrics, and final holdout separation remain unchanged. Fold artifacts and evaluation orchestration are aligned to the redesigned 2017 contract and use isolated canonical feature and result roots. Existing four-fold, eight-fold, and feasibility artifacts are historical or experimental evidence and must not be overwritten or presented as completed redesigned canonical evaluation.
 
 For fold origin `O`, a training example is eligible only when:
 
 ```text
-2016-01-01 <= forecast_date <= O
+2017-01-01 <= forecast_date <= O
 ```
 
 An earlier example origin alone is insufficient because its labelled target may still occur after `O`.
@@ -136,7 +136,7 @@ The latest validation window ends on `2017-07-30`, immediately before the protec
 
 The holdout remains unavailable for model selection, preprocessing decisions, metric policy, threshold selection, hyperparameter tuning, sensitivity-design selection, or workflow tuning. Scoring requires a separately approved later work item after all such decisions are frozen.
 
-## 8. Bounded current smoke evidence
+## 8. Bounded feature and training-feasibility evidence
 
 The executed model-ready feature smoke build records:
 
@@ -158,6 +158,21 @@ The 548 rows are observed sparse targets, not a dense 50-item by 16-day panel. M
 
 The manifest and Parquet evidence agree on ordered schema, row/column counts, origin, date range, exact horizon set, duplicate count, forbidden-column checks, and training/inference schema parity.
 
+A separate training-only feasibility run recorded:
+
+| Property | Confirmed value |
+|---|---|
+| Training target scope | `2017-01-01` through `2017-06-30` |
+| Model-ready rows | 277,275,971 |
+| Parquet size | Approximately 2.23 GiB |
+| Trainer | Existing `FavoritaLightGBMAdapter.fit_parquet()` |
+| Training result | Succeeded |
+| Peak process RAM | Approximately 30.70 GiB |
+| Exit status | 0 |
+| Machine memory | 64 GB RAM |
+
+Canonical Fold 4 subsequently succeeded with training targets through `2017-07-14`: 313,475,735 training rows, 1,672,872 validation rows, an approximately 2.6 GiB training Parquet, approximately 26 minutes elapsed time, approximately 34.7 GiB peak process RAM, zero swap use, and exit status 0. This confirms the current CPU LightGBM architecture on the largest approved fold; the adapter and fixed parameters remain unchanged.
+
 ## 9. Source immutability evidence
 
 Before smoke execution, the cleaned Parquet was 723,900,039 bytes with SHA-256:
@@ -170,7 +185,7 @@ The smoke build used the final holdout date boundary only to validate feature co
 
 ## 10. Executable boundary
 
-The current implementation provides deterministic structures and functions that:
+The redesigned executable boundary requires deterministic structures and functions that:
 
 - derive target windows from the canonical horizons;
 - enforce the exact ordered horizon tuple 1 through 16;
@@ -178,7 +193,8 @@ The current implementation provides deterministic structures and functions that:
 - validate fold identifiers, chronology, duration, and non-overlap;
 - determine training-label eligibility;
 - reject a post-origin training target;
-- locate or build the canonical four fold datasets from the approved boundaries in a separate artifact root;
+- build selected redesigned fold datasets from the approved boundaries under `artifacts/features/favorita_2017_four_fold`;
+- preserve and reuse complete compatible fold artifacts and reject incomplete or historical roots;
 - require a fresh model-agnostic adapter and target-free prediction inputs for each fold;
 - validate prediction counts, finiteness, audit-key alignment, and unique validation keys;
 - provide a reusable fold-local global LightGBM adapter with training-only categorical state, native missing-value handling, and the approved direct-horizon feature contract;
@@ -186,16 +202,25 @@ The current implementation provides deterministic structures and functions that:
 - validate the exact holdout dates and separation; and
 - validate the canonical contract on demand.
 
-The current executed temporal-definition notebook demonstrates these date and leakage boundaries without reading or rebuilding the full Favorita dataset.
+The archived temporal-definition notebook at `notebooks/favorita/archive/09_define_temporal_validation_and_backtesting.ipynb` records the superseded eight-fold design and is not the current canonical authority. The executable Python contract and these aligned research documents define the redesigned boundaries.
 
-## 11. Explicit later work
+## 11. Canonical execution and remaining work
 
-This contract does **not** complete:
+The canonical resumable execution path is:
 
-- full-data LightGBM, naive, statistical, or alternative-model training runs;
-- full-data expanding-window model fits or prediction runs;
-- persisted full-data backtest evidence and metric reporting;
-- full-data preprocessing and model-input materialization;
+```bash
+.venv/bin/python -m pipelines.features.build_favorita_fold_datasets --folds 1 2 3
+.venv/bin/python -m pipelines.evaluation.run_favorita_lightgbm_single_fold --fold 1
+.venv/bin/python -m pipelines.evaluation.run_favorita_lightgbm_single_fold --fold 2
+.venv/bin/python -m pipelines.evaluation.run_favorita_lightgbm_single_fold --fold 3
+```
+
+These commands leave existing compatible Fold 4 artifacts untouched and accumulate Fold 1 through 3 results into the existing Fold 4 result namespace. The expected final outputs are `artifacts/evaluation/favorita_2017_four_fold_lightgbm/experiment_results.json` and `artifacts/evaluation/favorita_2017_four_fold_lightgbm/lightgbm_evaluation_summary.md`. No completed fold is trained unless that fold is explicitly selected.
+
+Remaining work outside SCRUM-15 includes:
+
+- naive, statistical, or alternative-model evaluation runs;
+- final review of persisted four-fold metric evidence;
 - entity eligibility and population policy;
 - model comparison or selection;
 - hyperparameter tuning;

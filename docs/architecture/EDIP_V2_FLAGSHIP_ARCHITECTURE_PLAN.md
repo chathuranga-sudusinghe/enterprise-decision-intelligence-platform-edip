@@ -124,7 +124,7 @@ External providers remain adapters behind typed interfaces. Business behavior mu
 
 The forecasting capability uses the governed Favorita foundation for current research. Its approved near-term model direction is LightGBM with selected alternatives and credible naive/statistical baselines evaluated under identical temporal splits and metrics.
 
-The current temporal contract uses direct horizon-aware global forecasting for `unit_sales`, exact horizons 1 through 16, and no recursive prediction feedback. The approved four-fold expanding-window design and protected final holdout are defined in the linked research documents.
+The current temporal contract uses direct horizon-aware global forecasting for `unit_sales`, exact horizons 1 through 16, and no recursive prediction feedback. The approved four-fold expanding-window design covers modeling and evaluation targets from `2017-01-01` through `2017-07-30`; the protected final holdout covers `2017-07-31` through `2017-08-15`. The linked research documents define the exact boundaries.
 
 Forecast artifacts must identify their dataset, feature schema, model, baseline, training window, evaluation protocol, generation time, compatibility status, uncertainty representation, and checksum. Online services resolve approved immutable artifacts rather than developer-local “latest” files.
 
@@ -259,12 +259,12 @@ Claims such as “reliable,” “trustworthy,” “adaptive,” or “multi-ag
 
 ## 12. Current state and target-state boundary
 
-Confirmed repository evidence includes the Favorita governed source record, leakage-safe feature contract, exact 16-day forecast horizon, approved four-fold expanding-window temporal design, executable temporal-boundary validation, and bounded smoke evidence.
+Confirmed repository evidence includes the Favorita governed source record, leakage-safe feature contract, exact 16-day forecast horizon, redesigned four-fold expanding-window contract, executable validation, bounded smoke evidence, and successful canonical Fold 4 execution. Fold 4 used 313,475,735 training rows, 1,672,872 validation rows, an approximately 2.6 GiB training Parquet, approximately 26 minutes elapsed time, approximately 34.7 GiB peak process RAM, zero swap, and the unchanged LightGBM adapter on a 64 GB CPU machine.
 
 The following remain target work unless separately evidenced:
 
-- trained and evaluated forecasting baselines and models;
-- actual multi-fold model fitting and scoring;
+- redesigned canonical forecasting baseline and model evaluation;
+- remaining Fold 1 through 3 fitting, scoring, and final four-fold result review;
 - metric selection and negative-target policy;
 - final holdout scoring;
 - governed production RAG and approved corpus;

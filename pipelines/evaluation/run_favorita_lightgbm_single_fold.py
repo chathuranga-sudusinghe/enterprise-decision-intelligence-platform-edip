@@ -9,7 +9,8 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from time import perf_counter
+from threading import Event, Thread
+from time import monotonic, perf_counter
 from typing import Any
 
 import numpy as np
@@ -20,6 +21,7 @@ from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
     FORECAST_HORIZONS,
+    MODELING_TARGET_END,
     MODELING_TARGET_START,
     TemporalValidationFold,
     validate_approved_contract,
@@ -28,6 +30,8 @@ from pipelines.evaluation.run_favorita_lightgbm_evaluation import (
     _validate_validation_batch,
     _ValidationKeyTracker,
     iter_model_ready_validation_batches,
+    validate_evaluation_fold_output_dir,
+    validate_evaluation_result_output_dir,
 )
 from pipelines.features.build_favorita_fold_datasets import (
     ALL_FAVORITA_STORES,
@@ -37,7 +41,6 @@ from pipelines.features.build_favorita_fold_datasets import (
     FoldArtifactPaths,
     approved_fold_artifact_paths,
     canonical_training_origins,
-    validate_canonical_fold_output_dir,
 )
 from pipelines.features.build_favorita_fold_datasets import (
     DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
@@ -49,12 +52,14 @@ from pipelines.features.favorita_model_ready import (
 )
 from pipelines.models.favorita_lightgbm import FavoritaLightGBMAdapter
 
-DEFAULT_OUTPUT_DIR = Path("artifacts/evaluation/favorita_lightgbm")
+DEFAULT_OUTPUT_DIR = Path("artifacts/evaluation/favorita_2017_four_fold_lightgbm")
 EXPERIMENT_RESULTS_FILENAME = "experiment_results.json"
 MARKDOWN_SUMMARY_FILENAME = "lightgbm_evaluation_summary.md"
-EXPERIMENT_NAME = "Favorita SCRUM-15 canonical four-fold expanding-window evaluation"
+EXPERIMENT_NAME = "Favorita 2017 canonical four-fold expanding-window evaluation"
 MODEL_NAME = "LightGBM"
 SUPPORTED_FOLD_IDS: tuple[int, ...] = CANONICAL_FOLD_IDS
+FIT_HEARTBEAT_INTERVAL_SECONDS = 60.0
+VALIDATION_PROGRESS_BATCH_INTERVAL = 10
 METRIC_NAMES: tuple[str, ...] = (
     "mae",
     "rmse",
@@ -178,6 +183,7 @@ def _manifest_observed_stores(
 def _validate_manifest(
     manifest: Mapping[str, Any],
     fold: TemporalValidationFold,
+    artifact_root: Path,
 ) -> tuple[int, int, tuple[int, ...]]:
     training_origins = canonical_training_origins(fold)
     observed_stores = _manifest_observed_stores(manifest, fold)
@@ -198,7 +204,9 @@ def _validate_manifest(
         ("forecast_origin", fold.forecast_origin.isoformat()),
         ("validation_start", fold.validation_start.isoformat()),
         ("validation_end", fold.validation_end.isoformat()),
+        ("artifact_root", artifact_root.as_posix()),
         ("modeling_target_start", MODELING_TARGET_START.isoformat()),
+        ("modeling_target_end", MODELING_TARGET_END.isoformat()),
         ("training_target_start", MODELING_TARGET_START.isoformat()),
         ("training_target_end", fold.forecast_origin.isoformat()),
         ("max_items_per_store", None),
@@ -341,7 +349,8 @@ def validate_existing_fold(
     validate_approved_contract()
     if config.validation_batch_size <= 0:
         raise ValueError("validation_batch_size must be positive")
-    validate_canonical_fold_output_dir(config.fold_output_dir)
+    validate_evaluation_fold_output_dir(config.fold_output_dir)
+    validate_evaluation_result_output_dir(config.output_dir)
     fold = _resolve_fold(config.fold_id)
     paths = _fold_artifact_paths(fold.fold_id, config.fold_output_dir)
     _require_existing_artifacts(paths)
@@ -349,6 +358,7 @@ def validate_existing_fold(
     training_rows, validation_rows, observed_stores = _validate_manifest(
         manifest,
         fold,
+        config.fold_output_dir,
     )
     _validate_parquet_footer(
         paths.training,
@@ -384,6 +394,7 @@ def _empty_results() -> dict[str, Any]:
     return {
         "experiment": EXPERIMENT_NAME,
         "model": MODEL_NAME,
+        "execution_scope": EXECUTION_SCOPE,
         "completed_folds": [],
         "folds": {},
         "final_holdout_scored": False,
@@ -398,11 +409,18 @@ def _load_existing_results(path: Path) -> dict[str, Any]:
         raise ValueError("Existing experiment results use a different experiment")
     if payload.get("model") != MODEL_NAME:
         raise ValueError("Existing experiment results use a different model")
+    if payload.get("execution_scope") != EXECUTION_SCOPE:
+        raise ValueError("Existing experiment results use a different execution scope")
     if payload.get("final_holdout_scored") is not False:
         raise ValueError("Existing results must preserve final_holdout_scored=false")
     folds = payload.get("folds")
     if not isinstance(folds, dict):
         raise ValueError("Existing experiment results folds must be a JSON object")
+    expected_completed_folds = sorted(int(key) for key in folds)
+    if payload.get("completed_folds") != expected_completed_folds:
+        raise ValueError(
+            "Existing experiment results completed_folds must match fold records"
+        )
     for key, record in folds.items():
         if key not in {str(value) for value in SUPPORTED_FOLD_IDS}:
             raise ValueError(
@@ -410,6 +428,48 @@ def _load_existing_results(path: Path) -> dict[str, Any]:
             )
         if not isinstance(record, dict) or record.get("status") != "completed":
             raise ValueError(f"Existing fold {key} is not a completed result")
+        fold = _resolve_fold(int(key))
+        expected_dates = {
+            "forecast_origin": fold.forecast_origin.isoformat(),
+            "validation_start": fold.validation_start.isoformat(),
+            "validation_end": fold.validation_end.isoformat(),
+        }
+        for field, expected in expected_dates.items():
+            if record.get(field) != expected:
+                raise ValueError(
+                    f"Existing fold {key} result {field} must equal {expected!r}"
+                )
+        for field in ("training_rows", "validation_rows"):
+            value = record.get(field)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(
+                    f"Existing fold {key} result {field} must be positive"
+                )
+        runtime_seconds = record.get("runtime_seconds")
+        if (
+            isinstance(runtime_seconds, bool)
+            or not isinstance(runtime_seconds, (int, float))
+            or not np.isfinite(runtime_seconds)
+            or runtime_seconds < 0
+        ):
+            raise ValueError(
+                f"Existing fold {key} result runtime_seconds must be finite "
+                "and non-negative"
+            )
+        metrics = record.get("metrics")
+        if not isinstance(metrics, dict) or set(metrics) != set(METRIC_NAMES):
+            raise ValueError(
+                f"Existing fold {key} result metrics must match the metric contract"
+            )
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not np.isfinite(value)
+            for value in metrics.values()
+        ):
+            raise ValueError(
+                f"Existing fold {key} result metrics must be finite numbers"
+            )
     return payload
 
 
@@ -439,6 +499,7 @@ def _merge_fold_result(
     return {
         "experiment": EXPERIMENT_NAME,
         "model": MODEL_NAME,
+        "execution_scope": EXECUTION_SCOPE,
         "completed_folds": [int(key) for key in ordered_folds],
         "folds": ordered_folds,
         "final_holdout_scored": False,
@@ -552,22 +613,85 @@ def _publish_results(
         raise
 
 
+def _log_progress(fold_id: int, message: str) -> None:
+    print(f"[Fold {fold_id}/{len(APPROVED_FOLDS)}] {message}", flush=True)
+
+
+def _fit_with_heartbeat(
+    model: FavoritaLightGBMAdapter,
+    training_path: Path,
+    *,
+    fold_id: int,
+) -> float:
+    """Fit once while emitting a bounded, low-cost progress heartbeat."""
+
+    stop_heartbeat = Event()
+    fit_started = monotonic()
+
+    def heartbeat() -> None:
+        while not stop_heartbeat.wait(FIT_HEARTBEAT_INTERVAL_SECONDS):
+            elapsed = monotonic() - fit_started
+            _log_progress(
+                fold_id,
+                f"LightGBM fit active — elapsed {elapsed:.0f} seconds",
+            )
+
+    heartbeat_thread = Thread(
+        target=heartbeat,
+        name=f"favorita-fold-{fold_id}-fit-heartbeat",
+        daemon=True,
+    )
+    heartbeat_thread.start()
+    try:
+        model.fit_parquet(training_path)
+    finally:
+        stop_heartbeat.set()
+        heartbeat_thread.join()
+    return monotonic() - fit_started
+
+
 def run_single_fold(
     config: SingleFoldEvaluationConfig,
 ) -> SingleFoldResultPaths:
     """Train and stream-evaluate exactly one existing canonical fold."""
 
+    fold_id = config.fold_id
+    total_started = monotonic()
+    _log_progress(fold_id, "artifact validation started")
     validated = validate_existing_fold(config)
+    _log_progress(fold_id, "artifact validation complete")
+    paths = _result_paths(config.output_dir)
+    existing = _load_existing_results(paths.experiment_results)
+    _log_progress(fold_id, f"training rows: {validated.training_rows:,}")
+    _log_progress(fold_id, f"validation rows: {validated.validation_rows:,}")
+    _log_progress(
+        fold_id,
+        f"training Parquet: {validated.paths.training.as_posix()}",
+    )
+
     started = perf_counter()
     model = FavoritaLightGBMAdapter()
-    model.fit_parquet(validated.paths.training)
+    _log_progress(fold_id, "LightGBM fit started")
+    fit_elapsed = _fit_with_heartbeat(
+        model,
+        validated.paths.training,
+        fold_id=fold_id,
+    )
+    _log_progress(
+        fold_id,
+        f"LightGBM fit complete — elapsed {fit_elapsed:.1f} seconds",
+    )
+
+    _log_progress(fold_id, "validation prediction and evaluation started")
     accumulator = FavoritaMetricAccumulator()
     key_tracker = _ValidationKeyTracker()
     observed_horizons: set[int] = set()
+    validation_batch_count = 0
     for frame in iter_model_ready_validation_batches(
         validated.paths.validation,
         batch_size=config.validation_batch_size,
     ):
+        validation_batch_count += 1
         _validate_validation_batch(validated.fold, frame, key_tracker)
         predictions = np.asarray(model.predict_frame(frame), dtype="float64")
         if predictions.ndim != 1 or len(predictions) != len(frame):
@@ -583,6 +707,16 @@ def run_single_fold(
         observed_horizons.update(
             int(value) for value in frame["forecast_horizon"].unique()
         )
+        if (
+            validation_batch_count == 1
+            or validation_batch_count % VALIDATION_PROGRESS_BATCH_INTERVAL == 0
+        ):
+            _log_progress(
+                fold_id,
+                "validation progress: "
+                f"{accumulator.count:,} of {validated.validation_rows:,} rows "
+                f"across {validation_batch_count} batches",
+            )
         del frame, predictions, actual, perishable
     if tuple(sorted(observed_horizons)) != FORECAST_HORIZONS:
         raise ValueError(
@@ -591,10 +725,13 @@ def run_single_fold(
     metrics = accumulator.finalize()
     if accumulator.count != validated.validation_rows:
         raise ValueError("Validated prediction count differs from manifest row count")
+    _log_progress(
+        fold_id,
+        "metric aggregation complete: "
+        f"{accumulator.count:,} rows across {validation_batch_count} batches",
+    )
     runtime_seconds = perf_counter() - started
 
-    paths = _result_paths(config.output_dir)
-    existing = _load_existing_results(paths.experiment_results)
     merged = _merge_fold_result(
         existing,
         fold=validated.fold,
@@ -603,7 +740,13 @@ def run_single_fold(
         validation_rows=validated.validation_rows,
         metrics=asdict(metrics),
     )
+    _log_progress(fold_id, "result publication started")
     _publish_results(merged, paths)
+    _log_progress(fold_id, "result publication complete")
+    _log_progress(
+        fold_id,
+        f"total runtime: {monotonic() - total_started:.1f} seconds",
+    )
     return paths
 
 

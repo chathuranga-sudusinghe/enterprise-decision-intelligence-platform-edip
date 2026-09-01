@@ -18,6 +18,7 @@ from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
     FORECAST_HORIZONS,
+    MODELING_TARGET_START,
     TemporalValidationFold,
 )
 
@@ -47,7 +48,7 @@ def _canonical_examples(
     *,
     duplicate_first_fold_population: bool = False,
 ) -> list[BacktestExample]:
-    examples = [_example(date(2015, 12, 31), 1, item_nbr=900)]
+    examples = [_example(date(2016, 12, 31), 1, item_nbr=900)]
     for fold in APPROVED_FOLDS:
         for horizon in FORECAST_HORIZONS:
             examples.append(
@@ -126,6 +127,11 @@ def test_canonical_four_fold_definition_is_accepted() -> None:
 def test_fold_training_rows_enforce_label_eligibility() -> None:
     datasets = build_approved_fold_datasets(_canonical_examples())
 
+    assert all(
+        min(row.forecast_date for row in dataset.training_rows)
+        == MODELING_TARGET_START
+        for dataset in datasets
+    )
     assert all(
         row.forecast_date <= dataset.fold.forecast_origin
         for dataset in datasets
@@ -271,7 +277,7 @@ def test_duplicate_validation_keys_are_rejected() -> None:
 
 def test_duplicate_training_keys_are_rejected() -> None:
     examples = _canonical_examples()
-    duplicate = _example(date(2016, 2, 1), 1, item_nbr=777)
+    duplicate = _example(date(2017, 2, 1), 1, item_nbr=777)
     examples.extend((duplicate, duplicate))
 
     with pytest.raises(
@@ -335,8 +341,8 @@ def test_final_untouched_holdout_rows_are_rejected() -> None:
 def test_input_sequence_and_feature_mapping_are_not_mutated() -> None:
     feature_values = {"constant": 1.0}
     first = BacktestExample(
-        forecast_origin=date(2015, 12, 31),
-        forecast_date=date(2016, 1, 1),
+        forecast_origin=date(2016, 12, 31),
+        forecast_date=date(2017, 1, 1),
         forecast_horizon=1,
         store_nbr=1,
         item_nbr=900,

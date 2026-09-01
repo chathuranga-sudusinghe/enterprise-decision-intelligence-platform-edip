@@ -10,6 +10,7 @@ from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
     FORECAST_HORIZONS,
+    MODELING_TARGET_END,
     MODELING_TARGET_START,
     HoldoutWindow,
     TemporalValidationFold,
@@ -24,16 +25,16 @@ from pipelines.evaluation.favorita_temporal_validation import (
 )
 
 EXPECTED_ORIGINS = (
-    date(2016, 6, 30),
-    date(2016, 12, 31),
-    date(2017, 4, 30),
+    date(2017, 2, 28),
+    date(2017, 4, 14),
+    date(2017, 5, 31),
     date(2017, 7, 14),
 )
 
 EXPECTED_WINDOWS = (
-    (date(2016, 7, 1), date(2016, 7, 16)),
-    (date(2017, 1, 1), date(2017, 1, 16)),
-    (date(2017, 5, 1), date(2017, 5, 16)),
+    (date(2017, 3, 1), date(2017, 3, 16)),
+    (date(2017, 4, 15), date(2017, 4, 30)),
+    (date(2017, 6, 1), date(2017, 6, 16)),
     (date(2017, 7, 15), date(2017, 7, 30)),
 )
 
@@ -98,10 +99,10 @@ def test_exact_final_holdout_definition() -> None:
     assert (FINAL_HOLDOUT.holdout_end - FINAL_HOLDOUT.holdout_start).days + 1 == 16
 
 
-def test_exact_modeling_target_start() -> None:
-    assert MODELING_TARGET_START == date(2016, 1, 1)
-
-
+def test_exact_modeling_target_scope() -> None:
+    assert MODELING_TARGET_START == date(2017, 1, 1)
+    assert MODELING_TARGET_END == date(2017, 7, 30)
+    assert APPROVED_FOLDS[-1].validation_end == MODELING_TARGET_END
 
 def test_training_target_on_origin_is_eligible() -> None:
     origin = APPROVED_FOLDS[0].forecast_origin

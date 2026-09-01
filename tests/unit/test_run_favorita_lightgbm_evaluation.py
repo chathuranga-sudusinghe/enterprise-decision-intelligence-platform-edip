@@ -35,16 +35,60 @@ def _config(tmp_path: Path) -> runner.FavoritaEvaluationRunConfig:
     )
 
 
-def test_historical_eight_fold_artifact_root_is_rejected(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "fold_output_dir",
+    (
+        Path("artifacts/features/favorita_folds"),
+        Path("artifacts/features/favorita_four_fold"),
+        runner.EXPERIMENTAL_FEASIBILITY_FOLD_OUTPUT_DIR,
+    ),
+)
+def test_incompatible_fold_artifact_roots_are_rejected(
+    tmp_path: Path,
+    fold_output_dir: Path,
+) -> None:
+    config = _config(tmp_path)
+    incompatible_config = runner.FavoritaEvaluationRunConfig(
+        source_path=config.source_path,
+        output_dir=config.output_dir,
+        fold_output_dir=fold_output_dir,
+    )
+
+    with pytest.raises(ValueError, match="artifact root|feasibility artifact root"):
+        runner.validate_evaluation_config(incompatible_config)
+
+
+def test_historical_result_root_is_rejected(tmp_path: Path) -> None:
     config = _config(tmp_path)
     historical_config = runner.FavoritaEvaluationRunConfig(
         source_path=config.source_path,
-        output_dir=config.output_dir,
-        fold_output_dir=Path("artifacts/features/favorita_folds"),
+        output_dir=runner.HISTORICAL_EVALUATION_OUTPUT_DIR,
+        fold_output_dir=config.fold_output_dir,
     )
 
-    with pytest.raises(ValueError, match="historical artifact root"):
+    with pytest.raises(ValueError, match="historical result root"):
         runner.validate_evaluation_config(historical_config)
+
+
+def test_full_evaluator_rejects_accumulated_single_fold_results(
+    tmp_path: Path,
+) -> None:
+    config = _config(tmp_path)
+    config.output_dir.mkdir(parents=True)
+    accumulated = config.output_dir / runner.ACCUMULATED_RESULTS_FILENAME
+    accumulated.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(FileExistsError, match="refuses to retrain folds"):
+        runner.validate_evaluation_config(config)
+
+
+def test_default_namespaces_belong_to_the_2017_redesign() -> None:
+    assert runner.DEFAULT_FOLD_OUTPUT_DIR == Path(
+        "artifacts/features/favorita_2017_four_fold"
+    )
+    assert runner.DEFAULT_OUTPUT_DIR == Path(
+        "artifacts/evaluation/favorita_2017_four_fold_lightgbm"
+    )
 
 
 def _metrics() -> ForecastMetricResults:
@@ -596,6 +640,11 @@ def test_manifest_configuration_matches_unsampled_contract(
         source_state={"size_bytes": 16, "mtime_ns": 1},
     )
 
+    assert manifest["namespace"] == {
+        "execution_scope": runner.EXECUTION_SCOPE,
+        "fold_artifact_root": config.fold_output_dir.as_posix(),
+        "result_root": config.output_dir.as_posix(),
+    }
     assert set(manifest["configuration"]) == {
         "stores",
         "store_count",

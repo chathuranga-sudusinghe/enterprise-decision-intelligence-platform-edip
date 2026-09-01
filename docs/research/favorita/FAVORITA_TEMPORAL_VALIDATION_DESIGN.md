@@ -3,19 +3,19 @@
 | Field | Value |
 |---|---|
 | Status | Approved canonical temporal-validation design |
-| Canonical replacement date | 2026-08-29 |
+| Canonical replacement date | 2026-08-31 |
 | Target | `unit_sales` |
 | Forecast strategy | Direct horizon-aware global forecasting |
 | Maximum horizon | 16 calendar days |
-| Modeling target scope | `2016-01-01` through `2017-07-30` |
+| Modeling/evaluation scope | `2017-01-01` through `2017-07-30` |
 | Validation method | Four-fold expanding-window backtesting |
 | Final untouched holdout | `2017-07-31` through `2017-08-15` |
 
 ## 1. Purpose
 
-This document records the canonical four-fold temporal validation design for Favorita forecasting. It defines the approved windows, the 2016 modeling-target boundary, expanding training histories, leakage prevention, and limitations that must accompany later model results. It replaces the earlier eight-fold paired-season design.
+This document records the redesigned canonical four-fold temporal validation design for Favorita forecasting. It defines the approved windows, the `2017-01-01` modeling-target boundary, expanding training histories, leakage prevention, and limitations that must accompany later model results. It replaces both the earlier eight-fold paired-season design and the superseded four-fold schedule that began on `2016-01-01`.
 
-It is a research design, not evidence that a model was trained, a backtest ran, metrics were calculated, or the final holdout was scored.
+The fold boundaries remain a research design contract. Execution evidence is recorded separately below: Fold 4 has completed successfully, while the final holdout remains unscored.
 
 Related authorities:
 
@@ -35,7 +35,8 @@ Related authorities:
 - recursive prediction feedback: forbidden;
 - validation duration: 16 calendar days;
 - validation method: four-fold expanding-window backtesting; random splitting is forbidden;
-- modeling target start: `2016-01-01`;
+- modeling target start: `2017-01-01`;
+- modeling/evaluation end: `2017-07-30`;
 - approved main fold count: four;
 - final holdout origin: `2017-07-30`;
 - final untouched holdout: `2017-07-31` through `2017-08-15`;
@@ -48,31 +49,31 @@ Sixteen is the maximum supported horizon, not a minimum forecasting requirement.
 
 The full cleaned Favorita dataset remains unchanged. Its verified source contract is 125,497,040 rows, 21 columns, 502 Parquet row groups, 54 stores, 4,036 observed items, date coverage from `2013-01-01` through `2017-08-15`, grain `(date, store_nbr, item_nbr)`, and zero recorded duplicate grain keys.
 
-The new modeling target boundary does not truncate or rewrite the cleaned source. Existing leakage-safe feature engineering is reused unchanged so pre-2016 observations can still supply historical context for features whose supervised target dates start on `2016-01-01`.
+The new modeling target boundary does not truncate or rewrite the cleaned source. Existing leakage-safe feature engineering is reused unchanged so observations before `2017-01-01` can still supply origin-available historical context for features whose supervised target dates start on `2017-01-01`.
 
-The new four-fold model-ready artifacts have not yet been materialized, so this design does not claim new fold row counts or executed scoring evidence.
+Canonical Fold 4 has been materialized and trained/evaluated successfully. Folds 1 through 3 remain to be materialized and evaluated through the same canonical code. Earlier feasibility artifacts remain historical evidence, not canonical fold artifacts.
 
 ## 4. Validation method
 
-EDIP uses expanding-window backtesting. Training targets begin on `2016-01-01` and the eligible history grows through each fold origin, while each validation window remains 16 calendar days. This preserves temporal order and prevents future-label leakage.
+EDIP uses expanding-window backtesting. Training targets begin on `2017-01-01` and the eligible history grows through each fold origin, while each validation window remains 16 calendar days. This preserves temporal order and prevents future-label leakage.
 
-All four folds are canonical. A single-fold runner executes exactly one selected fold per invocation so real-data runs can be controlled and accumulated safely without exposing the final holdout.
+All four folds are canonical. The approved execution shape runs exactly one selected fold per invocation so completed results accumulate safely without exposing the final holdout. Fold 4 is complete; Folds 1 through 3 must be invoked sequentially.
 
 ```text
-Fold 1: 2016-01-01 through 2016-06-30 -> next 16 days validation
-Fold 2: 2016-01-01 through 2016-12-31 -> next 16 days validation
-Fold 3: 2016-01-01 through 2017-04-30 -> next 16 days validation
-Fold 4: 2016-01-01 through 2017-07-14 -> next 16 days validation
+Fold 1: 2017-01-01 through 2017-02-28 -> 2017-03-01 through 2017-03-16 validation
+Fold 2: 2017-01-01 through 2017-04-14 -> 2017-04-15 through 2017-04-30 validation
+Fold 3: 2017-01-01 through 2017-05-31 -> 2017-06-01 through 2017-06-16 validation
+Fold 4: 2017-01-01 through 2017-07-14 -> 2017-07-15 through 2017-07-30 validation
 ```
 
 ## 5. Approved four folds
 
 | Fold | Training target dates | Forecast origin | Validation dates |
 |---:|---|---|---|
-| 1 | `2016-01-01` through `2016-06-30` | `2016-06-30` | `2016-07-01` through `2016-07-16` |
-| 2 | `2016-01-01` through `2016-12-31` | `2016-12-31` | `2017-01-01` through `2017-01-16` |
-| 3 | `2016-01-01` through `2017-04-30` | `2017-04-30` | `2017-05-01` through `2017-05-16` |
-| 4 | `2016-01-01` through `2017-07-14` | `2017-07-14` | `2017-07-15` through `2017-07-30` |
+| 1 | `2017-01-01` through `2017-02-28` | `2017-02-28` | `2017-03-01` through `2017-03-16` |
+| 2 | `2017-01-01` through `2017-04-14` | `2017-04-14` | `2017-04-15` through `2017-04-30` |
+| 3 | `2017-01-01` through `2017-05-31` | `2017-05-31` | `2017-06-01` through `2017-06-16` |
+| 4 | `2017-01-01` through `2017-07-14` | `2017-07-14` | `2017-07-15` through `2017-07-30` |
 
 The origins are strictly increasing. Every validation window contains exactly 16 inclusive calendar dates, the windows do not overlap, and the final validation date precedes the protected holdout.
 
@@ -81,21 +82,23 @@ The origins are strictly increasing. Every validation window contains exactly 16
 For fold origin `O`, every training example must satisfy:
 
 ```text
-2016-01-01 <= forecast_date <= O
+2017-01-01 <= forecast_date <= O
 ```
 
 An earlier example origin alone is insufficient because its labelled target may still occur after `O`. Each fold is a separate fit. Preprocessing and model fitting use only that fold's eligible training partition, and validation actuals are consumed only for scoring after prediction.
 
-Fold artifacts are materialized serially under `artifacts/features/favorita_four_fold/`. The existing eight-fold artifacts under `artifacts/features/favorita_folds/` remain untouched historical evidence and are incompatible with the new canonical experiment.
+The redesigned canonical fold artifact root is `artifacts/features/favorita_2017_four_fold/`, with manifest metadata bound to that root and the 2017 execution scope. Existing four-fold artifacts under `artifacts/features/favorita_four_fold/`, older eight-fold artifacts under `artifacts/features/favorita_folds/`, and feasibility artifacts remain historical or experimental evidence. They must not be overwritten or silently reused for the redesigned schedule.
 
-The materializer processes one store at a time and the LightGBM adapter avoids a full-fold pandas training frame, but LightGBM's native binned dataset remains in memory. Full real-data peak RAM, runtime, temporary-disk demand, and final artifact sizes remain unmeasured; real Fold 1 materialization and training therefore require separate execution approval and resource observation.
+The materializer processes one store at a time and the LightGBM adapter avoids a full-fold pandas training frame, but LightGBM's native binned dataset remains in memory. A training-only feasibility run for targets `2017-01-01` through `2017-06-30` succeeded with 277,275,971 model-ready rows, an approximately 2.23 GiB Parquet, approximately 30.70 GiB peak process RAM, and exit status 0 on a 64 GB RAM machine. It used the existing adapter and unchanged parameters.
+
+Fold 4 training through `2017-07-14` succeeded with 313,475,735 training rows, 1,672,872 validation rows, an approximately 2.6 GiB training Parquet, approximately 26 minutes elapsed time, approximately 34.7 GiB peak process RAM, zero swap use, and exit status 0. The current 64 GB CPU LightGBM architecture is therefore approved unchanged.
 
 ## 7. Leakage controls
 
 Implementation and evaluation must enforce:
 
 1. no random row splitting;
-2. no training target before `2016-01-01` or after the fold origin;
+2. no training target before `2017-01-01` or after the fold origin;
 3. no overlapping validation windows;
 4. no overlap with the final holdout;
 5. no future actual `unit_sales`, transactions, or oil inputs;
@@ -120,24 +123,23 @@ The latest approved validation date is `2017-07-30`, immediately before the hold
 
 ## 9. Superseded design and artifact separation
 
-The previous eight-fold schedule and the resource-constrained subset `(1, 3, 6, 8)` are no longer active methodology. Existing old artifacts must not be deleted, overwritten, rebuilt, or presented as evidence for this four-fold experiment.
+The previous eight-fold schedule, its resource-constrained subset `(1, 3, 6, 8)`, and the superseded four-fold schedule beginning on `2016-01-01` are historical methodology only. Existing artifacts must not be deleted, overwritten, rebuilt, or presented as evidence for the redesigned four-fold evaluation.
 
-The separate four-fold artifact root makes the methodology boundary explicit. Reuse within that root is allowed only when artifact manifests and Parquet metadata match the complete canonical four-fold contract.
+The active root is `artifacts/features/favorita_2017_four_fold/`; manifests bind artifacts to the redesigned execution scope, and incompatible historical roots remain rejected.
 
 ## 10. Research rationale and limitations
 
-The design provides 64 predeclared validation calendar days across four expanding folds. It supports a controlled medium-scale experiment within the active 2016-2017 modeling target scope. Fold-specific metrics and row counts must be reported; robustness beyond these four windows is not claimed.
+The design provides 64 predeclared validation calendar days across four expanding folds within the `2017-01-01` through `2017-07-30` modeling/evaluation scope. Fold-specific metrics and row counts must be reported; robustness beyond these four windows is not claimed.
 
-Limitations include changing store/item populations, sparse target coverage, incomplete representation of months and business regimes, unmeasured full-data compute cost, and the fact that four folds do not prove exhaustive historical robustness.
+Limitations include changing store/item populations, sparse target coverage, incomplete representation of months and business regimes, and the fact that four folds do not prove exhaustive historical robustness.
 
 ## 11. Remaining decisions
 
 The unresolved controls include:
 
-- real-data fold materialization, training execution, and metric reporting by fold and horizon;
+- remaining Fold 1 through 3 materialization, sequential training, and final four-fold metric review;
 - uncertainty reporting and optional sensitivity designs;
 - entity eligibility, cold-start handling, and fixed or dynamic population policy;
-- full real-data resource sizing and execution approval;
 - preprocessing, categorical, nullable-feature, and feature-availability policy;
 - the model-input role of `forecast_horizon`;
 - weighting or sampling for targets represented under multiple origins; and
@@ -145,4 +147,4 @@ The unresolved controls include:
 
 Separate approval is still required for real-data fold materialization and training execution, model comparison or selection, uncertainty reporting, optional sensitivity designs, final holdout scoring, Kaggle submission, and deployment.
 
-The four folds, the `2016-01-01` modeling target start, the 16-day horizon, expanding-window boundary, separate artifact location, and protected final holdout are canonical.
+The four approved folds, the `2017-01-01` modeling target start, the `2017-07-30` evaluation end, the 16-day horizon, expanding-window boundary, and protected final holdout are canonical. The canonical artifact and result roots are implemented and protected from historical reuse.
