@@ -17,6 +17,8 @@ The workflow applies to APIs, data, feature engineering, forecasting, machine le
 
 Current verified repository and execution evidence has priority for current implementation truth. The architecture plan and approved ADRs define target decisions. Dated historical records describe only the revision and boundary they inspected.
 
+The current MSc study has one primary hypothesis-driven experiment: the Favorita forecasting comparison defined by the approved research design. RAG, LangGraph orchestration, Human-in-the-Loop controls, and enterprise integration remain applied EDIP system capabilities unless a separately approved research protocol introduces another research question. This positioning does not change the evidence hierarchy or governance workflow below.
+
 ## 2. Two-layer operating model
 
 EDIP separates lifecycle governance from execution management.
@@ -173,7 +175,7 @@ Application release and infrastructure lifecycle are distinct. Terraform is used
 
 ## 10. Data, feature, and research integrity
 
-Favorita work follows the [dataset source and governance record](FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md), [temporal validation design](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md), and [temporal validation contract](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
+Favorita work follows the [dataset source and governance record](FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md), [research hypothesis and experiment design](../research/favorita/FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md), [temporal validation design](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md), and [temporal validation contract](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
 
 Research records must preserve:
 

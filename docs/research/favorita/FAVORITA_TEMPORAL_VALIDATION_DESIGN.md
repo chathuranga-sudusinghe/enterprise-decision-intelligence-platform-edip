@@ -15,11 +15,12 @@
 
 This document records the redesigned canonical four-fold temporal validation design for Favorita forecasting. It defines the approved windows, the `2017-01-01` modeling-target boundary, expanding training histories, leakage prevention, and limitations that must accompany later model results. It replaces both the earlier eight-fold paired-season design and the superseded four-fold schedule that began on `2016-01-01`.
 
-The fold boundaries remain a research design contract. Execution evidence is recorded separately below: Fold 4 has completed successfully, while the final holdout remains unscored.
+The fold boundaries remain a research design contract. All four canonical Proposed LightGBM folds have completed successfully, while the final holdout remains unscored.
 
 Related authorities:
 
 - [Favorita Dataset Source and Governance](../../governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md);
+- [Favorita Research Hypothesis and Experiment Design](FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md);
 - [Favorita Temporal Validation Contract](FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md);
 - [Favorita Forecasting Evaluation Metric Contract](FAVORITA_FORECASTING_EVALUATION_METRICS.md); and
 - [EDIP Architecture Plan](../../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md).
@@ -51,13 +52,13 @@ The full cleaned Favorita dataset remains unchanged. Its verified source contrac
 
 The new modeling target boundary does not truncate or rewrite the cleaned source. Existing leakage-safe feature engineering is reused unchanged so observations before `2017-01-01` can still supply origin-available historical context for features whose supervised target dates start on `2017-01-01`.
 
-Canonical Fold 4 has been materialized and trained/evaluated successfully. Folds 1 through 3 remain to be materialized and evaluated through the same canonical code. Earlier feasibility artifacts remain historical evidence, not canonical fold artifacts.
+All four canonical Proposed LightGBM folds have been materialized and trained/evaluated successfully (`completed_folds = [1, 2, 3, 4]`). Earlier feasibility artifacts remain historical evidence, not canonical fold artifacts.
 
 ## 4. Validation method
 
 EDIP uses expanding-window backtesting. Training targets begin on `2017-01-01` and the eligible history grows through each fold origin, while each validation window remains 16 calendar days. This preserves temporal order and prevents future-label leakage.
 
-All four folds are canonical. The approved execution shape runs exactly one selected fold per invocation so completed results accumulate safely without exposing the final holdout. Fold 4 is complete; Folds 1 through 3 must be invoked sequentially.
+All four folds are canonical and complete for the Proposed time-aware LightGBM. This four-fold design is the common experimental framework for the SCRUM-18 Basic LightGBM versus Proposed time-aware LightGBM comparison; each comparator must use the same fold boundaries, training scope per fold, horizons, and holdout separation.
 
 ```text
 Fold 1: 2017-01-01 through 2017-02-28 -> 2017-03-01 through 2017-03-16 validation
@@ -137,14 +138,14 @@ Limitations include changing store/item populations, sparse target coverage, inc
 
 The unresolved controls include:
 
-- remaining Fold 1 through 3 materialization, sequential training, and final four-fold metric review;
-- uncertainty reporting and optional sensitivity designs;
-- entity eligibility, cold-start handling, and fixed or dynamic population policy;
-- preprocessing, categorical, nullable-feature, and feature-availability policy;
-- the model-input role of `forecast_horizon`;
-- weighting or sampling for targets represented under multiple origins; and
+- the Basic LightGBM feature schema and boundary between shared contextual information and removed advanced temporal/history features;
+- controlled model configuration and other experimental conditions for a fair feature-information comparison;
+- the predeclared comparison and consistency interpretation;
+- candidate selection from complete four-fold evidence;
+- optional sensitivity or uncertainty analysis;
+- later final-holdout evaluation after promotion criteria and selection decisions are frozen; and
 - compute, temporary storage, durable artifact, and retention budgets.
 
-Separate approval is still required for real-data fold materialization and training execution, model comparison or selection, uncertainty reporting, optional sensitivity designs, final holdout scoring, Kaggle submission, and deployment.
+Separate approval is still required for SCRUM-18 comparator execution and model selection, uncertainty reporting, optional sensitivity designs, final holdout scoring, Kaggle submission, and deployment.
 
 The four approved folds, the `2017-01-01` modeling target start, the `2017-07-30` evaluation end, the 16-day horizon, expanding-window boundary, and protected final holdout are canonical. The canonical artifact and result roots are implemented and protected from historical reuse.
