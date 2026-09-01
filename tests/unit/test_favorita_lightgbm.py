@@ -396,7 +396,7 @@ def test_fixed_training_configuration_is_exposed() -> None:
 
 
 def test_adapter_integrates_with_approved_four_fold_backtester() -> None:
-    examples = [_example(9000, origin=date(2015, 12, 31), horizon=1)]
+    examples = [_example(9000, origin=date(2016, 12, 31), horizon=1)]
     for fold in APPROVED_FOLDS:
         for horizon in FORECAST_HORIZONS:
             examples.append(

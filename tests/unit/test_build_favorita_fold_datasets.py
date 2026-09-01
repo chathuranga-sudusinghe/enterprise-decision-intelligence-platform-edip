@@ -13,6 +13,7 @@ from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
     FORECAST_HORIZONS,
+    MODELING_TARGET_END,
     MODELING_TARGET_START,
     TemporalValidationFold,
     derive_target_window,
@@ -24,9 +25,9 @@ from pipelines.features.favorita_model_ready import (
 )
 
 EXPECTED_ORIGINS = (
-    "2016-06-30",
-    "2016-12-31",
-    "2017-04-30",
+    "2017-02-28",
+    "2017-04-14",
+    "2017-05-31",
     "2017-07-14",
 )
 
@@ -45,6 +46,11 @@ def test_exactly_four_canonical_fold_output_definitions(tmp_path: Path) -> None:
     assert all(path.training.name == "training.parquet" for path in paths)
     assert all(path.validation.name == "validation.parquet" for path in paths)
     assert all(path.manifest.name == "manifest.json" for path in paths)
+    assert APPROVED_FOLDS[-1].validation_end == MODELING_TARGET_END
+    assert all(
+        fold.validation_end < FINAL_HOLDOUT.holdout_start
+        for fold in APPROVED_FOLDS
+    )
 
 
 def test_canonical_subset_is_exactly_folds_1_through_4() -> None:
@@ -68,13 +74,15 @@ def test_all_store_no_item_cap_configuration_is_locked() -> None:
     config = builder.FoldDatasetBuildConfig()
 
     assert builder.ALL_FAVORITA_STORES == tuple(range(1, 55))
-    assert config.output_dir == Path("artifacts/features/favorita_four_fold")
+    assert config.output_dir == Path("artifacts/features/favorita_2017_four_fold")
     assert config.store_batches == tuple((store,) for store in range(1, 55))
     assert config.max_items_per_store is None
 
 
-def test_training_origins_are_daily_and_end_before_fold_origin() -> None:
-    fold = APPROVED_FOLDS[0]
+@pytest.mark.parametrize("fold", APPROVED_FOLDS)
+def test_training_origins_are_daily_and_end_before_fold_origin(
+    fold: TemporalValidationFold,
+) -> None:
     source_start = MODELING_TARGET_START - timedelta(days=35)
 
     origins = builder.derive_training_origins(source_start, fold)
@@ -171,9 +179,11 @@ def test_bounded_fold_build_enforces_temporal_and_artifact_contract(
     assert manifest["experiment_subset"] == [1, 2, 3, 4]
     assert manifest["execution_scope"] == "synthetic_test_fixture"
     assert manifest["canonical_validation_design"] == ("four_fold_expanding_window")
-    assert manifest["modeling_target_start"] == "2016-01-01"
-    assert manifest["training_target_start"] == "2016-01-01"
-    assert manifest["training_target_end"] == "2016-06-30"
+    assert manifest["artifact_root"] == config.output_dir.as_posix()
+    assert manifest["modeling_target_start"] == "2017-01-01"
+    assert manifest["modeling_target_end"] == "2017-07-30"
+    assert manifest["training_target_start"] == "2017-01-01"
+    assert manifest["training_target_end"] == "2017-02-28"
     assert manifest["configured_store_count"] == 1
     assert manifest["observed_store_count"] == 1
     assert manifest["processed_stores"] == [1]
@@ -382,6 +392,9 @@ def test_canonical_fold_allows_configured_stores_without_observed_rows(
     assert manifest["observed_stores"] == [1]
     assert manifest["observed_store_count"] == 1
     assert manifest["store_count"] == 1
+    assert 52 in manifest["configured_stores"]
+    assert 52 in manifest["processed_stores"]
+    assert 52 not in manifest["observed_stores"]
     assert config.source_path.read_bytes() == source_bytes
 
 
@@ -482,18 +495,28 @@ def test_canonical_build_rejects_partial_store_scope(tmp_path: Path) -> None:
         )
 
 
-def test_historical_eight_fold_artifact_root_is_rejected() -> None:
-    with pytest.raises(ValueError, match="historical artifact root"):
-        builder.validate_canonical_fold_output_dir(builder.HISTORICAL_OUTPUT_DIR)
-    with pytest.raises(ValueError, match="historical artifact root"):
-        builder.validate_canonical_fold_output_dir(
-            builder.HISTORICAL_OUTPUT_DIR / "fold_01"
-        )
+@pytest.mark.parametrize("output_dir", builder.INCOMPATIBLE_OUTPUT_DIRS)
+def test_incompatible_historical_artifact_roots_are_rejected(
+    output_dir: Path,
+) -> None:
+    with pytest.raises(ValueError, match="incompatible artifact root"):
+        builder.validate_canonical_fold_output_dir(output_dir)
+    with pytest.raises(ValueError, match="incompatible artifact root"):
+        builder.validate_canonical_fold_output_dir(output_dir / "fold_01")
 
 
+@pytest.mark.parametrize(
+    ("mismatch_key", "mismatch_value"),
+    (
+        ("execution_scope", "mismatched_scope"),
+        ("artifact_root", "artifacts/features/favorita_four_fold"),
+    ),
+)
 def test_manifest_mismatch_fails_closed_without_rewriting(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    mismatch_key: str,
+    mismatch_value: str,
 ) -> None:
     config, fold, paths, training_origins, _ = _bounded_fold_fixture(tmp_path)
     builder.build_one_fold_dataset(
@@ -503,7 +526,7 @@ def test_manifest_mismatch_fails_closed_without_rewriting(
         training_origins=training_origins,
     )
     manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
-    manifest["execution_scope"] = "mismatched_scope"
+    manifest[mismatch_key] = mismatch_value
     paths.manifest.write_text(json.dumps(manifest), encoding="utf-8")
     manifest_before = paths.manifest.read_bytes()
 

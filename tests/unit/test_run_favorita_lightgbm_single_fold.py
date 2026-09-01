@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from threading import Event
+from threading import enumerate as enumerate_threads
 
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
+from pipelines.evaluation import run_favorita_lightgbm_evaluation as evaluation_runner
 from pipelines.evaluation import run_favorita_lightgbm_single_fold as runner
 from pipelines.evaluation.favorita_metrics import FavoritaMetricAccumulator
 from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
+    MODELING_TARGET_END,
     MODELING_TARGET_START,
 )
 from pipelines.features.favorita_model_ready import (
@@ -91,7 +95,9 @@ def _write_existing_fold(root: Path, fold_id: int) -> runner.FoldArtifactPaths:
         "forecast_origin": fold.forecast_origin.isoformat(),
         "validation_start": fold.validation_start.isoformat(),
         "validation_end": fold.validation_end.isoformat(),
+        "artifact_root": root.as_posix(),
         "modeling_target_start": MODELING_TARGET_START.isoformat(),
+        "modeling_target_end": MODELING_TARGET_END.isoformat(),
         "training_target_start": MODELING_TARGET_START.isoformat(),
         "training_target_end": fold.forecast_origin.isoformat(),
         "final_holdout_excluded": True,
@@ -150,6 +156,15 @@ def test_unsupported_fold_selection_is_rejected(fold_id: int) -> None:
         runner._resolve_fold(fold_id)
 
 
+def test_default_namespaces_belong_to_the_2017_redesign() -> None:
+    assert runner.DEFAULT_FOLD_OUTPUT_DIR == Path(
+        "artifacts/features/favorita_2017_four_fold"
+    )
+    assert runner.DEFAULT_OUTPUT_DIR == Path(
+        "artifacts/evaluation/favorita_2017_four_fold_lightgbm"
+    )
+
+
 def test_cli_has_only_required_single_fold_selection() -> None:
     parser = runner._argument_parser()
     option_strings = {
@@ -189,11 +204,13 @@ def test_missing_artifact_fails_without_any_builder_or_model_call(
         ("canonical_fold_count", 8, "canonical_fold_count"),
         ("canonical_contract_enforced", False, "canonical_contract_enforced"),
         ("modeling_target_start", "2015-01-01", "modeling_target_start"),
+        ("modeling_target_end", "2017-06-30", "modeling_target_end"),
+        ("artifact_root", "artifacts/features/favorita_four_fold", "artifact_root"),
         ("training_target_start", "2015-01-01", "training_target_start"),
-        ("training_target_end", "2016-06-29", "training_target_end"),
+        ("training_target_end", "2017-02-27", "training_target_end"),
         ("training_origin_count", 2, "training_origin_count"),
-        ("training_origin_start", "2016-01-01", "training_origin_start"),
-        ("training_origin_end", "2016-06-27", "training_origin_end"),
+        ("training_origin_start", "2016-12-30", "training_origin_start"),
+        ("training_origin_end", "2017-02-26", "training_origin_end"),
         ("canonical_fold_id", 3, "canonical_fold_id"),
         ("canonical_validation_design", "other", "canonical_validation_design"),
         ("execution_scope", "other", "execution_scope"),
@@ -260,14 +277,35 @@ def test_observed_store_manifest_evidence_fails_closed(
         runner.validate_existing_fold(_config(tmp_path))
 
 
-def test_historical_eight_fold_root_is_rejected_before_artifact_access() -> None:
+@pytest.mark.parametrize(
+    "fold_output_dir",
+    (
+        Path("artifacts/features/favorita_folds"),
+        Path("artifacts/features/favorita_four_fold"),
+        evaluation_runner.EXPERIMENTAL_FEASIBILITY_FOLD_OUTPUT_DIR,
+    ),
+)
+def test_incompatible_fold_roots_are_rejected_before_artifact_access(
+    fold_output_dir: Path,
+) -> None:
     config = runner.SingleFoldEvaluationConfig(
         fold_id=1,
-        fold_output_dir=Path("artifacts/features/favorita_folds"),
-        output_dir=Path("artifacts/evaluation/favorita_lightgbm"),
+        fold_output_dir=fold_output_dir,
+        output_dir=runner.DEFAULT_OUTPUT_DIR,
     )
 
-    with pytest.raises(ValueError, match="historical artifact root"):
+    with pytest.raises(ValueError, match="artifact root|feasibility artifact root"):
+        runner.validate_existing_fold(config)
+
+
+def test_historical_result_root_is_rejected_before_artifact_access() -> None:
+    config = runner.SingleFoldEvaluationConfig(
+        fold_id=1,
+        fold_output_dir=runner.DEFAULT_FOLD_OUTPUT_DIR,
+        output_dir=evaluation_runner.HISTORICAL_EVALUATION_OUTPUT_DIR,
+    )
+
+    with pytest.raises(ValueError, match="historical result root"):
         runner.validate_existing_fold(config)
 
 
@@ -304,6 +342,7 @@ def test_markdown_rejects_any_canonical_holdout_scoring_claim() -> None:
 def test_success_uses_parquet_fit_batched_guards_and_metric_accumulator(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     artifact_paths = _write_existing_fold(tmp_path / "folds", 1)
     _install_fake_adapter(monkeypatch, value=2.0)
@@ -351,6 +390,49 @@ def test_success_uses_parquet_fit_batched_guards_and_metric_accumulator(
         runner.EXPERIMENT_RESULTS_FILENAME,
         runner.MARKDOWN_SUMMARY_FILENAME,
     }
+    output = capsys.readouterr().out
+    assert "[Fold 1/4] artifact validation started" in output
+    assert "[Fold 1/4] artifact validation complete" in output
+    assert f"training rows: {record['training_rows']:,}" in output
+    assert f"validation rows: {record['validation_rows']:,}" in output
+    assert f"training Parquet: {artifact_paths.training.as_posix()}" in output
+    assert "[Fold 1/4] LightGBM fit started" in output
+    assert "[Fold 1/4] LightGBM fit complete" in output
+    assert "validation prediction and evaluation started" in output
+    assert "validation progress:" in output
+    assert "metric aggregation complete:" in output
+    assert "result publication complete" in output
+    assert "total runtime:" in output
+
+
+def test_fit_heartbeat_stops_cleanly_when_fit_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    training_path = tmp_path / "training.parquet"
+
+    class FailingAdapter:
+        fit_calls = 0
+
+        def fit_parquet(self, path: Path) -> None:
+            assert path == training_path
+            self.fit_calls += 1
+            Event().wait(0.02)
+            raise RuntimeError("training failed")
+
+    adapter = FailingAdapter()
+    monkeypatch.setattr(runner, "FIT_HEARTBEAT_INTERVAL_SECONDS", 0.001)
+
+    with pytest.raises(RuntimeError, match="training failed"):
+        runner._fit_with_heartbeat(adapter, training_path, fold_id=1)
+
+    assert adapter.fit_calls == 1
+    assert "[Fold 1/4] LightGBM fit active" in capsys.readouterr().out
+    assert all(
+        thread.name != "favorita-fold-1-fit-heartbeat"
+        for thread in enumerate_threads()
+    )
 
 
 def test_separate_invocations_preserve_prior_fold_and_rerun_replaces_result(
@@ -384,18 +466,56 @@ def test_separate_invocations_preserve_prior_fold_and_rerun_replaces_result(
     )
 
 
+def test_invalid_accumulated_result_fails_before_model_construction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _config(tmp_path)
+    _write_existing_fold(config.fold_output_dir, 1)
+    paths = runner._result_paths(config.output_dir)
+    paths.experiment_results.parent.mkdir(parents=True)
+    existing = runner._merge_fold_result(
+        runner._empty_results(),
+        fold=_fold(4),
+        runtime_seconds=1.0,
+        training_rows=10,
+        validation_rows=10,
+        metrics={name: 0.0 for name in runner.METRIC_NAMES},
+    )
+    existing["folds"]["4"]["validation_end"] = "2017-07-31"
+    paths.experiment_results.write_text(json.dumps(existing), encoding="utf-8")
+    constructed = False
+
+    class RejectAdapter:
+        def __init__(self) -> None:
+            nonlocal constructed
+            constructed = True
+
+    monkeypatch.setattr(runner, "FavoritaLightGBMAdapter", RejectAdapter)
+
+    with pytest.raises(ValueError, match="validation_end"):
+        runner.run_single_fold(config)
+
+    assert constructed is False
+
+
 def test_failed_fold_preserves_existing_json_and_markdown(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     _write_existing_fold(tmp_path / "folds", 1)
     _install_fake_adapter(monkeypatch)
     paths = runner.run_single_fold(_config(tmp_path))
     json_before = paths.experiment_results.read_bytes()
     markdown_before = paths.markdown_summary.read_bytes()
+    capsys.readouterr()
 
     class FailingAdapter:
+        fit_calls = 0
+
         def fit_parquet(self, path: Path) -> None:
+            type(self).fit_calls += 1
             raise RuntimeError("training failed")
 
     monkeypatch.setattr(runner, "FavoritaLightGBMAdapter", FailingAdapter)
@@ -403,5 +523,10 @@ def test_failed_fold_preserves_existing_json_and_markdown(
     with pytest.raises(RuntimeError, match="training failed"):
         runner.run_single_fold(_config(tmp_path))
 
+    assert FailingAdapter.fit_calls == 1
     assert paths.experiment_results.read_bytes() == json_before
     assert paths.markdown_summary.read_bytes() == markdown_before
+    output = capsys.readouterr().out
+    assert "LightGBM fit started" in output
+    assert "LightGBM fit complete" not in output
+    assert "result publication" not in output

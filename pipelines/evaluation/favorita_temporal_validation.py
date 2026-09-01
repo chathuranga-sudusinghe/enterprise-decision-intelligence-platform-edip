@@ -13,7 +13,8 @@ from datetime import date, timedelta
 FORECAST_HORIZONS: tuple[int, ...] = tuple(range(1, 17))
 VALIDATION_WINDOW_DAYS = len(FORECAST_HORIZONS)
 EXPECTED_FOLD_COUNT = 4
-MODELING_TARGET_START = date(2016, 1, 1)
+MODELING_TARGET_START = date(2017, 1, 1)
+MODELING_TARGET_END = date(2017, 7, 30)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,9 +56,9 @@ def _fold(fold_id: int, forecast_origin: date) -> TemporalValidationFold:
 
 
 APPROVED_FOLD_ORIGINS: tuple[date, ...] = (
-    date(2016, 6, 30),
-    date(2016, 12, 31),
-    date(2017, 4, 30),
+    date(2017, 2, 28),
+    date(2017, 4, 14),
+    date(2017, 5, 31),
     date(2017, 7, 14),
 )
 
@@ -185,6 +186,8 @@ def validate_approved_contract() -> None:
 
     if tuple(fold.forecast_origin for fold in APPROVED_FOLDS) != APPROVED_FOLD_ORIGINS:
         raise ValueError("Approved folds do not match the canonical origins")
+    if APPROVED_FOLDS[-1].validation_end != MODELING_TARGET_END:
+        raise ValueError("Approved folds must end at the modeling target boundary")
     validate_fold_contract(APPROVED_FOLDS, FINAL_HOLDOUT)
 
 

@@ -1050,7 +1050,7 @@ def build_feature_manifest(
             "pandas": pd.__version__,
             "numpy": np.__version__,
             "pyarrow": pa.__version__,
-            "notebook": "notebooks/favorita/08_build_model_ready_feature_dataset.ipynb",
+            "notebook": "notebooks/favorita/archive/08_build_model_ready_feature_dataset.ipynb",
         },
     }
 
