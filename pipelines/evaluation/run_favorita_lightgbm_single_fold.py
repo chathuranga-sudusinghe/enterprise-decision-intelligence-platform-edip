@@ -46,8 +46,8 @@ from pipelines.features.build_favorita_fold_datasets import (
     DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
 )
 from pipelines.features.favorita_model_ready import (
-    OUTPUT_ARROW_SCHEMA,
-    TRAINING_OUTPUT_COLUMNS,
+    ROW_KEY_TARGET_DIGEST_VERSION,
+    resolve_feature_profile,
     write_json_atomic,
 )
 from pipelines.models.favorita_lightgbm import (
@@ -200,7 +200,10 @@ def _validate_manifest(
     manifest: Mapping[str, Any],
     fold: TemporalValidationFold,
     artifact_root: Path,
+    *,
+    feature_profile: str,
 ) -> tuple[int, int, tuple[int, ...]]:
+    profile = resolve_feature_profile(feature_profile)
     training_origins = canonical_training_origins(fold)
     observed_stores = _manifest_observed_stores(manifest, fold)
     for key in ("store_count", "observed_store_count"):
@@ -235,11 +238,30 @@ def _validate_manifest(
         ("processed_store_count", len(ALL_FAVORITA_STORES)),
         ("configured_stores", list(ALL_FAVORITA_STORES)),
         ("processed_stores", list(ALL_FAVORITA_STORES)),
-        ("ordered_schema", list(TRAINING_OUTPUT_COLUMNS)),
+        ("feature_profile", profile.name),
+        ("feature_profile_version", profile.version),
+        ("model_feature_columns", list(profile.model_feature_columns)),
+        ("ordered_schema", list(profile.output_columns)),
     )
     for key, value in expected:
         if manifest.get(key) != value:
             raise ValueError(f"Fold {fold.fold_id} manifest {key} must equal {value!r}")
+    for partition in ("training", "validation"):
+        if manifest.get(
+            f"{partition}_row_key_target_digest_version"
+        ) != ROW_KEY_TARGET_DIGEST_VERSION:
+            raise ValueError(
+                f"Fold {fold.fold_id} manifest {partition} digest version is invalid"
+            )
+        digest = manifest.get(f"{partition}_row_key_target_sha256")
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+        ):
+            raise ValueError(
+                f"Fold {fold.fold_id} manifest {partition} digest is invalid"
+            )
     if manifest.get("final_holdout_excluded") is not True:
         raise ValueError(
             f"Fold {fold.fold_id} manifest final_holdout_excluded must equal True"
@@ -265,14 +287,16 @@ def _validate_parquet_footer(
     partition: str,
     expected_rows: int,
     fold: TemporalValidationFold,
+    feature_profile: str,
 ) -> None:
+    profile = resolve_feature_profile(feature_profile)
     parquet_file = pq.ParquetFile(path)
     try:
-        if not parquet_file.schema_arrow.equals(OUTPUT_ARROW_SCHEMA):
+        if not parquet_file.schema_arrow.equals(profile.arrow_schema):
             raise ValueError(
                 f"{partition} Parquet must match the ordered model-ready schema"
             )
-        if tuple(parquet_file.schema_arrow.names) != TRAINING_OUTPUT_COLUMNS:
+        if tuple(parquet_file.schema_arrow.names) != profile.output_columns:
             raise ValueError(
                 f"{partition} Parquet must match the ordered training columns"
             )
@@ -367,6 +391,15 @@ def validate_existing_fold(
         raise ValueError("validation_batch_size must be positive")
     validate_evaluation_fold_output_dir(config.fold_output_dir)
     validate_evaluation_result_output_dir(config.output_dir)
+    profile = resolve_feature_profile(config.feature_contract)
+    if config.fold_output_dir in tuple(
+        item.canonical_artifact_root
+        for item in (
+            resolve_feature_profile("contextual"),
+            resolve_feature_profile("time-aware"),
+        )
+    ) and config.fold_output_dir != profile.canonical_artifact_root:
+        raise ValueError("Feature contract and canonical fold artifact root differ")
     fold = _resolve_fold(config.fold_id)
     paths = _fold_artifact_paths(fold.fold_id, config.fold_output_dir)
     _require_existing_artifacts(paths)
@@ -375,18 +408,21 @@ def validate_existing_fold(
         manifest,
         fold,
         config.fold_output_dir,
+        feature_profile=profile.name,
     )
     _validate_parquet_footer(
         paths.training,
         partition="Training",
         expected_rows=training_rows,
         fold=fold,
+        feature_profile=profile.name,
     )
     _validate_parquet_footer(
         paths.validation,
         partition="Validation",
         expected_rows=validation_rows,
         fold=fold,
+        feature_profile=profile.name,
     )
     parquet_observed_stores = _parquet_store_set(paths.training) | _parquet_store_set(
         paths.validation
@@ -732,10 +768,16 @@ def run_single_fold(
     validation_batch_count = 0
     for frame in iter_model_ready_validation_batches(
         validated.paths.validation,
+        feature_profile=config.feature_contract,
         batch_size=config.validation_batch_size,
     ):
         validation_batch_count += 1
-        _validate_validation_batch(validated.fold, frame, key_tracker)
+        _validate_validation_batch(
+            validated.fold,
+            frame,
+            key_tracker,
+            feature_profile=config.feature_contract,
+        )
         predictions = np.asarray(model.predict_frame(frame), dtype="float64")
         if predictions.ndim != 1 or len(predictions) != len(frame):
             raise ValueError(
@@ -822,6 +864,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         SingleFoldEvaluationConfig(
             fold_id=args.fold,
             feature_contract=args.feature_contract,
+            fold_output_dir=resolve_feature_profile(
+                args.feature_contract
+            ).canonical_artifact_root,
             output_dir=FEATURE_CONTRACT_OUTPUT_DIRS[args.feature_contract],
         )
     )

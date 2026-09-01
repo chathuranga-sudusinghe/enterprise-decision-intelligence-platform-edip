@@ -23,20 +23,26 @@ from pipelines.evaluation.favorita_temporal_validation import (
     validate_approved_contract,
 )
 from pipelines.features.favorita_model_ready import (
-    OUTPUT_ARROW_SCHEMA,
-    TRAINING_OUTPUT_COLUMNS,
+    FEATURE_PROFILES,
     FeatureBuildConfig,
     materialize_feature_dataset,
+    resolve_feature_profile,
+    source_footer,
+    validate_feature_artifact,
     write_json_atomic,
 )
 
 DEFAULT_SOURCE_PATH = Path(
     "data/processed/favorita_cleaned/favorita_cleaned.parquet"
 )
-DEFAULT_OUTPUT_DIR = Path("artifacts/features/favorita_2017_four_fold")
+CONTEXTUAL_OUTPUT_DIR = FEATURE_PROFILES["contextual"].canonical_artifact_root
+TIME_AWARE_OUTPUT_DIR = FEATURE_PROFILES["time-aware"].canonical_artifact_root
+DEFAULT_OUTPUT_DIR = TIME_AWARE_OUTPUT_DIR
+OLD_SHARED_OUTPUT_DIR = Path("artifacts/features/favorita_2017_four_fold")
 SUPERSEDED_FOUR_FOLD_OUTPUT_DIR = Path("artifacts/features/favorita_four_fold")
 HISTORICAL_OUTPUT_DIR = Path("artifacts/features/favorita_folds")
 INCOMPATIBLE_OUTPUT_DIRS: tuple[Path, ...] = (
+    OLD_SHARED_OUTPUT_DIR,
     SUPERSEDED_FOUR_FOLD_OUTPUT_DIR,
     HISTORICAL_OUTPUT_DIR,
 )
@@ -57,6 +63,7 @@ COMPUTE_CONSTRAINT_REASON = (
 class FoldDatasetBuildConfig:
     """Inputs for the approved fold-wise model-ready artifact build."""
 
+    feature_profile: str
     source_path: Path = DEFAULT_SOURCE_PATH
     output_dir: Path = DEFAULT_OUTPUT_DIR
     store_batches: tuple[tuple[int, ...], ...] = ALL_STORE_BATCHES
@@ -194,7 +201,20 @@ def canonical_training_origins(
 
 
 def _require_canonical_build_config(config: FoldDatasetBuildConfig) -> None:
+    profile = resolve_feature_profile(config.feature_profile)
     validate_canonical_fold_output_dir(config.output_dir)
+    known_roots = tuple(
+        item.canonical_artifact_root for item in FEATURE_PROFILES.values()
+    )
+    if (
+        config.canonical_contract
+        and config.output_dir in known_roots
+        and config.output_dir != profile.canonical_artifact_root
+    ):
+        raise ValueError(
+            f"Feature profile {profile.name!r} requires canonical artifact root "
+            f"{profile.canonical_artifact_root.as_posix()}"
+        )
     if not config.canonical_contract:
         return
     if _configured_stores(config) != ALL_FAVORITA_STORES:
@@ -236,12 +256,15 @@ def _entity_sets(path: Path) -> tuple[set[int], set[int]]:
     return stores, items
 
 
-def _artifact_footer_validation(path: Path) -> dict[str, Any]:
+def _artifact_footer_validation(
+    path: Path, *, feature_profile: str
+) -> dict[str, Any]:
     """Validate reusable artifact structure from Parquet footer metadata only."""
 
+    profile = resolve_feature_profile(feature_profile)
     parquet_file = pq.ParquetFile(path)
     try:
-        if not parquet_file.schema_arrow.equals(OUTPUT_ARROW_SCHEMA):
+        if not parquet_file.schema_arrow.equals(profile.arrow_schema):
             raise AssertionError("Output Arrow schema differs from declared contract")
         if parquet_file.metadata.num_rows <= 0:
             raise AssertionError("Feature artifact contains no rows")
@@ -296,13 +319,16 @@ def _existing_artifact_result(
     path: Path,
     *,
     processed_stores: Sequence[int],
+    feature_profile: str,
 ) -> dict[str, Any] | None:
     if not path.exists():
         return None
     return {
         "creation_status": "reused",
         "processed_stores": list(processed_stores),
-        "artifact_validation": _artifact_footer_validation(path),
+        "artifact_validation": validate_feature_artifact(
+            path, feature_profile=feature_profile, bounded_memory=True
+        ),
     }
 
 
@@ -377,7 +403,19 @@ def _manifest_matches_reusable_fold(
             ),
             manifest.get("final_holdout_excluded") is True,
             manifest.get("future_actual_leakage") is False,
-            manifest.get("ordered_schema") == list(TRAINING_OUTPUT_COLUMNS),
+            manifest.get("feature_profile") == config.feature_profile,
+            manifest.get("feature_profile_version")
+            == resolve_feature_profile(config.feature_profile).version,
+            manifest.get("ordered_schema")
+            == list(resolve_feature_profile(config.feature_profile).output_columns),
+            manifest.get("model_feature_columns")
+            == list(
+                resolve_feature_profile(config.feature_profile).model_feature_columns
+            ),
+            manifest.get("training_row_key_target_sha256")
+            == training_validation["row_key_target_sha256"],
+            manifest.get("validation_row_key_target_sha256")
+            == validation_validation["row_key_target_sha256"],
         )
     )
 
@@ -430,7 +468,15 @@ def fold_manifest_payload(
 ) -> dict[str, Any]:
     """Return the shared canonical fold-manifest structure."""
 
+    profile = resolve_feature_profile(config.feature_profile)
+    source_metadata = source_footer(config.source_path)
     return {
+        "feature_profile": profile.name,
+        "feature_profile_version": profile.version,
+        "model_feature_columns": list(profile.model_feature_columns),
+        "historical_feature_groups_enabled": (
+            profile.historical_feature_groups_enabled
+        ),
         "fold_id": fold.fold_id,
         "canonical_fold_id": fold.fold_id,
         "canonical_fold_count": len(APPROVED_FOLDS),
@@ -451,6 +497,10 @@ def fold_manifest_payload(
         "training_target_end": training_validation["forecast_date_max"],
         "training_row_count": training_validation["rows"],
         "validation_row_count": validation_validation["rows"],
+        "training_store_cardinality": training_validation["store_cardinality"],
+        "training_item_cardinality": training_validation["item_cardinality"],
+        "validation_store_cardinality": validation_validation["store_cardinality"],
+        "validation_item_cardinality": validation_validation["item_cardinality"],
         "store_count": len(observed_stores),
         "configured_store_count": len(configured_stores),
         "observed_store_count": len(observed_stores),
@@ -462,15 +512,40 @@ def fold_manifest_payload(
         "horizons": list(FORECAST_HORIZONS),
         "max_items_per_store": config.max_items_per_store,
         "source_path": config.source_path.as_posix(),
+        "source_identity": source_metadata,
         "source_not_mutated": True,
         "final_holdout_excluded": True,
-        "ordered_schema": list(TRAINING_OUTPUT_COLUMNS),
+        "ordered_schema": list(profile.output_columns),
+        "arrow_schema": [
+            {
+                "name": field.name,
+                "type": str(field.type),
+                "nullable": field.nullable,
+            }
+            for field in profile.arrow_schema
+        ],
+        "training_row_key_target_digest_version": training_validation[
+            "row_key_target_digest_version"
+        ],
+        "training_row_key_target_sha256": training_validation[
+            "row_key_target_sha256"
+        ],
+        "validation_row_key_target_digest_version": validation_validation[
+            "row_key_target_digest_version"
+        ],
+        "validation_row_key_target_sha256": validation_validation[
+            "row_key_target_sha256"
+        ],
         "training_origin_count": len(training_origins),
         "training_origin_start": min(training_origins).isoformat(),
         "training_origin_end": max(training_origins).isoformat(),
         "direct_horizon_aware": True,
         "recursive_feedback": False,
         "future_actual_leakage": False,
+        "leakage_safe_cutoff_policy": "historical features use values at or before forecast_origin",
+        "future_known_promotion_assumption_enabled": False,
+        "future_known_holiday_assumption_enabled": False,
+        "imputation_performed": False,
         "sparse_observed_rows_only": True,
         "negative_and_fractional_unit_sales_preserved": True,
         "configured_stores": list(configured_stores),
@@ -478,6 +553,60 @@ def fold_manifest_payload(
             "training": paths.training.as_posix(),
             "validation": paths.validation.as_posix(),
         },
+    }
+
+
+def _record_cross_arm_equivalence(
+    manifest: dict[str, Any], *, fold_id: int, feature_profile: str
+) -> None:
+    counterpart_name = (
+        "time-aware" if feature_profile == "contextual" else "contextual"
+    )
+    counterpart_profile = resolve_feature_profile(counterpart_name)
+    counterpart_path = (
+        counterpart_profile.canonical_artifact_root
+        / f"fold_{fold_id:02d}"
+        / "manifest.json"
+    )
+    if not counterpart_path.is_file():
+        manifest["cross_arm_row_equivalence"] = {
+            "status": "pending-counterpart",
+            "counterpart_feature_profile": counterpart_name,
+        }
+        return
+    counterpart = _load_manifest(counterpart_path)
+    if counterpart is None:
+        raise ValueError(f"Counterpart manifest is invalid: {counterpart_path}")
+    compared_fields = (
+        "forecast_origin",
+        "validation_start",
+        "validation_end",
+        "training_row_count",
+        "validation_row_count",
+        "training_row_key_target_digest_version",
+        "training_row_key_target_sha256",
+        "validation_row_key_target_digest_version",
+        "validation_row_key_target_sha256",
+        "training_store_cardinality",
+        "training_item_cardinality",
+        "validation_store_cardinality",
+        "validation_item_cardinality",
+    )
+    mismatched = [
+        field
+        for field in compared_fields
+        if manifest.get(field) != counterpart.get(field)
+    ]
+    if mismatched:
+        raise ValueError(
+            f"Fold {fold_id} cross-arm row equivalence failed: "
+            + ", ".join(mismatched)
+        )
+    manifest["cross_arm_row_equivalence"] = {
+        "status": "verified",
+        "counterpart_feature_profile": counterpart_name,
+        "counterpart_manifest": counterpart_path.as_posix(),
+        "compared_fields": list(compared_fields),
     }
 
 
@@ -494,6 +623,7 @@ def _partition_config(
         manifest_path=manifest_path,
         forecast_origins=origins,
         store_batches=config.store_batches,
+        feature_profile=config.feature_profile,
         max_items_per_store=config.max_items_per_store,
         allow_assumed_future_promotion=False,
         allow_assumed_future_holidays=False,
@@ -562,6 +692,7 @@ def build_one_fold_dataset(
             return _existing_artifact_result(
                 path,
                 processed_stores=reuse_processed_stores,
+                feature_profile=config.feature_profile,
             )
         except (OSError, ValueError, AssertionError) as error:
             if not config.overwrite:
@@ -725,6 +856,11 @@ def build_one_fold_dataset(
         validation_validation=validation_validation,
         processed_store_evidence="materializer_processed_stores",
     )
+    _record_cross_arm_equivalence(
+        manifest,
+        fold_id=fold.fold_id,
+        feature_profile=config.feature_profile,
+    )
     write_json_atomic(
         manifest,
         paths.manifest,
@@ -789,7 +925,11 @@ def _argument_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument("--source-path", type=Path, default=DEFAULT_SOURCE_PATH)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--feature-profile",
+        required=True,
+        choices=tuple(FEATURE_PROFILES),
+    )
     parser.add_argument(
         "--folds",
         nargs="+",
@@ -805,8 +945,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _argument_parser().parse_args(argv)
     build_approved_fold_datasets(
         FoldDatasetBuildConfig(
+            feature_profile=args.feature_profile,
             source_path=args.source_path,
-            output_dir=args.output_dir,
+            output_dir=FEATURE_PROFILES[
+                args.feature_profile
+            ].canonical_artifact_root,
             overwrite=args.overwrite,
         ),
         fold_ids=args.folds,

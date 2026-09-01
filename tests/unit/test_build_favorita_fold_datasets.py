@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 
@@ -59,7 +60,9 @@ def test_canonical_subset_is_exactly_folds_1_through_4() -> None:
     assert len(APPROVED_FOLDS) == 4
     assert builder.CANONICAL_FOLD_IDS == (1, 2, 3, 4)
     assert tuple(fold.fold_id for fold in selected) == (1, 2, 3, 4)
-    args = builder._argument_parser().parse_args(["--folds", "1", "2", "3", "4"])
+    args = builder._argument_parser().parse_args([
+        "--feature-profile", "time-aware", "--folds", "1", "2", "3", "4"
+    ])
     assert args.folds == [1, 2, 3, 4]
 
 
@@ -71,10 +74,12 @@ def test_invalid_or_duplicate_fold_ids_are_rejected() -> None:
 
 
 def test_all_store_no_item_cap_configuration_is_locked() -> None:
-    config = builder.FoldDatasetBuildConfig()
+    config = builder.FoldDatasetBuildConfig(feature_profile="time-aware")
 
     assert builder.ALL_FAVORITA_STORES == tuple(range(1, 55))
-    assert config.output_dir == Path("artifacts/features/favorita_2017_four_fold")
+    assert config.output_dir == Path(
+        "artifacts/features/favorita_2017_four_fold_time_aware"
+    )
     assert config.store_batches == tuple((store,) for store in range(1, 55))
     assert config.max_items_per_store is None
 
@@ -119,6 +124,7 @@ def _bounded_fold_fixture(tmp_path: Path) -> tuple[
         validation_end=validation_end,
     )
     config = builder.FoldDatasetBuildConfig(
+        feature_profile="time-aware",
         source_path=source_path,
         output_dir=tmp_path / "folds",
         store_batches=((1,),),
@@ -205,6 +211,7 @@ def test_bounded_fold_build_enforces_temporal_and_artifact_contract(
 def test_build_rejects_item_cap(tmp_path: Path) -> None:
     config, fold, paths, training_origins, _ = _bounded_fold_fixture(tmp_path)
     capped = builder.FoldDatasetBuildConfig(
+        feature_profile="time-aware",
         source_path=config.source_path,
         output_dir=config.output_dir,
         store_batches=config.store_batches,
@@ -229,6 +236,7 @@ def test_orchestration_completes_one_fold_before_next(
     source_path = tmp_path / "source.parquet"
     source_path.write_bytes(b"fixture")
     config = builder.FoldDatasetBuildConfig(
+        feature_profile="time-aware",
         source_path=source_path,
         output_dir=tmp_path / "folds",
     )
@@ -329,6 +337,7 @@ def test_sparse_zero_row_store_is_allowed_without_synthetic_rows(
         tmp_path
     )
     config = builder.FoldDatasetBuildConfig(
+        feature_profile="time-aware",
         source_path=base_config.source_path,
         output_dir=base_config.output_dir,
         store_batches=((1,), (2,)),
@@ -374,6 +383,7 @@ def test_canonical_fold_allows_configured_stores_without_observed_rows(
 ) -> None:
     base_config, fold, paths, _, source_bytes = _bounded_fold_fixture(tmp_path)
     config = builder.FoldDatasetBuildConfig(
+        feature_profile="time-aware",
         source_path=base_config.source_path,
         output_dir=base_config.output_dir,
     )
@@ -404,6 +414,7 @@ def test_skipped_configured_store_fails(
 ) -> None:
     base_config, fold, paths, training_origins, _ = _bounded_fold_fixture(tmp_path)
     config = builder.FoldDatasetBuildConfig(
+        feature_profile="time-aware",
         source_path=base_config.source_path,
         output_dir=base_config.output_dir,
         store_batches=((1,), (2,)),
@@ -456,6 +467,7 @@ def test_canonical_build_rejects_incomplete_or_non_daily_origins(
 ) -> None:
     base_config, fold, paths, _, _ = _bounded_fold_fixture(tmp_path)
     config = builder.FoldDatasetBuildConfig(
+        feature_profile="time-aware",
         source_path=base_config.source_path,
         output_dir=base_config.output_dir,
     )
@@ -481,6 +493,7 @@ def test_canonical_build_rejects_incomplete_or_non_daily_origins(
 def test_canonical_build_rejects_partial_store_scope(tmp_path: Path) -> None:
     config, fold, paths, _, _ = _bounded_fold_fixture(tmp_path)
     canonical_config = builder.FoldDatasetBuildConfig(
+        feature_profile="time-aware",
         source_path=config.source_path,
         output_dir=config.output_dir,
         store_batches=((1,),),
@@ -544,3 +557,61 @@ def test_manifest_mismatch_fails_closed_without_rewriting(
         )
 
     assert paths.manifest.read_bytes() == manifest_before
+
+
+def test_profile_root_contract_rejects_wrong_approved_root() -> None:
+    config = builder.FoldDatasetBuildConfig(
+        feature_profile="contextual",
+        output_dir=builder.TIME_AWARE_OUTPUT_DIR,
+    )
+    with pytest.raises(ValueError, match="requires canonical artifact root"):
+        builder._require_canonical_build_config(config)
+
+
+def test_bounded_dual_profile_folds_have_identical_row_digests(
+    tmp_path: Path,
+) -> None:
+    time_config, fold, _, training_origins, _ = _bounded_fold_fixture(tmp_path)
+    time_config = replace(
+        time_config,
+        output_dir=tmp_path / "time-aware",
+        feature_profile="time-aware",
+    )
+    contextual_config = replace(
+        time_config,
+        output_dir=tmp_path / "contextual",
+        feature_profile="contextual",
+    )
+    time_paths = builder.approved_fold_artifact_paths(time_config.output_dir)[0]
+    contextual_paths = builder.approved_fold_artifact_paths(
+        contextual_config.output_dir
+    )[0]
+    time_manifest = builder.build_one_fold_dataset(
+        time_config,
+        fold,
+        time_paths,
+        training_origins=training_origins,
+    )
+    contextual_manifest = builder.build_one_fold_dataset(
+        contextual_config,
+        fold,
+        contextual_paths,
+        training_origins=training_origins,
+    )
+    assert time_manifest["feature_profile"] == "time-aware"
+    assert contextual_manifest["feature_profile"] == "contextual"
+    assert len(time_manifest["ordered_schema"]) == 43
+    assert len(contextual_manifest["ordered_schema"]) == 25
+    for field in (
+        "training_row_count",
+        "validation_row_count",
+        "training_row_key_target_sha256",
+        "validation_row_key_target_sha256",
+        "training_store_cardinality",
+        "training_item_cardinality",
+        "validation_store_cardinality",
+        "validation_item_cardinality",
+    ):
+        assert contextual_manifest[field] == time_manifest[field]
+    assert contextual_manifest["historical_feature_groups_enabled"] is False
+    assert time_manifest["historical_feature_groups_enabled"] is True

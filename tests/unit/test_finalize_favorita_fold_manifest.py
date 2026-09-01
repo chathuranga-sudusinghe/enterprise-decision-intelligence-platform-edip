@@ -44,6 +44,7 @@ def _existing_parquet_fixture(
     output_dir = tmp_path / "favorita_2017_four_fold"
     paths = builder.approved_fold_artifact_paths(output_dir)[0]
     config = builder.FoldDatasetBuildConfig(
+        feature_profile="time-aware",
         source_path=source_path,
         output_dir=output_dir,
         store_batches=((1,),),

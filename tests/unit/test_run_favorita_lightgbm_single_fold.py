@@ -103,9 +103,26 @@ def _write_existing_fold(root: Path, fold_id: int) -> runner.FoldArtifactPaths:
         "final_holdout_excluded": True,
         "future_actual_leakage": False,
         "max_items_per_store": None,
-        "ordered_schema": list(TRAINING_OUTPUT_COLUMNS),
+        "feature_profile": "time-aware",
+        "feature_profile_version": runner.resolve_feature_profile(
+            "time-aware"
+        ).version,
+        "model_feature_columns": list(
+            runner.resolve_feature_profile("time-aware").model_feature_columns
+        ),
+        "ordered_schema": list(
+            runner.resolve_feature_profile("time-aware").output_columns
+        ),
         "training_row_count": len(training),
         "validation_row_count": len(validation),
+        "training_row_key_target_digest_version": (
+            runner.ROW_KEY_TARGET_DIGEST_VERSION
+        ),
+        "training_row_key_target_sha256": "a" * 64,
+        "validation_row_key_target_digest_version": (
+            runner.ROW_KEY_TARGET_DIGEST_VERSION
+        ),
+        "validation_row_key_target_sha256": "b" * 64,
     }
     paths.manifest.write_text(
         json.dumps(manifest, indent=2),
@@ -167,7 +184,7 @@ def test_unsupported_fold_selection_is_rejected(fold_id: int) -> None:
 
 def test_default_namespaces_belong_to_the_2017_redesign() -> None:
     assert runner.DEFAULT_FOLD_OUTPUT_DIR == Path(
-        "artifacts/features/favorita_2017_four_fold"
+        "artifacts/features/favorita_2017_four_fold_time_aware"
     )
     assert runner.CONTEXTUAL_OUTPUT_DIR == Path(
         "artifacts/evaluation/favorita_2017_four_fold_lightgbm_contextual"
@@ -558,3 +575,22 @@ def test_failed_fold_preserves_existing_json_and_markdown(
     assert "LightGBM fit started" in output
     assert "LightGBM fit complete" not in output
     assert "result publication" not in output
+
+
+def test_cli_selects_matching_profile_specific_fold_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[runner.SingleFoldEvaluationConfig] = []
+
+    def fake_run(config: runner.SingleFoldEvaluationConfig):
+        captured.append(config)
+        return runner._result_paths(config.output_dir)
+
+    monkeypatch.setattr(runner, "run_single_fold", fake_run)
+    assert runner.main(
+        ["--feature-contract", "contextual", "--fold", "1"]
+    ) == 0
+    assert captured[0].fold_output_dir == Path(
+        "artifacts/features/favorita_2017_four_fold_contextual"
+    )
+    assert captured[0].output_dir == runner.CONTEXTUAL_OUTPUT_DIR

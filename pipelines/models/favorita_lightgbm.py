@@ -23,60 +23,19 @@ from pipelines.evaluation.favorita_backtesting import (
 )
 from pipelines.evaluation.favorita_temporal_validation import FORECAST_HORIZONS
 from pipelines.features.favorita_model_ready import (
+    CONTEXTUAL_FEATURE_COLUMNS,
+    CONTEXTUAL_FEATURE_PROFILE,
     FORBIDDEN_MODEL_COLUMNS,
     MODEL_FEATURE_COLUMNS,
     PARQUET_ROW_GROUP_SIZE,
     TARGET_COLUMN,
-    TRAINING_OUTPUT_COLUMNS,
+    TIME_AWARE_FEATURE_COLUMNS,
+    TIME_AWARE_FEATURE_PROFILE,
+    resolve_feature_profile,
 )
 
-CONTEXTUAL_FEATURE_CONTRACT = "contextual"
-TIME_AWARE_FEATURE_CONTRACT = "time-aware"
-CONTEXTUAL_FEATURE_COLUMNS: tuple[str, ...] = (
-    "forecast_horizon",
-    "store_nbr",
-    "item_nbr",
-    "family",
-    "class",
-    "perishable",
-    "city",
-    "state",
-    "store_type",
-    "cluster",
-    "onpromotion",
-    "is_holiday",
-    "holiday_type",
-    "holiday_locale",
-    "holiday_transferred",
-    "holiday_event_count",
-    "day_of_week",
-    "day_of_month",
-    "week_of_year",
-    "month",
-    "quarter",
-    "is_weekend",
-)
-TIME_AWARE_FEATURE_COLUMNS: tuple[str, ...] = (
-    *CONTEXTUAL_FEATURE_COLUMNS,
-    "sales_lag_1",
-    "sales_lag_7",
-    "sales_lag_14",
-    "sales_lag_28",
-    "sales_rolling_mean_7",
-    "sales_rolling_mean_14",
-    "sales_rolling_mean_28",
-    "sales_rolling_std_7",
-    "sales_rolling_std_28",
-    "transactions_at_origin",
-    "transactions_mean_7d",
-    "transactions_mean_14d",
-    "transactions_lag_7",
-    "transactions_lag_14",
-    "oil_pct_change_1d",
-    "oil_pct_change_7d",
-    "oil_rolling_change_7d",
-    "oil_rolling_volatility_7d",
-)
+CONTEXTUAL_FEATURE_CONTRACT = CONTEXTUAL_FEATURE_PROFILE
+TIME_AWARE_FEATURE_CONTRACT = TIME_AWARE_FEATURE_PROFILE
 DEFAULT_FEATURE_COLUMNS = TIME_AWARE_FEATURE_COLUMNS
 FEATURE_CONTRACTS: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
@@ -364,6 +323,9 @@ class FavoritaLightGBMAdapter:
         self._feature_contract_name = feature_contract_name(
             self._candidate_feature_columns
         )
+        self._feature_profile = resolve_feature_profile(
+            self._feature_contract_name
+        )
         self._booster: lgb.Booster | None = None
         self._fitted_feature_columns: tuple[str, ...] = ()
         self._excluded_all_null_features: tuple[str, ...] = ()
@@ -430,9 +392,8 @@ class FavoritaLightGBMAdapter:
                 if pd.api.types.is_bool_dtype(frame[column].dtype):
                     frame[column] = frame[column].astype(float)
 
-    @staticmethod
-    def _validate_model_ready_frame(frame: pd.DataFrame) -> None:
-        if tuple(frame.columns) != TRAINING_OUTPUT_COLUMNS:
+    def _validate_model_ready_frame(self, frame: pd.DataFrame) -> None:
+        if tuple(frame.columns) != self._feature_profile.output_columns:
             raise ValueError(
                 "Model-ready frame must match the ordered training schema"
             )
@@ -548,9 +509,12 @@ class FavoritaLightGBMAdapter:
             raise FileNotFoundError(training_path)
         parquet_file = pq.ParquetFile(training_path)
         try:
-            if tuple(parquet_file.schema_arrow.names) != TRAINING_OUTPUT_COLUMNS:
+            if not parquet_file.schema_arrow.equals(
+                self._feature_profile.arrow_schema
+            ):
                 raise ValueError(
-                    "Parquet must match the ordered training schema"
+                    "Parquet must match the ordered training schema "
+                    f"for profile {self._feature_contract_name}"
                 )
             row_count = parquet_file.metadata.num_rows
             if row_count <= 0:

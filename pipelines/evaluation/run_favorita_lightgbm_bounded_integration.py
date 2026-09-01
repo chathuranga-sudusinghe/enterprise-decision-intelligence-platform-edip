@@ -393,6 +393,7 @@ def run_bounded_integration(
         feature_started = perf_counter()
         training_result = materialize_feature_dataset(
             FeatureBuildConfig(
+                feature_profile="time-aware",
                 source_path=config.source_path,
                 output_path=stage_paths.training,
                 manifest_path=stage_dir / "training_feature_manifest.json",
@@ -406,6 +407,7 @@ def run_bounded_integration(
         )
         validation_result = materialize_feature_dataset(
             FeatureBuildConfig(
+                feature_profile="time-aware",
                 source_path=config.source_path,
                 output_path=stage_paths.validation,
                 manifest_path=stage_dir / "validation_feature_manifest.json",

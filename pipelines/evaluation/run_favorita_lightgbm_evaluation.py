@@ -49,13 +49,21 @@ from pipelines.features.build_favorita_fold_datasets import (
     validate_canonical_fold_output_dir,
 )
 from pipelines.features.build_favorita_fold_datasets import (
+    CONTEXTUAL_OUTPUT_DIR as CONTEXTUAL_FOLD_OUTPUT_DIR,
+)
+from pipelines.features.build_favorita_fold_datasets import (
     DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
+)
+from pipelines.features.build_favorita_fold_datasets import (
+    TIME_AWARE_OUTPUT_DIR as TIME_AWARE_FOLD_OUTPUT_DIR,
 )
 from pipelines.features.favorita_model_ready import (
     MODEL_FEATURE_COLUMNS,
-    OUTPUT_ARROW_SCHEMA,
     PARQUET_ROW_GROUP_SIZE,
+    ROW_KEY_TARGET_DIGEST_VERSION,
+    TIME_AWARE_FEATURE_PROFILE,
     TRAINING_OUTPUT_COLUMNS,
+    resolve_feature_profile,
     write_json_atomic,
 )
 from pipelines.models.favorita_lightgbm import (
@@ -227,7 +235,11 @@ def validate_evaluation_config(config: FavoritaEvaluationRunConfig) -> None:
 
     validate_approved_contract()
     resolve_feature_contract(config.feature_contract)
+    profile = resolve_feature_profile(config.feature_contract)
     validate_evaluation_fold_output_dir(config.fold_output_dir)
+    if config.fold_output_dir in (CONTEXTUAL_FOLD_OUTPUT_DIR, TIME_AWARE_FOLD_OUTPUT_DIR):
+        if config.fold_output_dir != profile.canonical_artifact_root:
+            raise ValueError("Feature contract and canonical fold artifact root differ")
     validate_evaluation_result_output_dir(config.output_dir)
     accumulated_results = config.output_dir / ACCUMULATED_RESULTS_FILENAME
     if accumulated_results.exists():
@@ -319,14 +331,16 @@ def load_model_ready_frame(feature_path: Path) -> pd.DataFrame:
 def iter_model_ready_validation_batches(
     feature_path: Path,
     *,
+    feature_profile: str = TIME_AWARE_FEATURE_PROFILE,
     batch_size: int = PARQUET_ROW_GROUP_SIZE,
 ) -> Iterator[pd.DataFrame]:
     """Yield one ordered model-ready validation batch at a time."""
 
     if batch_size <= 0:
         raise ValueError("batch_size must be positive")
+    profile = resolve_feature_profile(feature_profile)
     parquet_file = pq.ParquetFile(feature_path)
-    if tuple(parquet_file.schema_arrow.names) != TRAINING_OUTPUT_COLUMNS:
+    if not parquet_file.schema_arrow.equals(profile.arrow_schema):
         parquet_file.close()
         raise ValueError(
             "Validation Parquet must match the ordered training schema"
@@ -335,10 +349,10 @@ def iter_model_ready_validation_batches(
     try:
         for batch in parquet_file.iter_batches(
             batch_size=batch_size,
-            columns=list(TRAINING_OUTPUT_COLUMNS),
+            columns=list(profile.output_columns),
         ):
             frame = batch.to_pandas()
-            if tuple(frame.columns) != TRAINING_OUTPUT_COLUMNS:
+            if tuple(frame.columns) != profile.output_columns:
                 raise ValueError(
                     "Validation batch must match the ordered training schema"
                 )
@@ -443,8 +457,11 @@ def _validate_validation_batch(
     fold: TemporalValidationFold,
     frame: pd.DataFrame,
     key_tracker: _ValidationKeyTracker,
+    *,
+    feature_profile: str = TIME_AWARE_FEATURE_PROFILE,
 ) -> None:
-    if tuple(frame.columns) != TRAINING_OUTPUT_COLUMNS:
+    profile = resolve_feature_profile(feature_profile)
+    if tuple(frame.columns) != profile.output_columns:
         raise ValueError("Validation batch must match the ordered training schema")
     origins = pd.to_datetime(frame["forecast_origin"])
     forecast_dates = pd.to_datetime(frame["forecast_date"])
@@ -488,8 +505,15 @@ def _stream_fold_validation(
     fold_accumulator = FavoritaMetricAccumulator()
     key_tracker = _ValidationKeyTracker()
     observed_horizons: set[int] = set()
-    for frame in iter_model_ready_validation_batches(validation_path):
-        _validate_validation_batch(fold, frame, key_tracker)
+    for frame in iter_model_ready_validation_batches(
+        validation_path, feature_profile=model.feature_contract_name
+    ):
+        _validate_validation_batch(
+            fold,
+            frame,
+            key_tracker,
+            feature_profile=model.feature_contract_name,
+        )
         predictions = np.asarray(model.predict_frame(frame), dtype="float64")
         if predictions.ndim != 1 or len(predictions) != len(frame):
             raise ValueError(
@@ -887,14 +911,16 @@ def _validate_existing_fold_parquet(
     partition: str,
     expected_rows: int,
     fold: TemporalValidationFold,
+    feature_profile: str,
 ) -> None:
+    profile = resolve_feature_profile(feature_profile)
     parquet_file = pq.ParquetFile(path)
     try:
-        if not parquet_file.schema_arrow.equals(OUTPUT_ARROW_SCHEMA):
+        if not parquet_file.schema_arrow.equals(profile.arrow_schema):
             raise ValueError(
                 f"{partition} Parquet must match the ordered model-ready schema"
             )
-        if tuple(parquet_file.schema_arrow.names) != TRAINING_OUTPUT_COLUMNS:
+        if tuple(parquet_file.schema_arrow.names) != profile.output_columns:
             raise ValueError(
                 f"{partition} Parquet must match the ordered training columns"
             )
@@ -947,10 +973,11 @@ def _validate_existing_fold_parquet(
 
 
 def _read_existing_fold_evidence(
-    output_dir: Path,
+    output_dir: Path, *, feature_profile: str
 ) -> tuple[ExistingFoldArtifactEvidence, ...]:
     """Read and validate all canonical persisted folds without writing artifacts."""
 
+    profile = resolve_feature_profile(feature_profile)
     evidence: list[ExistingFoldArtifactEvidence] = []
     for fold, paths in zip(
         APPROVED_FOLDS, approved_fold_artifact_paths(output_dir), strict=True
@@ -990,7 +1017,10 @@ def _read_existing_fold_evidence(
             "training_target_start": MODELING_TARGET_START.isoformat(),
             "training_target_end": fold.forecast_origin.isoformat(),
             "max_items_per_store": None,
-            "ordered_schema": list(TRAINING_OUTPUT_COLUMNS),
+            "feature_profile": profile.name,
+            "feature_profile_version": profile.version,
+            "model_feature_columns": list(profile.model_feature_columns),
+            "ordered_schema": list(profile.output_columns),
             "final_holdout_excluded": True,
             "future_actual_leakage": False,
         }
@@ -998,6 +1028,24 @@ def _read_existing_fold_evidence(
             if manifest.get(key) != value:
                 raise ValueError(
                     f"Fold {fold.fold_id} manifest {key} must equal {value!r}"
+                )
+        for partition in ("training", "validation"):
+            if manifest.get(
+                f"{partition}_row_key_target_digest_version"
+            ) != ROW_KEY_TARGET_DIGEST_VERSION:
+                raise ValueError(
+                    f"Fold {fold.fold_id} manifest {partition} digest version is invalid"
+                )
+            digest = manifest.get(f"{partition}_row_key_target_sha256")
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(
+                    character not in "0123456789abcdef" for character in digest
+                )
+            ):
+                raise ValueError(
+                    f"Fold {fold.fold_id} manifest {partition} digest is invalid"
                 )
         if fold.validation_end >= FINAL_HOLDOUT.holdout_start:
             raise ValueError("Canonical validation enters the protected final holdout")
@@ -1012,12 +1060,14 @@ def _read_existing_fold_evidence(
             partition="Training",
             expected_rows=training_rows,
             fold=fold,
+            feature_profile=profile.name,
         )
         _validate_existing_fold_parquet(
             paths.validation,
             partition="Validation",
             expected_rows=validation_rows,
             fold=fold,
+            feature_profile=profile.name,
         )
         evidence.append(
             ExistingFoldArtifactEvidence(
@@ -1042,7 +1092,9 @@ def run_evaluation(
     source_state = _source_state(config.source_path)
     started_at = datetime.now(timezone.utc)
 
-    fold_evidence = _read_existing_fold_evidence(config.fold_output_dir)
+    fold_evidence = _read_existing_fold_evidence(
+        config.fold_output_dir, feature_profile=config.feature_contract
+    )
     if len(fold_evidence) != len(APPROVED_FOLDS):
         raise ValueError("Evaluation requires exactly 4 validated persisted folds")
 
@@ -1148,11 +1200,6 @@ def _argument_parser() -> argparse.ArgumentParser:
         required=True,
         choices=tuple(FEATURE_CONTRACTS),
     )
-    parser.add_argument(
-        "--fold-output-dir",
-        type=Path,
-        default=DEFAULT_FOLD_OUTPUT_DIR,
-    )
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
@@ -1164,7 +1211,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             source_path=args.source_path,
             output_dir=FEATURE_CONTRACT_OUTPUT_DIRS[args.feature_contract],
             feature_contract=args.feature_contract,
-            fold_output_dir=args.fold_output_dir,
+            fold_output_dir=resolve_feature_profile(
+                args.feature_contract
+            ).canonical_artifact_root,
             overwrite=args.overwrite,
         )
     )

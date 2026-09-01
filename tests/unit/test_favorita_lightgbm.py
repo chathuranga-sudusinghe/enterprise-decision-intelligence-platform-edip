@@ -140,8 +140,14 @@ def _model_ready_frame() -> pd.DataFrame:
     )
 
 
-def _write_model_ready_parquet(frame: pd.DataFrame, path: Path) -> None:
-    pq.write_table(to_arrow_table(frame), path, row_group_size=7)
+def _write_model_ready_parquet(
+    frame: pd.DataFrame, path: Path, *, feature_profile: str = "time-aware"
+) -> None:
+    pq.write_table(
+        to_arrow_table(frame, feature_profile=feature_profile),
+        path,
+        row_group_size=7,
+    )
 
 
 def test_parquet_native_fit_and_frame_prediction_avoid_row_objects(
@@ -440,9 +446,17 @@ def test_adapter_accepts_only_each_approved_ordered_contract(
 def test_contextual_parquet_fit_projects_only_contextual_columns(
     tmp_path: Path,
 ) -> None:
-    frame = _model_ready_frame()
+    frame = build_feature_rows_for_origin(
+        _fixture_source_frame()[0],
+        forecast_origin=_fixture_source_frame()[1],
+        allow_assumed_future_promotion=True,
+        allow_assumed_future_holidays=True,
+        feature_profile="contextual",
+    )
     training_path = tmp_path / "training.parquet"
-    _write_model_ready_parquet(frame, training_path)
+    _write_model_ready_parquet(
+        frame, training_path, feature_profile="contextual"
+    )
     adapter = FavoritaLightGBMAdapter(
         feature_columns=CONTEXTUAL_FEATURE_COLUMNS
     )
@@ -473,3 +487,33 @@ def test_feature_contract_rejects_target_and_audit_columns(forbidden: str) -> No
     invalid = (*CONTEXTUAL_FEATURE_COLUMNS[:-1], forbidden)
     with pytest.raises(ValueError, match="forbidden audit/target"):
         FavoritaLightGBMAdapter(feature_columns=invalid)
+
+
+@pytest.mark.parametrize(
+    ("artifact_profile", "feature_columns"),
+    (
+        ("contextual", TIME_AWARE_FEATURE_COLUMNS),
+        ("time-aware", CONTEXTUAL_FEATURE_COLUMNS),
+    ),
+)
+def test_cross_profile_parquet_and_model_contract_mismatch_fails_closed(
+    tmp_path: Path,
+    artifact_profile: str,
+    feature_columns: tuple[str, ...],
+) -> None:
+    source, origin = _fixture_source_frame()
+    frame = build_feature_rows_for_origin(
+        source,
+        forecast_origin=origin,
+        allow_assumed_future_promotion=True,
+        allow_assumed_future_holidays=True,
+        feature_profile=artifact_profile,
+    )
+    path = tmp_path / f"{artifact_profile}.parquet"
+    _write_model_ready_parquet(
+        frame, path, feature_profile=artifact_profile
+    )
+    with pytest.raises(ValueError, match="ordered training schema"):
+        FavoritaLightGBMAdapter(
+            feature_columns=feature_columns
+        ).fit_parquet(path)
