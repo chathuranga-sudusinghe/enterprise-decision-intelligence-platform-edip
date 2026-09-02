@@ -395,6 +395,10 @@ def _install_serial_fakes(
                 runner.ROW_KEY_TARGET_DIGEST_VERSION
             ),
             "validation_row_key_target_sha256": "b" * 64,
+            "cross_arm_row_equivalence": {
+                "status": "verified",
+                "counterpart_feature_profile": "contextual",
+            },
         }
         paths.manifest.write_text(json.dumps(manifest), encoding="utf-8")
 
@@ -591,17 +595,34 @@ def test_runner_processes_four_fold_artifacts_serially(
             rel=1e-14,
             abs=1e-14,
         )
-    fold_metrics = pd.read_csv(paths.fold_metrics)
-    horizon_metrics = pd.read_csv(paths.horizon_metrics)
-    assert tuple(fold_metrics["validation_rows"]) == (16,) * 4
-    assert tuple(horizon_metrics["validation_rows"]) == (4,) * 16
+    fold_metrics = json.loads(paths.fold_metrics.read_text(encoding="utf-8"))
+    horizon_metrics = json.loads(paths.horizon_metrics.read_text(encoding="utf-8"))
+    assert [record["fold_id"] for record in fold_metrics] == [1, 2, 3, 4]
+    assert [record["validation_rows"] for record in fold_metrics] == [16] * 4
+    assert [record["forecast_horizon"] for record in horizon_metrics] == list(
+        FORECAST_HORIZONS
+    )
+    assert [record["row_count"] for record in horizon_metrics] == [4] * 16
+    assert set(fold_metrics[0]) == {
+        "fold_id", "forecast_origin", "validation_start", "validation_end",
+        "validation_rows", *runner._METRIC_NAMES,
+    }
+    assert set(horizon_metrics[0]) == {
+        "forecast_horizon", "row_count", *runner._METRIC_NAMES,
+    }
+    assert not (config.output_dir / "fold_metrics.csv").exists()
+    assert not (config.output_dir / "horizon_metrics.csv").exists()
+    summary = paths.evaluation_summary.read_text(encoding="utf-8")
+    assert "# Favorita LightGBM Evaluation Summary" in summary
+    assert "four-fold expanding-window evaluation" in summary
+    assert "protected final holdout was not materialized or scored" in summary
     for fold_id, group in predictions.groupby("fold_id", sort=True):
         expected_fold = evaluate_favorita_forecasts(
             group["actual_unit_sales"],
             group["prediction"],
             group["perishable"],
         )
-        record = fold_metrics.loc[fold_metrics["fold_id"] == fold_id].iloc[0]
+        record = next(item for item in fold_metrics if item["fold_id"] == fold_id)
         for metric_name in runner._METRIC_NAMES:
             assert record[metric_name] == pytest.approx(
                 getattr(expected_fold, metric_name),
@@ -614,15 +635,63 @@ def test_runner_processes_four_fold_artifacts_serially(
             group["prediction"],
             group["perishable"],
         )
-        record = horizon_metrics.loc[
-            horizon_metrics["forecast_horizon"] == horizon
-        ].iloc[0]
+        record = next(
+            item for item in horizon_metrics
+            if item["forecast_horizon"] == horizon
+        )
         for metric_name in runner._METRIC_NAMES:
             assert record[metric_name] == pytest.approx(
                 getattr(expected_horizon, metric_name),
                 rel=1e-14,
                 abs=1e-14,
             )
+
+
+def test_progress_messages_are_concise(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config = _config(tmp_path)
+    _install_serial_fakes(monkeypatch, config)
+
+    runner.run_evaluation(config)
+
+    output = capsys.readouterr().out
+    for fold_id in range(1, 5):
+        prefix = f"[Fold {fold_id}/4]"
+        assert f"{prefix} validating artifacts..." in output
+        assert f"{prefix} training LightGBM..." in output
+        assert f"{prefix} training completed in " in output
+        assert f"{prefix} evaluating validation rows..." in output
+        assert f"{prefix} evaluation completed in " in output
+        assert f"{prefix} completed" in output
+    assert f"Evaluation completed: {config.output_dir.as_posix()}" in output
+
+
+@pytest.mark.parametrize("status", ("pending-counterpart", "mismatch"))
+def test_unverified_cross_arm_evidence_fails_before_model_construction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+) -> None:
+    config = _config(tmp_path)
+    _, models = _install_serial_fakes(monkeypatch, config)
+    first_manifest = runner.approved_fold_artifact_paths(
+        config.fold_output_dir
+    )[0].manifest
+    payload = json.loads(first_manifest.read_text(encoding="utf-8"))
+    payload["cross_arm_row_equivalence"]["status"] = status
+    first_manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="cross-arm row equivalence must be verified"):
+        runner.run_evaluation(config)
+
+    assert models == []
+    assert not any(
+        path.exists()
+        for path in runner._path_values(runner._artifact_paths(config.output_dir))
+    )
 
 
 def test_output_preflight_runs_before_fold_artifact_read(
@@ -697,19 +766,17 @@ def test_artifact_staging_failure_publishes_no_completed_outputs(
 ) -> None:
     config = _config(tmp_path)
     _install_serial_fakes(monkeypatch, config)
-    write_frame_atomic = runner._write_frame_atomic
+    write_json_list_atomic = runner._write_json_list_atomic
 
     def fail_horizon_write(
-        frame: pd.DataFrame,
+        payload: list[dict[str, object]],
         path: Path,
-        *,
-        overwrite: bool,
     ) -> None:
-        if path.name == "horizon_metrics.csv":
+        if path.name == "horizon_metrics.json":
             raise RuntimeError("staging failed")
-        write_frame_atomic(frame, path, overwrite=overwrite)
+        write_json_list_atomic(payload, path)
 
-    monkeypatch.setattr(runner, "_write_frame_atomic", fail_horizon_write)
+    monkeypatch.setattr(runner, "_write_json_list_atomic", fail_horizon_write)
 
     with pytest.raises(RuntimeError, match="staging failed"):
         runner.run_evaluation(config)

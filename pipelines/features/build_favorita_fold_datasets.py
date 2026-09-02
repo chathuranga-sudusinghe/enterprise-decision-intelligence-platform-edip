@@ -556,18 +556,24 @@ def fold_manifest_payload(
     }
 
 
+def _counterpart_manifest_path(feature_profile: str, fold_id: int) -> Path:
+    counterpart_name = (
+        "time-aware" if feature_profile == "contextual" else "contextual"
+    )
+    return (
+        resolve_feature_profile(counterpart_name).canonical_artifact_root
+        / f"fold_{fold_id:02d}"
+        / "manifest.json"
+    )
+
+
 def _record_cross_arm_equivalence(
     manifest: dict[str, Any], *, fold_id: int, feature_profile: str
 ) -> None:
     counterpart_name = (
         "time-aware" if feature_profile == "contextual" else "contextual"
     )
-    counterpart_profile = resolve_feature_profile(counterpart_name)
-    counterpart_path = (
-        counterpart_profile.canonical_artifact_root
-        / f"fold_{fold_id:02d}"
-        / "manifest.json"
-    )
+    counterpart_path = _counterpart_manifest_path(feature_profile, fold_id)
     if not counterpart_path.is_file():
         manifest["cross_arm_row_equivalence"] = {
             "status": "pending-counterpart",
@@ -742,6 +748,22 @@ def build_one_fold_dataset(
                 training_validation=training_validation,
                 validation_validation=validation_validation,
             ):
+                previous_cross_arm = existing_manifest.get(
+                    "cross_arm_row_equivalence"
+                )
+                _record_cross_arm_equivalence(
+                    existing_manifest,
+                    fold_id=fold.fold_id,
+                    feature_profile=config.feature_profile,
+                )
+                if existing_manifest.get("cross_arm_row_equivalence") != (
+                    previous_cross_arm
+                ):
+                    write_json_atomic(
+                        existing_manifest,
+                        paths.manifest,
+                        overwrite=True,
+                    )
                 if _source_state(config.source_path) != source_before:
                     raise AssertionError(
                         "Cleaned source changed during fold validation"

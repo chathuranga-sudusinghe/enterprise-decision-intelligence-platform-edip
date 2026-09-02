@@ -33,6 +33,24 @@ EXPECTED_ORIGINS = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_counterpart_manifests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    roots = {
+        "contextual": tmp_path / "contextual",
+        "time-aware": tmp_path / "time-aware",
+    }
+
+    def isolated_path(feature_profile: str, fold_id: int) -> Path:
+        counterpart = (
+            "time-aware" if feature_profile == "contextual" else "contextual"
+        )
+        return roots[counterpart] / f"fold_{fold_id:02d}" / "manifest.json"
+
+    monkeypatch.setattr(builder, "_counterpart_manifest_path", isolated_path)
+
+
 def test_exactly_four_canonical_fold_output_definitions(tmp_path: Path) -> None:
     paths = builder.approved_fold_artifact_paths(tmp_path / "folds")
 
@@ -615,3 +633,133 @@ def test_bounded_dual_profile_folds_have_identical_row_digests(
         assert contextual_manifest[field] == time_manifest[field]
     assert contextual_manifest["historical_feature_groups_enabled"] is False
     assert time_manifest["historical_feature_groups_enabled"] is True
+
+
+def _dual_profile_fixture(tmp_path: Path):
+    base_config, fold, _, training_origins, _ = _bounded_fold_fixture(tmp_path)
+    contextual_config = replace(
+        base_config,
+        output_dir=tmp_path / "contextual",
+        feature_profile="contextual",
+    )
+    time_aware_config = replace(
+        base_config,
+        output_dir=tmp_path / "time-aware",
+        feature_profile="time-aware",
+    )
+    contextual_paths = builder.approved_fold_artifact_paths(
+        contextual_config.output_dir
+    )[0]
+    time_aware_paths = builder.approved_fold_artifact_paths(
+        time_aware_config.output_dir
+    )[0]
+    contextual_manifest = builder.build_one_fold_dataset(
+        contextual_config,
+        fold,
+        contextual_paths,
+        training_origins=training_origins,
+    )
+    time_aware_manifest = builder.build_one_fold_dataset(
+        time_aware_config,
+        fold,
+        time_aware_paths,
+        training_origins=training_origins,
+    )
+    return (
+        contextual_config,
+        fold,
+        contextual_paths,
+        time_aware_paths,
+        training_origins,
+        contextual_manifest,
+        time_aware_manifest,
+    )
+
+
+def test_reuse_refreshes_only_pending_cross_arm_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        contextual_config,
+        fold,
+        contextual_paths,
+        _,
+        training_origins,
+        contextual_manifest,
+        time_aware_manifest,
+    ) = _dual_profile_fixture(tmp_path)
+    assert contextual_manifest["cross_arm_row_equivalence"]["status"] == (
+        "pending-counterpart"
+    )
+    assert time_aware_manifest["cross_arm_row_equivalence"]["status"] == "verified"
+    parquet_state = {
+        path: (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in (contextual_paths.training, contextual_paths.validation)
+    }
+
+    def reject_materialization(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("manifest refresh must not materialize features")
+
+    monkeypatch.setattr(
+        builder, "materialize_feature_dataset", reject_materialization
+    )
+    refreshed = builder.build_one_fold_dataset(
+        contextual_config,
+        fold,
+        contextual_paths,
+        training_origins=training_origins,
+    )
+
+    assert refreshed["cross_arm_row_equivalence"]["status"] == "verified"
+    assert json.loads(contextual_paths.manifest.read_text(encoding="utf-8")) == (
+        refreshed
+    )
+    assert {
+        path: (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in (contextual_paths.training, contextual_paths.validation)
+    } == parquet_state
+
+
+def test_reuse_cross_arm_mismatch_fails_without_materialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (
+        contextual_config,
+        fold,
+        contextual_paths,
+        time_aware_paths,
+        training_origins,
+        _,
+        _,
+    ) = _dual_profile_fixture(tmp_path)
+    counterpart = json.loads(time_aware_paths.manifest.read_text(encoding="utf-8"))
+    counterpart["training_row_key_target_sha256"] = "f" * 64
+    time_aware_paths.manifest.write_text(
+        json.dumps(counterpart, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    contextual_manifest_before = contextual_paths.manifest.read_bytes()
+    parquet_state = {
+        path: (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in (contextual_paths.training, contextual_paths.validation)
+    }
+
+    def reject_materialization(*args: object, **kwargs: object) -> dict[str, object]:
+        raise AssertionError("mismatch validation must not materialize features")
+
+    monkeypatch.setattr(
+        builder, "materialize_feature_dataset", reject_materialization
+    )
+    with pytest.raises(ValueError, match="cross-arm row equivalence failed"):
+        builder.build_one_fold_dataset(
+            contextual_config,
+            fold,
+            contextual_paths,
+            training_origins=training_origins,
+        )
+
+    assert contextual_paths.manifest.read_bytes() == contextual_manifest_before
+    assert {
+        path: (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in (contextual_paths.training, contextual_paths.validation)
+    } == parquet_state

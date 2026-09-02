@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 import uuid
 from collections.abc import Iterator, Sequence
 from dataclasses import asdict, dataclass
@@ -163,6 +164,7 @@ class EvaluationArtifactPaths:
     horizon_metrics: Path
     predictions: Path
     run_manifest: Path
+    evaluation_summary: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,10 +196,11 @@ class StreamingEvaluationSummary:
 def _artifact_paths(output_dir: Path) -> EvaluationArtifactPaths:
     return EvaluationArtifactPaths(
         overall_metrics=output_dir / "overall_metrics.json",
-        fold_metrics=output_dir / "fold_metrics.csv",
-        horizon_metrics=output_dir / "horizon_metrics.csv",
+        fold_metrics=output_dir / "fold_metrics.json",
+        horizon_metrics=output_dir / "horizon_metrics.json",
         predictions=output_dir / "predictions.parquet",
         run_manifest=output_dir / "run_manifest.json",
+        evaluation_summary=output_dir / "evaluation_summary.md",
     )
 
 
@@ -670,8 +673,10 @@ def _metrics_record(metrics: ForecastMetricResults) -> dict[str, float]:
     return {name: float(values[name]) for name in _METRIC_NAMES}
 
 
-def _fold_metrics_frame(result: StreamingEvaluationSummary) -> pd.DataFrame:
-    return pd.DataFrame.from_records(
+def _fold_metrics_records(
+    result: StreamingEvaluationSummary,
+) -> list[dict[str, Any]]:
+    return [
         {
             "fold_id": fold.fold_id,
             "forecast_origin": fold.forecast_origin.isoformat(),
@@ -681,18 +686,109 @@ def _fold_metrics_frame(result: StreamingEvaluationSummary) -> pd.DataFrame:
             **_metrics_record(fold.metrics),
         }
         for fold in result.fold_metrics
-    )
+    ]
 
 
-def _horizon_metrics_frame(result: StreamingEvaluationSummary) -> pd.DataFrame:
-    return pd.DataFrame.from_records(
+def _horizon_metrics_records(
+    result: StreamingEvaluationSummary,
+) -> list[dict[str, Any]]:
+    return [
         {
             "forecast_horizon": horizon.forecast_horizon,
-            "validation_rows": horizon.row_count,
+            "row_count": horizon.row_count,
             **_metrics_record(horizon.metrics),
         }
         for horizon in result.horizon_metrics
+    ]
+
+
+def _write_json_list_atomic(payload: list[dict[str, Any]], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        raise FileExistsError(path)
+    temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temp_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        json.loads(temp_path.read_text(encoding="utf-8"))
+        os.replace(temp_path, path)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def _evaluation_summary_markdown(
+    *,
+    config: FavoritaEvaluationRunConfig,
+    result: StreamingEvaluationSummary,
+    started_at: datetime,
+    completed_at: datetime,
+) -> str:
+    lines = [
+        "# Favorita LightGBM Evaluation Summary",
+        "",
+        f"- Experiment: SCRUM-18 {config.feature_contract} LightGBM evaluation",
+        f"- Feature contract: `{config.feature_contract}`",
+        "- Model: `FavoritaLightGBMAdapter`",
+        "- Evaluation: four-fold expanding-window evaluation",
+        f"- Started (UTC): {started_at.isoformat()}",
+        f"- Completed (UTC): {completed_at.isoformat()}",
+        f"- Prediction rows: {result.prediction_row_count}",
+        "- Protected final holdout: unscored",
+        "- Holdout note: the protected final holdout was not materialized or scored.",
+        "",
+        "## Overall metrics",
+        "",
+        "| Metric | Value |",
+        "|---|---:|",
+        *[
+            f"| {name} | {value:.12g} |"
+            for name, value in _metrics_record(result.overall_metrics).items()
+        ],
+        "",
+        "## Per-fold metrics",
+        "",
+        "| Fold | Forecast origin | Validation start | Validation end | Rows | MAE | RMSE | WAPE | Bias | RMSLE | NWRMSLE |",
+        "|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for record in _fold_metrics_records(result):
+        lines.append(
+            "| {fold_id} | {forecast_origin} | {validation_start} | "
+            "{validation_end} | {validation_rows} | {mae:.12g} | {rmse:.12g} | "
+            "{wape:.12g} | {bias:.12g} | {rmsle:.12g} | {nwrmsle:.12g} |".format(
+                **record
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Per-horizon metrics",
+            "",
+            "| Horizon | Rows | MAE | RMSE | WAPE | Bias | RMSLE | NWRMSLE |",
+            "|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
     )
+    for record in _horizon_metrics_records(result):
+        lines.append(
+            "| {forecast_horizon} | {row_count} | {mae:.12g} | {rmse:.12g} | "
+            "{wape:.12g} | {bias:.12g} | {rmsle:.12g} | {nwrmsle:.12g} |".format(
+                **record
+            )
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _write_text_atomic(text: str, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        raise FileExistsError(path)
+    temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temp_path.write_text(text, encoding="utf-8")
+        os.replace(temp_path, path)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def _predictions_frame(result: BacktestResult) -> pd.DataFrame:
@@ -710,9 +806,7 @@ def _write_frame_atomic(
         raise FileExistsError(path)
     temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
-        if path.suffix == ".csv":
-            frame.to_csv(temp_path, index=False)
-        elif path.suffix == ".parquet":
+        if path.suffix == ".parquet":
             frame.to_parquet(temp_path, index=False, compression="zstd")
         else:
             raise ValueError(f"Unsupported dataframe artifact format: {path.suffix}")
@@ -846,6 +940,9 @@ def _publish_completed_artifacts(
     stage_paths: EvaluationArtifactPaths,
     result: StreamingEvaluationSummary,
     manifest: dict[str, Any],
+    config: FavoritaEvaluationRunConfig,
+    started_at: datetime,
+    completed_at: datetime,
 ) -> None:
     """Finish staged summaries, then publish the completed manifest last."""
 
@@ -854,15 +951,22 @@ def _publish_completed_artifacts(
         stage_paths.overall_metrics,
         overwrite=False,
     )
-    _write_frame_atomic(
-        _fold_metrics_frame(result),
+    _write_json_list_atomic(
+        _fold_metrics_records(result),
         stage_paths.fold_metrics,
-        overwrite=False,
     )
-    _write_frame_atomic(
-        _horizon_metrics_frame(result),
+    _write_json_list_atomic(
+        _horizon_metrics_records(result),
         stage_paths.horizon_metrics,
-        overwrite=False,
+    )
+    _write_text_atomic(
+        _evaluation_summary_markdown(
+            config=config,
+            result=result,
+            started_at=started_at,
+            completed_at=completed_at,
+        ),
+        stage_paths.evaluation_summary,
     )
     if not stage_paths.predictions.is_file():
         raise FileNotFoundError(stage_paths.predictions)
@@ -1029,6 +1133,18 @@ def _read_existing_fold_evidence(
                 raise ValueError(
                     f"Fold {fold.fold_id} manifest {key} must equal {value!r}"
                 )
+        cross_arm = manifest.get("cross_arm_row_equivalence")
+        if not isinstance(cross_arm, dict):
+            raise ValueError(
+                f"Fold {fold.fold_id} manifest lacks cross-arm row equivalence evidence"
+            )
+        status = cross_arm.get("status")
+        if status != "verified":
+            raise ValueError(
+                f"Fold {fold.fold_id} cross-arm row equivalence must be verified; "
+                f"found {status!r}"
+            )
+
         for partition in ("training", "validation"):
             if manifest.get(
                 f"{partition}_row_key_target_digest_version"
@@ -1114,10 +1230,20 @@ def run_evaluation(
             for artifact_evidence in fold_evidence:
                 fold = artifact_evidence.fold
                 artifact_paths = artifact_evidence.paths
+                prefix = f"[Fold {fold.fold_id}/{len(APPROVED_FOLDS)}]"
+                print(f"{prefix} validating artifacts...")
+                print(f"{prefix} training LightGBM...")
+                training_started = time.monotonic()
                 model = FavoritaLightGBMAdapter(
                     feature_columns=resolve_feature_contract(config.feature_contract)
                 )
                 model.fit_parquet(artifact_paths.training)
+                print(
+                    f"{prefix} training completed in "
+                    f"{time.monotonic() - training_started:.1f}s"
+                )
+                print(f"{prefix} evaluating validation rows...")
+                evaluation_started = time.monotonic()
                 fold_metrics.append(
                     _stream_fold_validation(
                         fold=fold,
@@ -1129,6 +1255,11 @@ def run_evaluation(
                         horizon_accumulators=horizon_accumulators,
                     )
                 )
+                print(
+                    f"{prefix} evaluation completed in "
+                    f"{time.monotonic() - evaluation_started:.1f}s"
+                )
+                print(f"{prefix} completed")
                 del model
             prediction_writer.close()
         except Exception:
@@ -1181,10 +1312,14 @@ def run_evaluation(
             stage_paths=stage_paths,
             result=result,
             manifest=manifest,
+            config=config,
+            started_at=started_at,
+            completed_at=completed_at,
         )
     if _source_state(config.source_path) != source_state:
         paths.run_manifest.unlink(missing_ok=True)
         raise AssertionError("Cleaned source changed during artifact publication")
+    print(f"Evaluation completed: {config.output_dir.as_posix()}")
     return paths
 
 
