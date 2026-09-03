@@ -41,7 +41,7 @@ WAPE is returned as a ratio and multiplied by 100 only for percentage display. I
 
 ## 3. Selection and interpretation
 
-SCRUM-18 compares Basic LightGBM and Proposed time-aware LightGBM under this identical metric contract. MAE remains the primary selection metric; RMSE, WAPE, RMSLE, and NWRMSLE remain supporting evidence, and Bias remains diagnostic.
+SCRUM-18 compares Contextual LightGBM and Proposed Time-Aware LightGBM under this identical metric contract. MAE remains the primary selection metric; RMSE, WAPE, RMSLE, and NWRMSLE remain supporting evidence, and Bias remains diagnostic.
 
 | Metric | Role | Best direction | Perfect value |
 |---|---|---|---|
@@ -62,7 +62,7 @@ Every evaluated model must report the complete metric set:
 - separately for each validation fold; and
 - separately for each `forecast_horizon` from 1 through 16.
 
-Basic LightGBM and Proposed time-aware LightGBM must receive equivalent overall, per-fold, and per-horizon reporting. Overall MAE recomputed from pooled row-level errors is the primary accuracy evidence. Fold-level results provide consistency evidence by showing whether the direction and magnitude of performance differences are stable across the four canonical windows. No conclusion may cherry-pick a favorable fold, horizon, or supporting metric; all predeclared views and metrics must be disclosed and interpreted together.
+Contextual LightGBM and Proposed Time-Aware LightGBM must receive equivalent overall, per-fold, and per-horizon reporting. Overall MAE recomputed from pooled row-level errors is the primary accuracy evidence. Fold-level results provide consistency evidence by showing whether the direction and magnitude of performance differences are stable across the four canonical windows. No conclusion may cherry-pick a favorable fold, horizon, or supporting metric; all predeclared views and metrics must be disclosed and interpreted together.
 
 Overall metrics are recomputed from pooled row-level errors; they are not unweighted averages of fold or horizon metrics. Fold and horizon grouping belongs to the separately approved backtesting implementation. This contract does not implement folds, train a model, score the final holdout, or change source data.
 

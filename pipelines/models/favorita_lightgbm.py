@@ -23,16 +23,25 @@ from pipelines.evaluation.favorita_backtesting import (
 )
 from pipelines.evaluation.favorita_temporal_validation import FORECAST_HORIZONS
 from pipelines.features.favorita_model_ready import (
+    CONTEXTUAL_FEATURE_COLUMNS,
+    CONTEXTUAL_FEATURE_PROFILE,
     FORBIDDEN_MODEL_COLUMNS,
     MODEL_FEATURE_COLUMNS,
     PARQUET_ROW_GROUP_SIZE,
     TARGET_COLUMN,
-    TRAINING_OUTPUT_COLUMNS,
+    TIME_AWARE_FEATURE_COLUMNS,
+    TIME_AWARE_FEATURE_PROFILE,
+    resolve_feature_profile,
 )
 
-DEFAULT_FEATURE_COLUMNS: tuple[str, ...] = (
-    "forecast_horizon",
-    *MODEL_FEATURE_COLUMNS,
+CONTEXTUAL_FEATURE_CONTRACT = CONTEXTUAL_FEATURE_PROFILE
+TIME_AWARE_FEATURE_CONTRACT = TIME_AWARE_FEATURE_PROFILE
+DEFAULT_FEATURE_COLUMNS = TIME_AWARE_FEATURE_COLUMNS
+FEATURE_CONTRACTS: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        CONTEXTUAL_FEATURE_CONTRACT: CONTEXTUAL_FEATURE_COLUMNS,
+        TIME_AWARE_FEATURE_CONTRACT: TIME_AWARE_FEATURE_COLUMNS,
+    }
 )
 CATEGORICAL_FEATURE_CANDIDATES: tuple[str, ...] = (
     "store_nbr",
@@ -75,11 +84,41 @@ def _validate_feature_contract(feature_columns: Sequence[str]) -> tuple[str, ...
         raise ValueError("feature_columns must not be empty")
     if len(columns) != len(set(columns)):
         raise ValueError("feature_columns contains duplicate feature names")
-    if columns != DEFAULT_FEATURE_COLUMNS:
+    prohibited = set(columns) & (
+        FORBIDDEN_MODEL_COLUMNS | {TARGET_COLUMN, "forecast_origin", "forecast_date"}
+    )
+    if prohibited:
         raise ValueError(
-            "feature_columns must match the ordered Favorita model feature contract"
+            "feature_columns contains forbidden audit/target columns: "
+            + ", ".join(sorted(prohibited))
+        )
+    if columns not in FEATURE_CONTRACTS.values():
+        raise ValueError(
+            "feature_columns must exactly match an approved ordered Favorita "
+            "feature contract"
         )
     return columns
+
+
+def resolve_feature_contract(name: str) -> tuple[str, ...]:
+    """Return one approved ordered contract by its stable machine name."""
+
+    try:
+        return FEATURE_CONTRACTS[name]
+    except KeyError as exc:
+        supported = ", ".join(FEATURE_CONTRACTS)
+        raise ValueError(
+            f"Unsupported feature contract {name!r}; use {supported}"
+        ) from exc
+
+
+def feature_contract_name(feature_columns: Sequence[str]) -> str:
+    """Resolve an exact approved ordered tuple to its stable machine name."""
+
+    columns = _validate_feature_contract(feature_columns)
+    return next(
+        name for name, approved in FEATURE_CONTRACTS.items() if columns == approved
+    )
 
 
 def _validate_feature_mapping(features: Mapping[str, object]) -> None:
@@ -281,6 +320,12 @@ class FavoritaLightGBMAdapter:
         feature_columns: Sequence[str] = DEFAULT_FEATURE_COLUMNS,
     ) -> None:
         self._candidate_feature_columns = _validate_feature_contract(feature_columns)
+        self._feature_contract_name = feature_contract_name(
+            self._candidate_feature_columns
+        )
+        self._feature_profile = resolve_feature_profile(
+            self._feature_contract_name
+        )
         self._booster: lgb.Booster | None = None
         self._fitted_feature_columns: tuple[str, ...] = ()
         self._excluded_all_null_features: tuple[str, ...] = ()
@@ -293,6 +338,14 @@ class FavoritaLightGBMAdapter:
     @property
     def is_fitted(self) -> bool:
         return self._booster is not None
+
+    @property
+    def feature_contract_name(self) -> str:
+        return self._feature_contract_name
+
+    @property
+    def candidate_feature_columns(self) -> tuple[str, ...]:
+        return self._candidate_feature_columns
 
     @property
     def fitted_feature_columns(self) -> tuple[str, ...]:
@@ -339,9 +392,8 @@ class FavoritaLightGBMAdapter:
                 if pd.api.types.is_bool_dtype(frame[column].dtype):
                     frame[column] = frame[column].astype(float)
 
-    @staticmethod
-    def _validate_model_ready_frame(frame: pd.DataFrame) -> None:
-        if tuple(frame.columns) != TRAINING_OUTPUT_COLUMNS:
+    def _validate_model_ready_frame(self, frame: pd.DataFrame) -> None:
+        if tuple(frame.columns) != self._feature_profile.output_columns:
             raise ValueError(
                 "Model-ready frame must match the ordered training schema"
             )
@@ -457,9 +509,12 @@ class FavoritaLightGBMAdapter:
             raise FileNotFoundError(training_path)
         parquet_file = pq.ParquetFile(training_path)
         try:
-            if tuple(parquet_file.schema_arrow.names) != TRAINING_OUTPUT_COLUMNS:
+            if not parquet_file.schema_arrow.equals(
+                self._feature_profile.arrow_schema
+            ):
                 raise ValueError(
-                    "Parquet must match the ordered training schema"
+                    "Parquet must match the ordered training schema "
+                    f"for profile {self._feature_contract_name}"
                 )
             row_count = parquet_file.metadata.num_rows
             if row_count <= 0:

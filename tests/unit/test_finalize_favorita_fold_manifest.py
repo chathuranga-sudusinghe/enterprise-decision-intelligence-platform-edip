@@ -23,6 +23,23 @@ from pipelines.features.favorita_model_ready import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_counterpart_manifests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        builder,
+        "_counterpart_manifest_path",
+        lambda feature_profile, fold_id: (
+            tmp_path
+            / "isolated-counterparts"
+            / feature_profile
+            / f"fold_{fold_id:02d}"
+            / "manifest.json"
+        ),
+    )
+
+
 def _existing_parquet_fixture(
     tmp_path: Path,
     *,
@@ -44,6 +61,7 @@ def _existing_parquet_fixture(
     output_dir = tmp_path / "favorita_2017_four_fold"
     paths = builder.approved_fold_artifact_paths(output_dir)[0]
     config = builder.FoldDatasetBuildConfig(
+        feature_profile="time-aware",
         source_path=source_path,
         output_dir=output_dir,
         store_batches=((1,),),

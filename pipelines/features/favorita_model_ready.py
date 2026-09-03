@@ -3,12 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import struct
 import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Sequence
+from types import MappingProxyType
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -85,29 +87,45 @@ HOLIDAY_FEATURE_COLUMNS: tuple[str, ...] = (
     "holiday_event_count",
 )
 
-MODEL_FEATURE_COLUMNS: tuple[str, ...] = (
+CONTEXTUAL_FEATURE_PROFILE = "contextual"
+TIME_AWARE_FEATURE_PROFILE = "time-aware"
+FEATURE_PROFILE_VERSION = "scrum-18-v1"
+ROW_KEY_TARGET_DIGEST_VERSION = "sha256-binary-v1"
+CONTEXTUAL_FEATURE_COLUMNS: tuple[str, ...] = (
+    "forecast_horizon",
     *STATIC_COLUMNS,
-    *SALES_FEATURE_COLUMNS,
-    *CALENDAR_COLUMNS,
     *PROMOTION_COLUMNS,
+    *HOLIDAY_FEATURE_COLUMNS,
+    *CALENDAR_COLUMNS,
+)
+HISTORICAL_FEATURE_COLUMNS: tuple[str, ...] = (
+    *SALES_FEATURE_COLUMNS,
     *TRANSACTION_FEATURE_COLUMNS,
     *OIL_FEATURE_COLUMNS,
-    *HOLIDAY_FEATURE_COLUMNS,
 )
-TRAINING_OUTPUT_COLUMNS: tuple[str, ...] = (
-    *AUDIT_COLUMNS,
-    *STATIC_COLUMNS,
+TIME_AWARE_FEATURE_COLUMNS: tuple[str, ...] = (
+    *CONTEXTUAL_FEATURE_COLUMNS,
+    *HISTORICAL_FEATURE_COLUMNS,
+)
+CONTEXTUAL_OUTPUT_COLUMNS: tuple[str, ...] = (
+    "forecast_origin",
+    "forecast_date",
+    *CONTEXTUAL_FEATURE_COLUMNS,
     TARGET_COLUMN,
-    *SALES_FEATURE_COLUMNS,
-    *CALENDAR_COLUMNS,
-    *PROMOTION_COLUMNS,
-    *TRANSACTION_FEATURE_COLUMNS,
-    *OIL_FEATURE_COLUMNS,
-    *HOLIDAY_FEATURE_COLUMNS,
 )
-INFERENCE_OUTPUT_COLUMNS: tuple[str, ...] = (
-    *AUDIT_COLUMNS,
-    *MODEL_FEATURE_COLUMNS,
+TIME_AWARE_OUTPUT_COLUMNS: tuple[str, ...] = (
+    "forecast_origin",
+    "forecast_date",
+    *TIME_AWARE_FEATURE_COLUMNS,
+    TARGET_COLUMN,
+)
+# Compatibility aliases retain the approved Time-Aware behavior for non-profile code.
+MODEL_FEATURE_COLUMNS = TIME_AWARE_FEATURE_COLUMNS
+TRAINING_OUTPUT_COLUMNS = TIME_AWARE_OUTPUT_COLUMNS
+INFERENCE_OUTPUT_COLUMNS = (
+    "forecast_origin",
+    "forecast_date",
+    *TIME_AWARE_FEATURE_COLUMNS,
 )
 
 FORBIDDEN_MODEL_COLUMNS: frozenset[str] = frozenset(
@@ -146,44 +164,97 @@ SOURCE_READ_COLUMNS: tuple[str, ...] = (
     "holiday_event_count",
 )
 
-OUTPUT_ARROW_SCHEMA = pa.schema(
-    [
-        pa.field("forecast_origin", pa.timestamp("us"), nullable=False),
-        pa.field("forecast_date", pa.timestamp("us"), nullable=False),
-        pa.field("forecast_horizon", pa.int8(), nullable=False),
-        pa.field("store_nbr", pa.int16(), nullable=False),
-        pa.field("item_nbr", pa.int32(), nullable=False),
-        pa.field("family", pa.large_string(), nullable=False),
-        pa.field("class", pa.int16(), nullable=False),
-        pa.field("perishable", pa.int8(), nullable=False),
-        pa.field("city", pa.large_string(), nullable=False),
-        pa.field("state", pa.large_string(), nullable=False),
-        pa.field("store_type", pa.large_string(), nullable=False),
-        pa.field("cluster", pa.int8(), nullable=False),
-        pa.field("unit_sales", pa.float64(), nullable=False),
-        *[
-            pa.field(name, pa.float64(), nullable=True)
-            for name in SALES_FEATURE_COLUMNS
-        ],
-        pa.field("day_of_week", pa.int8(), nullable=False),
-        pa.field("day_of_month", pa.int8(), nullable=False),
-        pa.field("week_of_year", pa.int8(), nullable=False),
-        pa.field("month", pa.int8(), nullable=False),
-        pa.field("quarter", pa.int8(), nullable=False),
-        pa.field("is_weekend", pa.bool_(), nullable=False),
-        pa.field("onpromotion", pa.bool_(), nullable=True),
-        *[
-            pa.field(name, pa.float64(), nullable=True)
-            for name in TRANSACTION_FEATURE_COLUMNS
-        ],
-        *[pa.field(name, pa.float64(), nullable=True) for name in OIL_FEATURE_COLUMNS],
-        pa.field("is_holiday", pa.bool_(), nullable=True),
-        pa.field("holiday_type", pa.large_string(), nullable=True),
-        pa.field("holiday_locale", pa.large_string(), nullable=True),
-        pa.field("holiday_transferred", pa.bool_(), nullable=True),
-        pa.field("holiday_event_count", pa.int16(), nullable=True),
-    ]
-)
+def _field_for_output_column(name: str) -> pa.Field:
+    required_fields = {
+        "forecast_origin": pa.field("forecast_origin", pa.timestamp("us"), nullable=False),
+        "forecast_date": pa.field("forecast_date", pa.timestamp("us"), nullable=False),
+        "forecast_horizon": pa.field("forecast_horizon", pa.int8(), nullable=False),
+        "store_nbr": pa.field("store_nbr", pa.int16(), nullable=False),
+        "item_nbr": pa.field("item_nbr", pa.int32(), nullable=False),
+        "family": pa.field("family", pa.large_string(), nullable=False),
+        "class": pa.field("class", pa.int16(), nullable=False),
+        "perishable": pa.field("perishable", pa.int8(), nullable=False),
+        "city": pa.field("city", pa.large_string(), nullable=False),
+        "state": pa.field("state", pa.large_string(), nullable=False),
+        "store_type": pa.field("store_type", pa.large_string(), nullable=False),
+        "cluster": pa.field("cluster", pa.int8(), nullable=False),
+        "day_of_week": pa.field("day_of_week", pa.int8(), nullable=False),
+        "day_of_month": pa.field("day_of_month", pa.int8(), nullable=False),
+        "week_of_year": pa.field("week_of_year", pa.int8(), nullable=False),
+        "month": pa.field("month", pa.int8(), nullable=False),
+        "quarter": pa.field("quarter", pa.int8(), nullable=False),
+        "is_weekend": pa.field("is_weekend", pa.bool_(), nullable=False),
+        TARGET_COLUMN: pa.field(TARGET_COLUMN, pa.float64(), nullable=False),
+    }
+    nullable_fields = {
+        "onpromotion": pa.field("onpromotion", pa.bool_(), nullable=True),
+        "is_holiday": pa.field("is_holiday", pa.bool_(), nullable=True),
+        "holiday_type": pa.field("holiday_type", pa.large_string(), nullable=True),
+        "holiday_locale": pa.field("holiday_locale", pa.large_string(), nullable=True),
+        "holiday_transferred": pa.field("holiday_transferred", pa.bool_(), nullable=True),
+        "holiday_event_count": pa.field("holiday_event_count", pa.int16(), nullable=True),
+        **{name: pa.field(name, pa.float64(), nullable=True) for name in HISTORICAL_FEATURE_COLUMNS},
+    }
+    try:
+        return required_fields.get(name) or nullable_fields[name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown Favorita output column: {name}") from exc
+
+
+def _schema_for(columns: tuple[str, ...]) -> pa.Schema:
+    return pa.schema([_field_for_output_column(name) for name in columns])
+
+
+CONTEXTUAL_ARROW_SCHEMA = _schema_for(CONTEXTUAL_OUTPUT_COLUMNS)
+TIME_AWARE_ARROW_SCHEMA = _schema_for(TIME_AWARE_OUTPUT_COLUMNS)
+OUTPUT_ARROW_SCHEMA = TIME_AWARE_ARROW_SCHEMA
+
+
+@dataclass(frozen=True, slots=True)
+class FavoritaFeatureProfile:
+    name: str
+    version: str
+    model_feature_columns: tuple[str, ...]
+    output_columns: tuple[str, ...]
+    arrow_schema: pa.Schema
+    historical_feature_groups_enabled: bool
+    canonical_artifact_root: Path
+
+
+FEATURE_PROFILES: Mapping[str, FavoritaFeatureProfile] = MappingProxyType({
+    CONTEXTUAL_FEATURE_PROFILE: FavoritaFeatureProfile(
+        name=CONTEXTUAL_FEATURE_PROFILE,
+        version=FEATURE_PROFILE_VERSION,
+        model_feature_columns=CONTEXTUAL_FEATURE_COLUMNS,
+        output_columns=CONTEXTUAL_OUTPUT_COLUMNS,
+        arrow_schema=CONTEXTUAL_ARROW_SCHEMA,
+        historical_feature_groups_enabled=False,
+        canonical_artifact_root=Path(
+            "artifacts/features/favorita_2017_four_fold_contextual"
+        ),
+    ),
+    TIME_AWARE_FEATURE_PROFILE: FavoritaFeatureProfile(
+        name=TIME_AWARE_FEATURE_PROFILE,
+        version=FEATURE_PROFILE_VERSION,
+        model_feature_columns=TIME_AWARE_FEATURE_COLUMNS,
+        output_columns=TIME_AWARE_OUTPUT_COLUMNS,
+        arrow_schema=TIME_AWARE_ARROW_SCHEMA,
+        historical_feature_groups_enabled=True,
+        canonical_artifact_root=Path(
+            "artifacts/features/favorita_2017_four_fold_time_aware"
+        ),
+    ),
+})
+
+
+def resolve_feature_profile(name: str) -> FavoritaFeatureProfile:
+    try:
+        return FEATURE_PROFILES[name]
+    except KeyError as exc:
+        raise ValueError(
+            f"Unsupported feature profile {name!r}; use contextual or time-aware"
+        ) from exc
+
 
 SEMANTIC_TYPES: dict[str, str] = {
     "forecast_origin": "audit timestamp: end-of-day origin t",
@@ -254,6 +325,7 @@ class FeatureBuildConfig:
     manifest_path: Path
     forecast_origins: tuple[date, ...]
     store_batches: tuple[tuple[int, ...], ...]
+    feature_profile: str
     max_items_per_store: int | None = None
     allow_assumed_future_promotion: bool = False
     allow_assumed_future_holidays: bool = False
@@ -270,16 +342,22 @@ def sha256_file(path: Path, chunk_size: int = 8 * 1024 * 1024) -> str:
 
 def source_footer(path: Path) -> dict[str, Any]:
     parquet_file = pq.ParquetFile(path)
-    return {
-        "path": path.as_posix(),
-        "rows": parquet_file.metadata.num_rows,
-        "columns": len(parquet_file.schema_arrow),
-        "row_groups": parquet_file.metadata.num_row_groups,
-        "schema": {field.name: str(field.type) for field in parquet_file.schema_arrow},
-    }
+    try:
+        return {
+            "path": path.as_posix(),
+            "rows": parquet_file.metadata.num_rows,
+            "columns": len(parquet_file.schema_arrow),
+            "row_groups": parquet_file.metadata.num_row_groups,
+            "schema": {
+                field.name: str(field.type) for field in parquet_file.schema_arrow
+            },
+        }
+    finally:
+        parquet_file.close()
 
 
 def validate_build_config(config: FeatureBuildConfig) -> None:
+    resolve_feature_profile(config.feature_profile)
     if not config.source_path.is_file():
         raise FileNotFoundError(config.source_path)
     if not config.forecast_origins:
@@ -587,7 +665,9 @@ def build_feature_rows_for_origin(
     allow_assumed_future_promotion: bool = False,
     allow_assumed_future_holidays: bool = False,
     drop_targets_without_origin_history: bool = False,
+    feature_profile: str = TIME_AWARE_FEATURE_PROFILE,
 ) -> pd.DataFrame:
+    profile = resolve_feature_profile(feature_profile)
     origin = pd.Timestamp(forecast_origin).normalize()
     source = source_slice.copy()
     source["date"] = pd.to_datetime(source["date"]).dt.normalize()
@@ -612,7 +692,7 @@ def build_feature_rows_for_origin(
             validate="many_to_one",
         )
     if target_rows.empty:
-        return pd.DataFrame(columns=TRAINING_OUTPUT_COLUMNS)
+        return pd.DataFrame(columns=profile.output_columns)
 
     target_rows = target_rows.rename(columns={"date": "forecast_date"})
     target_rows["forecast_origin"] = origin
@@ -633,39 +713,46 @@ def build_feature_rows_for_origin(
         how="left",
         validate="many_to_one",
     )
-    series_features = _series_feature_frame(history, target_series, origin)
-    store_features = _transaction_feature_frame(
-        history,
-        target_rows[["store_nbr"]].drop_duplicates(),
-        origin,
-    )
-    oil_features = _oil_feature_values(history, origin)
+    output = target_rows
+    if profile.historical_feature_groups_enabled:
+        series_features = _series_feature_frame(history, target_series, origin)
+        store_features = _transaction_feature_frame(
+            history,
+            target_rows[["store_nbr"]].drop_duplicates(),
+            origin,
+        )
+        oil_features = _oil_feature_values(history, origin)
+        output = output.merge(
+            series_features, on=["store_nbr", "item_nbr"], how="left"
+        ).merge(store_features, on="store_nbr", how="left")
+        for column, value in oil_features.items():
+            output[column] = value
 
-    output = target_rows.merge(
-        series_features, on=["store_nbr", "item_nbr"], how="left"
-    ).merge(store_features, on="store_nbr", how="left")
-    for column, value in oil_features.items():
-        output[column] = value
-
-    output = output.loc[:, list(TRAINING_OUTPUT_COLUMNS)].copy()
+    output = output.loc[:, list(profile.output_columns)].copy()
     output = output.sort_values(
         ["forecast_origin", "forecast_date", "store_nbr", "item_nbr"]
     ).reset_index(drop=True)
-    validate_feature_frame(output)
+    validate_feature_frame(output, feature_profile=profile.name)
     return output
 
 
-def to_arrow_table(frame: pd.DataFrame) -> pa.Table:
+def to_arrow_table(
+    frame: pd.DataFrame, *, feature_profile: str = TIME_AWARE_FEATURE_PROFILE
+) -> pa.Table:
+    profile = resolve_feature_profile(feature_profile)
     return pa.Table.from_pandas(
-        frame.loc[:, list(TRAINING_OUTPUT_COLUMNS)],
-        schema=OUTPUT_ARROW_SCHEMA,
+        frame.loc[:, list(profile.output_columns)],
+        schema=profile.arrow_schema,
         preserve_index=False,
         safe=True,
     )
 
 
-def validate_feature_frame(frame: pd.DataFrame) -> None:
-    if tuple(frame.columns) != TRAINING_OUTPUT_COLUMNS:
+def validate_feature_frame(
+    frame: pd.DataFrame, *, feature_profile: str = TIME_AWARE_FEATURE_PROFILE
+) -> None:
+    profile = resolve_feature_profile(feature_profile)
+    if tuple(frame.columns) != profile.output_columns:
         raise AssertionError("Training output column order differs from contract")
     if not frame["forecast_horizon"].isin(FORECAST_HORIZONS).all():
         raise AssertionError("forecast_horizon must be restricted to 1..16")
@@ -681,18 +768,20 @@ def validate_feature_frame(frame: pd.DataFrame) -> None:
     )
     if duplicate_count:
         raise AssertionError(f"Output grain has {duplicate_count} duplicates")
-    if FORBIDDEN_MODEL_COLUMNS.intersection(MODEL_FEATURE_COLUMNS):
-        raise AssertionError("Forbidden fields entered MODEL_FEATURE_COLUMNS")
-    if TARGET_COLUMN in INFERENCE_OUTPUT_COLUMNS:
-        raise AssertionError("Target entered inference output columns")
-    if tuple(
-        column for column in TRAINING_OUTPUT_COLUMNS if column != TARGET_COLUMN
-    ) != (INFERENCE_OUTPUT_COLUMNS):
-        raise AssertionError("Training/inference ordered schema parity failed")
+    if FORBIDDEN_MODEL_COLUMNS.intersection(profile.model_feature_columns):
+        raise AssertionError("Forbidden fields entered model feature columns")
+    if any(
+        column in profile.model_feature_columns
+        for column in ("forecast_origin", "forecast_date", TARGET_COLUMN)
+    ):
+        raise AssertionError("Audit or target field entered model features")
 
 
 class AtomicParquetBatchWriter:
-    def __init__(self, output_path: Path, *, overwrite: bool) -> None:
+    def __init__(
+        self, output_path: Path, *, overwrite: bool, feature_profile: str
+    ) -> None:
+        self.profile = resolve_feature_profile(feature_profile)
         self.output_path = output_path
         self.overwrite = overwrite
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -708,7 +797,7 @@ class AtomicParquetBatchWriter:
                 raise FileExistsError(self.output_path)
             self.writer = pq.ParquetWriter(
                 self.temp_path,
-                OUTPUT_ARROW_SCHEMA,
+                self.profile.arrow_schema,
                 compression="zstd",
             )
         self.writer.write_table(
@@ -726,7 +815,7 @@ class AtomicParquetBatchWriter:
         try:
             if parquet_file.metadata.num_rows != self.rows_written:
                 raise AssertionError("Temporary Parquet row-count validation failed")
-            if not parquet_file.schema_arrow.equals(OUTPUT_ARROW_SCHEMA):
+            if not parquet_file.schema_arrow.equals(self.profile.arrow_schema):
                 raise AssertionError("Temporary Parquet schema validation failed")
         finally:
             parquet_file.close()
@@ -742,12 +831,14 @@ class AtomicParquetBatchWriter:
 def validate_feature_artifact(
     output_path: Path,
     *,
+    feature_profile: str = TIME_AWARE_FEATURE_PROFILE,
     bounded_memory: bool = False,
 ) -> dict[str, Any]:
+    profile = resolve_feature_profile(feature_profile)
     parquet_file = pq.ParquetFile(output_path)
-    if not parquet_file.schema_arrow.equals(OUTPUT_ARROW_SCHEMA):
+    if not parquet_file.schema_arrow.equals(profile.arrow_schema):
         raise AssertionError("Output Arrow schema differs from declared contract")
-    null_counts = {name: 0 for name in TRAINING_OUTPUT_COLUMNS}
+    null_counts = {name: 0 for name in profile.output_columns}
     row_count = 0
     min_forecast_date: datetime | None = None
     max_forecast_date: datetime | None = None
@@ -755,11 +846,12 @@ def validate_feature_artifact(
     items: set[int] = set()
     horizons: set[int] = set()
     duplicate_count = 0
+    row_key_target_digest = hashlib.sha256()
     seen_keys: set[tuple[Any, ...]] | None = set() if not bounded_memory else None
     for row_group_index in range(parquet_file.metadata.num_row_groups):
         table = parquet_file.read_row_group(row_group_index)
         row_count += table.num_rows
-        for column in TRAINING_OUTPUT_COLUMNS:
+        for column in profile.output_columns:
             null_counts[column] += table.column(column).null_count
         frame = table.select(
             [
@@ -768,6 +860,7 @@ def validate_feature_artifact(
                 "forecast_horizon",
                 "store_nbr",
                 "item_nbr",
+                TARGET_COLUMN,
             ]
         ).to_pandas()
         validate_dates = frame["forecast_origin"] + pd.to_timedelta(
@@ -790,6 +883,28 @@ def validate_feature_artifact(
                 if key in seen_keys:
                     duplicate_count += 1
                 seen_keys.add(key)
+        for row in frame[
+            [
+                "forecast_origin",
+                "forecast_date",
+                "forecast_horizon",
+                "store_nbr",
+                "item_nbr",
+                TARGET_COLUMN,
+            ]
+        ].itertuples(index=False, name=None):
+            origin, forecast_date, horizon, store, item, target = row
+            row_key_target_digest.update(
+                struct.pack(
+                    ">qqbhid",
+                    pd.Timestamp(origin).value // 1_000,
+                    pd.Timestamp(forecast_date).value // 1_000,
+                    int(horizon),
+                    int(store),
+                    int(item),
+                    float(target),
+                )
+            )
         stores.update(int(value) for value in frame["store_nbr"].unique())
         items.update(int(value) for value in frame["item_nbr"].unique())
         horizons.update(int(value) for value in frame["forecast_horizon"].unique())
@@ -821,6 +936,8 @@ def validate_feature_artifact(
         "item_cardinality": len(items),
         "horizons": sorted(horizons),
         "grain_duplicate_count": duplicate_count,
+        "row_key_target_digest_version": ROW_KEY_TARGET_DIGEST_VERSION,
+        "row_key_target_sha256": row_key_target_digest.hexdigest(),
         "null_counts": null_counts,
         "schema": {field.name: str(field.type) for field in parquet_file.schema_arrow},
     }
@@ -837,7 +954,12 @@ def materialize_feature_dataset(
     progress_phase: str = "",
 ) -> dict[str, Any]:
     validate_build_config(config)
-    writer = AtomicParquetBatchWriter(config.output_path, overwrite=config.overwrite)
+    profile = resolve_feature_profile(config.feature_profile)
+    writer = AtomicParquetBatchWriter(
+        config.output_path,
+        overwrite=config.overwrite,
+        feature_profile=profile.name,
+    )
     expected_target_rows = 0
     batches_written = 0
     processed_stores: set[int] = set()
@@ -866,6 +988,7 @@ def materialize_feature_dataset(
             drop_targets_without_origin_history=(
                 drop_targets_without_origin_history
             ),
+            feature_profile=profile.name,
         )
         if forecast_date_cutoff is not None:
             feature_rows = feature_rows.loc[
@@ -875,7 +998,7 @@ def materialize_feature_dataset(
         if feature_rows.empty:
             return
         expected_target_rows += len(feature_rows)
-        writer.write(to_arrow_table(feature_rows))
+        writer.write(to_arrow_table(feature_rows, feature_profile=profile.name))
         batches_written += 1
 
     try:
@@ -943,6 +1066,7 @@ def materialize_feature_dataset(
 
     artifact_validation = validate_feature_artifact(
         config.output_path,
+        feature_profile=profile.name,
         bounded_memory=bounded_memory_validation,
     )
     if artifact_validation["rows"] != expected_target_rows:
@@ -968,7 +1092,13 @@ def build_feature_manifest(
     creation_scope: str,
     limitations: Sequence[str],
 ) -> dict[str, Any]:
+    profile = resolve_feature_profile(config.feature_profile)
     return {
+        "feature_profile": profile.name,
+        "feature_profile_version": profile.version,
+        "historical_feature_groups_enabled": (
+            profile.historical_feature_groups_enabled
+        ),
         "artifact": {
             "artifact_type": "Parquet",
             "output_path": config.output_path.as_posix(),
@@ -988,11 +1118,13 @@ def build_feature_manifest(
             "store_nbr",
             "item_nbr",
         ],
-        "ordered_schema": list(TRAINING_OUTPUT_COLUMNS),
-        "arrow_schema": {field.name: str(field.type) for field in OUTPUT_ARROW_SCHEMA},
+        "ordered_schema": list(profile.output_columns),
+        "arrow_schema": {field.name: str(field.type) for field in profile.arrow_schema},
         "semantic_types": SEMANTIC_TYPES,
-        "model_feature_columns": list(MODEL_FEATURE_COLUMNS),
-        "inference_output_columns": list(INFERENCE_OUTPUT_COLUMNS),
+        "model_feature_columns": list(profile.model_feature_columns),
+        "inference_output_columns": [
+            column for column in profile.output_columns if column != TARGET_COLUMN
+        ],
         "feature_definitions": FEATURE_DEFINITIONS,
         "forecast_configuration": {
             "forecast_origins": [
