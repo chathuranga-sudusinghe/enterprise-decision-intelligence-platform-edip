@@ -20,7 +20,6 @@ from pipelines.features.build_favorita_fold_datasets import (
     DEFAULT_OUTPUT_DIR,
     DEFAULT_SOURCE_PATH,
     FoldDatasetBuildConfig,
-    _artifact_footer_validation,
     _entity_sets,
     _source_state,
     _validate_fold_artifact_boundaries,
@@ -30,7 +29,11 @@ from pipelines.features.build_favorita_fold_datasets import (
     selected_approved_folds,
     validate_canonical_fold_output_dir,
 )
-from pipelines.features.favorita_model_ready import write_json_atomic
+from pipelines.features.favorita_model_ready import (
+    TIME_AWARE_FEATURE_PROFILE,
+    validate_feature_artifact,
+    write_json_atomic,
+)
 
 PROCESSED_STORE_EVIDENCE = (
     "operator_confirmed_redesigned_canonical_materialization"
@@ -86,6 +89,7 @@ def finalize_existing_fold_manifest(
     *,
     source_path: Path = DEFAULT_SOURCE_PATH,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
+    feature_profile: str = TIME_AWARE_FEATURE_PROFILE,
     confirm_all_stores_processed: bool = False,
     log_progress: bool = False,
 ) -> dict[str, Any]:
@@ -124,8 +128,12 @@ def finalize_existing_fold_manifest(
     state_before = {path: _source_state(path) for path in immutable_paths}
 
     progress("validating Parquet schemas, row counts, and boundaries...")
-    training_validation = _artifact_footer_validation(paths.training)
-    validation_validation = _artifact_footer_validation(paths.validation)
+    training_validation = validate_feature_artifact(
+        paths.training, feature_profile=feature_profile, bounded_memory=True
+    )
+    validation_validation = validate_feature_artifact(
+        paths.validation, feature_profile=feature_profile, bounded_memory=True
+    )
     _validate_fold_artifact_boundaries(
         training_validation,
         validation_validation,
@@ -180,6 +188,7 @@ def finalize_existing_fold_manifest(
         raise AssertionError("Source or existing Parquet artifacts changed during validation")
 
     config = FoldDatasetBuildConfig(
+        feature_profile=feature_profile,
         source_path=source_path,
         output_dir=output_dir,
         overwrite=False,

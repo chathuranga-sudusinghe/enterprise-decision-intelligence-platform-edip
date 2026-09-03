@@ -123,7 +123,7 @@ External providers remain adapters behind typed interfaces. Business behavior mu
 
 ### 7.1 Forecasting and inventory risk
 
-The forecasting capability uses the governed Favorita foundation for the primary MSc research contribution. The principal hypothesis comparison is a Basic LightGBM model using mainly contextual/basic features against a Proposed time-aware LightGBM model from the same model family using the existing full leakage-safe temporal/history-derived feature set. Both approaches use the same experimental conditions so the independent difference is the availability of leakage-safe temporal/history information. Credible naive or statistical baselines may provide secondary reference evidence, but they are not the principal hypothesis comparison.
+The forecasting capability uses the governed Favorita foundation for the primary MSc research contribution. The principal hypothesis comparison is Contextual LightGBM versus Proposed Time-Aware LightGBM. The Proposed Time-Aware LightGBM adds leakage-safe temporal and time-series features to the same Contextual LightGBM baseline; this added feature group is the intended experimental difference. The exact feature-column lists remain a SCRUM-18 design decision and are not frozen here. Credible naive or statistical baselines may provide secondary reference evidence, but they are not the principal hypothesis comparison.
 
 The current temporal contract uses direct horizon-aware global forecasting for `unit_sales`, exact horizons 1 through 16, and no recursive prediction feedback. The approved four-fold expanding-window design covers modeling and evaluation targets from `2017-01-01` through `2017-07-30`; the protected final holdout covers `2017-07-31` through `2017-08-15`. The linked research documents define the exact boundaries.
 
@@ -260,12 +260,12 @@ Claims such as “reliable,” “trustworthy,” “adaptive,” or “multi-ag
 
 ## 12. Current state and target-state boundary
 
-Confirmed repository evidence includes the Favorita governed source record, leakage-safe feature contract, exact 16-day forecast horizon, redesigned four-fold expanding-window contract, executable validation, bounded smoke evidence, and completed Proposed LightGBM execution for all four canonical folds (`completed_folds = [1, 2, 3, 4]`). Fold 4, the largest approved fold, used 313,475,735 training rows, 1,672,872 validation rows, an approximately 2.6 GiB training Parquet, approximately 26 minutes elapsed time, approximately 34.7 GiB peak process RAM, zero swap, and the unchanged LightGBM adapter on a 64 GB CPU machine. The final protected holdout remains unscored.
+Confirmed repository evidence includes the Favorita governed source record, leakage-safe feature contract, exact 16-day forecast horizon, redesigned four-fold expanding-window contract, executable validation, bounded smoke evidence, and completed Proposed Time-Aware LightGBM execution for all four canonical folds (`completed_folds = [1, 2, 3, 4]`). Fold 4, the largest approved fold, used 313,475,735 training rows, 1,672,872 validation rows, an approximately 2.6 GiB training Parquet, approximately 26 minutes elapsed time, approximately 34.7 GiB peak process RAM, zero swap, and the unchanged LightGBM adapter on a 64 GB CPU machine. The final protected holdout remains unscored.
 
 The following remain target work unless separately evidenced:
 
-- SCRUM-18 definition of the Basic LightGBM feature boundary without intentionally weakening the comparator;
-- controlled Basic-versus-Proposed LightGBM execution and the predeclared accuracy/consistency interpretation;
+- SCRUM-18 definition of the Contextual LightGBM feature boundary without intentionally weakening the comparator;
+- controlled Contextual-versus-Proposed Time-Aware LightGBM execution and the predeclared accuracy/consistency interpretation;
 - candidate selection from the canonical four-fold evidence;
 - optional sensitivity or uncertainty analysis under separate approval;
 - later final-holdout promotion criteria and scoring after all selection decisions are frozen;

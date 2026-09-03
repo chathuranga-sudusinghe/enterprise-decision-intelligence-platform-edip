@@ -22,6 +22,7 @@ from pipelines.features.favorita_model_ready import (
     MODEL_FEATURE_COLUMNS,
     _fixture_source_frame,
     build_feature_rows_for_origin,
+    to_arrow_table,
 )
 
 
@@ -84,10 +85,13 @@ def test_full_evaluator_rejects_accumulated_single_fold_results(
 
 def test_default_namespaces_belong_to_the_2017_redesign() -> None:
     assert runner.DEFAULT_FOLD_OUTPUT_DIR == Path(
-        "artifacts/features/favorita_2017_four_fold"
+        "artifacts/features/favorita_2017_four_fold_time_aware"
     )
-    assert runner.DEFAULT_OUTPUT_DIR == Path(
-        "artifacts/evaluation/favorita_2017_four_fold_lightgbm"
+    assert runner.CONTEXTUAL_OUTPUT_DIR == Path(
+        "artifacts/evaluation/favorita_2017_four_fold_lightgbm_contextual"
+    )
+    assert runner.DEFAULT_OUTPUT_DIR == runner.TIME_AWARE_OUTPUT_DIR == Path(
+        "artifacts/evaluation/favorita_2017_four_fold_lightgbm_time_aware"
     )
 
 
@@ -111,6 +115,21 @@ def _streaming_summary() -> runner.StreamingEvaluationSummary:
             validation_end=fold.validation_end,
             metrics=_metrics(),
             row_count=16,
+            model_evidence={
+                "feature_contract": "time-aware",
+                "candidate_feature_columns": list(
+                    runner.resolve_feature_contract("time-aware")
+                ),
+                "fitted_feature_columns": list(
+                    runner.resolve_feature_contract("time-aware")
+                ),
+                "excluded_all_null_features": [],
+                "categorical_feature_columns": [],
+                "model_parameters": dict(runner.LIGHTGBM_PARAMETERS),
+                "num_boost_round": runner.NUM_BOOST_ROUND,
+                "training_artifact": {"path": "training.parquet"},
+                "validation_artifact": {"path": "validation.parquet"},
+            },
         )
         for fold in APPROVED_FOLDS
     )
@@ -199,7 +218,7 @@ def test_validation_batches_preserve_rows_across_batch_boundaries(
         allow_assumed_future_holidays=True,
     )
     feature_path = tmp_path / "validation.parquet"
-    frame.to_parquet(feature_path, index=False, row_group_size=5)
+    pq.write_table(to_arrow_table(frame), feature_path, row_group_size=5)
 
     small_batches = list(
         runner.iter_model_ready_validation_batches(feature_path, batch_size=3)
@@ -247,7 +266,7 @@ def test_validation_batch_reader_rejects_empty_or_reordered_artifacts(
     frame = build_feature_rows_for_origin(source, forecast_origin=origin)
     empty_path = tmp_path / "empty.parquet"
     reordered_path = tmp_path / "reordered.parquet"
-    frame.iloc[:0].to_parquet(empty_path, index=False)
+    pq.write_table(to_arrow_table(frame.iloc[:0]), empty_path)
     frame.loc[:, list(reversed(frame.columns))].to_parquet(
         reordered_path,
         index=False,
@@ -281,9 +300,10 @@ def test_cross_batch_duplicate_validation_key_is_rejected() -> None:
         tracker.update(second, fold_id=1)
 
 
-def test_full_entity_coverage_configuration_remains_unsampled() -> None:
-    assert runner.ALL_FAVORITA_STORES == tuple(range(1, 55))
-    assert runner.ALL_STORE_BATCHES == tuple((store_nbr,) for store_nbr in range(1, 55))
+def test_multi_fold_runner_has_no_fold_builder_runtime_dependency() -> None:
+    assert not hasattr(runner, "FoldDatasetBuildConfig")
+    assert not hasattr(runner, "build_approved_fold_datasets")
+    assert not hasattr(runner, "ALL_STORE_BATCHES")
 
 
 def _install_serial_fakes(
@@ -296,54 +316,116 @@ def _install_serial_fakes(
     events: list[tuple[str, int]] = []
     models: list[object] = []
     evaluation_paths = runner._artifact_paths(config.output_dir)
-
-    def fake_build(
-        build_config: runner.FoldDatasetBuildConfig,
-    ) -> tuple[dict[str, int], ...]:
-        assert build_config.source_path == config.source_path
-        assert build_config.output_dir == config.fold_output_dir
-        assert build_config.store_batches == runner.ALL_STORE_BATCHES
-        assert build_config.max_items_per_store is None
-        assert build_config.overwrite is config.overwrite
-        assert not any(path.exists() for path in runner._path_values(evaluation_paths))
-        events.append(("build", 0))
-        for fold, paths in zip(
-            APPROVED_FOLDS,
-            runner.approved_fold_artifact_paths(config.fold_output_dir),
-            strict=True,
-        ):
-            paths.directory.mkdir(parents=True, exist_ok=True)
-            paths.training.write_bytes(b"training")
-            source, fixture_origin = _fixture_source_frame()
-            frame = build_feature_rows_for_origin(
-                source,
-                forecast_origin=fixture_origin,
-                allow_assumed_future_promotion=True,
-                allow_assumed_future_holidays=True,
-            )
-            frame = frame.loc[frame["item_nbr"] == 100].reset_index(drop=True)
-            frame["forecast_origin"] = pd.Timestamp(fold.forecast_origin)
-            frame["forecast_date"] = frame["forecast_origin"] + pd.to_timedelta(
-                frame["forecast_horizon"],
-                unit="D",
-            )
-            frame.to_parquet(paths.validation, index=False, row_group_size=5)
-        return tuple({"fold_id": fold.fold_id} for fold in APPROVED_FOLDS)
+    source, fixture_origin = _fixture_source_frame()
+    base_frame = build_feature_rows_for_origin(
+        source,
+        forecast_origin=fixture_origin,
+        allow_assumed_future_promotion=True,
+        allow_assumed_future_holidays=True,
+    )
+    base_frame = base_frame.loc[base_frame["item_nbr"] == 100].reset_index(
+        drop=True
+    )
+    for fold, paths in zip(
+        APPROVED_FOLDS,
+        runner.approved_fold_artifact_paths(config.fold_output_dir),
+        strict=True,
+    ):
+        paths.directory.mkdir(parents=True, exist_ok=True)
+        training = base_frame.copy()
+        training["forecast_origin"] = pd.Timestamp(
+            runner.MODELING_TARGET_START
+        ) - pd.Timedelta(days=1)
+        training["forecast_date"] = training["forecast_origin"] + pd.to_timedelta(
+            training["forecast_horizon"], unit="D"
+        )
+        late = base_frame.loc[base_frame["forecast_horizon"] == 1].copy()
+        late["forecast_origin"] = pd.Timestamp(fold.forecast_origin) - pd.Timedelta(
+            days=1
+        )
+        late["forecast_date"] = pd.Timestamp(fold.forecast_origin)
+        training = pd.concat((training, late), ignore_index=True)
+        validation = base_frame.copy()
+        validation["forecast_origin"] = pd.Timestamp(fold.forecast_origin)
+        validation["forecast_date"] = validation["forecast_origin"] + pd.to_timedelta(
+            validation["forecast_horizon"], unit="D"
+        )
+        pq.write_table(to_arrow_table(training), paths.training, row_group_size=5)
+        pq.write_table(to_arrow_table(validation), paths.validation, row_group_size=5)
+        manifest = {
+            "fold_id": fold.fold_id,
+            "canonical_fold_id": fold.fold_id,
+            "canonical_fold_count": len(APPROVED_FOLDS),
+            "canonical_validation_design": runner.CANONICAL_VALIDATION_DESIGN,
+            "execution_scope": runner.EXECUTION_SCOPE,
+            "experiment_subset": list(runner.CANONICAL_FOLD_IDS),
+            "canonical_contract_enforced": True,
+            "forecast_origin": fold.forecast_origin.isoformat(),
+            "validation_start": fold.validation_start.isoformat(),
+            "validation_end": fold.validation_end.isoformat(),
+            "artifact_root": config.fold_output_dir.as_posix(),
+            "modeling_target_start": runner.MODELING_TARGET_START.isoformat(),
+            "modeling_target_end": runner.MODELING_TARGET_END.isoformat(),
+            "training_target_start": runner.MODELING_TARGET_START.isoformat(),
+            "training_target_end": fold.forecast_origin.isoformat(),
+            "max_items_per_store": None,
+            "feature_profile": config.feature_contract,
+            "feature_profile_version": runner.resolve_feature_profile(
+                config.feature_contract
+            ).version,
+            "model_feature_columns": list(
+                runner.resolve_feature_profile(
+                    config.feature_contract
+                ).model_feature_columns
+            ),
+            "ordered_schema": list(
+                runner.resolve_feature_profile(
+                    config.feature_contract
+                ).output_columns
+            ),
+            "final_holdout_excluded": True,
+            "future_actual_leakage": False,
+            "training_row_count": len(training),
+            "validation_row_count": len(validation),
+            "training_row_key_target_digest_version": (
+                runner.ROW_KEY_TARGET_DIGEST_VERSION
+            ),
+            "training_row_key_target_sha256": "a" * 64,
+            "validation_row_key_target_digest_version": (
+                runner.ROW_KEY_TARGET_DIGEST_VERSION
+            ),
+            "validation_row_key_target_sha256": "b" * 64,
+            "cross_arm_row_equivalence": {
+                "status": "verified",
+                "counterpart_feature_profile": "contextual",
+            },
+        }
+        paths.manifest.write_text(json.dumps(manifest), encoding="utf-8")
 
     original_batch_reader = runner.iter_model_ready_validation_batches
 
     def tracked_validation_batches(
         path: Path,
         *,
+        feature_profile: str = "time-aware",
         batch_size: int = runner.PARQUET_ROW_GROUP_SIZE,
     ):
         fold_id = int(path.parent.name[-2:])
-        for frame in original_batch_reader(path, batch_size=7):
+        for frame in original_batch_reader(
+            path, feature_profile=feature_profile, batch_size=7
+        ):
             events.append(("validation_batch", fold_id))
             yield frame
 
     class FakeAdapter:
-        def __init__(self) -> None:
+        def __init__(self, *, feature_columns) -> None:
+            self.candidate_feature_columns = tuple(feature_columns)
+            self.feature_contract_name = config.feature_contract
+            self.fitted_feature_columns = tuple(feature_columns)
+            self.excluded_all_null_features = ()
+            self.categorical_feature_columns = ()
+            self.model_parameters = runner.LIGHTGBM_PARAMETERS
+            self.num_boost_round = runner.NUM_BOOST_ROUND
             self.fold_id = len(models) + 1
             self.predict_calls = 0
             models.append(self)
@@ -374,7 +456,6 @@ def _install_serial_fakes(
     def reject_row_loader(path: Path) -> tuple[runner.BacktestExample, ...]:
         raise AssertionError(f"row-object loader must not be used: {path}")
 
-    monkeypatch.setattr(runner, "build_approved_fold_datasets", fake_build)
     monkeypatch.setattr(
         runner,
         "iter_model_ready_validation_batches",
@@ -413,13 +494,18 @@ def test_runner_processes_four_fold_artifacts_serially(
     config = _config(tmp_path)
     source_before = config.source_path.read_bytes()
     events, models = _install_serial_fakes(monkeypatch, config)
+    fold_files = tuple(
+        path
+        for artifact in runner.approved_fold_artifact_paths(config.fold_output_dir)
+        for path in (artifact.training, artifact.validation, artifact.manifest)
+    )
+    fold_state_before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in fold_files}
 
     paths = runner.run_evaluation(config)
 
     assert len(models) == 4
     assert len({id(model) for model in models}) == 4
-    assert events[0] == ("build", 0)
-    cursor = 1
+    cursor = 0
     for fold_id, model in enumerate(models, start=1):
         assert events[cursor : cursor + 2] == [
             ("model", fold_id),
@@ -437,9 +523,24 @@ def test_runner_processes_four_fold_artifacts_serially(
     assert all(path.exists() for path in runner._path_values(paths))
     assert not hasattr(paths, "feature_examples")
     assert config.source_path.read_bytes() == source_before
+    assert {
+        path: (path.read_bytes(), path.stat().st_mtime_ns) for path in fold_files
+    } == fold_state_before
     manifest = json.loads(paths.run_manifest.read_text(encoding="utf-8"))
     assert manifest["evaluation"]["fold_count"] == 4
     assert manifest["evaluation"]["horizon_count"] == 16
+    assert manifest["fold_artifact_consumption"]["mode"] == "consumption-only"
+    assert manifest["fold_artifact_consumption"]["fold_artifacts_mutated"] is False
+    for record, artifact in zip(
+        manifest["folds"],
+        runner.approved_fold_artifact_paths(config.fold_output_dir),
+        strict=True,
+    ):
+        source_manifest = json.loads(artifact.manifest.read_text(encoding="utf-8"))
+        assert record["training_rows"] == source_manifest["training_row_count"]
+        assert record["validation_rows"] == source_manifest["validation_row_count"]
+        assert record["training_artifact"]["path"] == artifact.training.as_posix()
+        assert record["validation_artifact"]["path"] == artifact.validation.as_posix()
     assert manifest["final_holdout"]["scored"] is False
     assert manifest["final_holdout"]["materialized"] is False
     assert manifest["run"]["status"] == "completed"
@@ -494,17 +595,34 @@ def test_runner_processes_four_fold_artifacts_serially(
             rel=1e-14,
             abs=1e-14,
         )
-    fold_metrics = pd.read_csv(paths.fold_metrics)
-    horizon_metrics = pd.read_csv(paths.horizon_metrics)
-    assert tuple(fold_metrics["validation_rows"]) == (16,) * 4
-    assert tuple(horizon_metrics["validation_rows"]) == (4,) * 16
+    fold_metrics = json.loads(paths.fold_metrics.read_text(encoding="utf-8"))
+    horizon_metrics = json.loads(paths.horizon_metrics.read_text(encoding="utf-8"))
+    assert [record["fold_id"] for record in fold_metrics] == [1, 2, 3, 4]
+    assert [record["validation_rows"] for record in fold_metrics] == [16] * 4
+    assert [record["forecast_horizon"] for record in horizon_metrics] == list(
+        FORECAST_HORIZONS
+    )
+    assert [record["row_count"] for record in horizon_metrics] == [4] * 16
+    assert set(fold_metrics[0]) == {
+        "fold_id", "forecast_origin", "validation_start", "validation_end",
+        "validation_rows", *runner._METRIC_NAMES,
+    }
+    assert set(horizon_metrics[0]) == {
+        "forecast_horizon", "row_count", *runner._METRIC_NAMES,
+    }
+    assert not (config.output_dir / "fold_metrics.csv").exists()
+    assert not (config.output_dir / "horizon_metrics.csv").exists()
+    summary = paths.evaluation_summary.read_text(encoding="utf-8")
+    assert "# Favorita LightGBM Evaluation Summary" in summary
+    assert "four-fold expanding-window evaluation" in summary
+    assert "protected final holdout was not materialized or scored" in summary
     for fold_id, group in predictions.groupby("fold_id", sort=True):
         expected_fold = evaluate_favorita_forecasts(
             group["actual_unit_sales"],
             group["prediction"],
             group["perishable"],
         )
-        record = fold_metrics.loc[fold_metrics["fold_id"] == fold_id].iloc[0]
+        record = next(item for item in fold_metrics if item["fold_id"] == fold_id)
         for metric_name in runner._METRIC_NAMES:
             assert record[metric_name] == pytest.approx(
                 getattr(expected_fold, metric_name),
@@ -517,9 +635,10 @@ def test_runner_processes_four_fold_artifacts_serially(
             group["prediction"],
             group["perishable"],
         )
-        record = horizon_metrics.loc[
-            horizon_metrics["forecast_horizon"] == horizon
-        ].iloc[0]
+        record = next(
+            item for item in horizon_metrics
+            if item["forecast_horizon"] == horizon
+        )
         for metric_name in runner._METRIC_NAMES:
             assert record[metric_name] == pytest.approx(
                 getattr(expected_horizon, metric_name),
@@ -528,7 +647,54 @@ def test_runner_processes_four_fold_artifacts_serially(
             )
 
 
-def test_overwrite_preflight_runs_before_fold_build(
+def test_progress_messages_are_concise(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config = _config(tmp_path)
+    _install_serial_fakes(monkeypatch, config)
+
+    runner.run_evaluation(config)
+
+    output = capsys.readouterr().out
+    for fold_id in range(1, 5):
+        prefix = f"[Fold {fold_id}/4]"
+        assert f"{prefix} validating artifacts..." in output
+        assert f"{prefix} training LightGBM..." in output
+        assert f"{prefix} training completed in " in output
+        assert f"{prefix} evaluating validation rows..." in output
+        assert f"{prefix} evaluation completed in " in output
+        assert f"{prefix} completed" in output
+    assert f"Evaluation completed: {config.output_dir.as_posix()}" in output
+
+
+@pytest.mark.parametrize("status", ("pending-counterpart", "mismatch"))
+def test_unverified_cross_arm_evidence_fails_before_model_construction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+) -> None:
+    config = _config(tmp_path)
+    _, models = _install_serial_fakes(monkeypatch, config)
+    first_manifest = runner.approved_fold_artifact_paths(
+        config.fold_output_dir
+    )[0].manifest
+    payload = json.loads(first_manifest.read_text(encoding="utf-8"))
+    payload["cross_arm_row_equivalence"]["status"] = status
+    first_manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="cross-arm row equivalence must be verified"):
+        runner.run_evaluation(config)
+
+    assert models == []
+    assert not any(
+        path.exists()
+        for path in runner._path_values(runner._artifact_paths(config.output_dir))
+    )
+
+
+def test_output_preflight_runs_before_fold_artifact_read(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -538,12 +704,12 @@ def test_overwrite_preflight_runs_before_fold_build(
     paths.overall_metrics.write_text("existing", encoding="utf-8")
     called = False
 
-    def fake_build(config: object) -> tuple[dict[str, int], ...]:
+    def reject_fold_read(output_dir: Path) -> tuple[()]:
         nonlocal called
         called = True
         return ()
 
-    monkeypatch.setattr(runner, "build_approved_fold_datasets", fake_build)
+    monkeypatch.setattr(runner, "_read_existing_fold_evidence", reject_fold_read)
 
     with pytest.raises(FileExistsError, match="overall_metrics.json"):
         runner.run_evaluation(config)
@@ -600,19 +766,17 @@ def test_artifact_staging_failure_publishes_no_completed_outputs(
 ) -> None:
     config = _config(tmp_path)
     _install_serial_fakes(monkeypatch, config)
-    write_frame_atomic = runner._write_frame_atomic
+    write_json_list_atomic = runner._write_json_list_atomic
 
     def fail_horizon_write(
-        frame: pd.DataFrame,
+        payload: list[dict[str, object]],
         path: Path,
-        *,
-        overwrite: bool,
     ) -> None:
-        if path.name == "horizon_metrics.csv":
+        if path.name == "horizon_metrics.json":
             raise RuntimeError("staging failed")
-        write_frame_atomic(frame, path, overwrite=overwrite)
+        write_json_list_atomic(payload, path)
 
-    monkeypatch.setattr(runner, "_write_frame_atomic", fail_horizon_write)
+    monkeypatch.setattr(runner, "_write_json_list_atomic", fail_horizon_write)
 
     with pytest.raises(RuntimeError, match="staging failed"):
         runner.run_evaluation(config)
@@ -633,7 +797,12 @@ def test_manifest_configuration_matches_unsampled_contract(
     manifest = runner._manifest(
         config=config,
         paths=paths,
-        build_result={"creation_status": "not_run"},
+        fold_artifact_evidence={
+            "creation_status": "not_run",
+            "folds": [
+                {"training_row_count": 32} for _ in APPROVED_FOLDS
+            ],
+        },
         result=_streaming_summary(),
         started_at=timestamp,
         completed_at=timestamp,
@@ -654,6 +823,8 @@ def test_manifest_configuration_matches_unsampled_contract(
         "recursive_feedback",
         "future_promotion_assumption",
         "future_holiday_assumption",
+        "feature_contract",
+        "candidate_feature_columns",
         "model_parameters",
         "num_boost_round",
         "hyperparameter_tuning",
@@ -677,7 +848,57 @@ def test_cli_exposes_only_execution_options(tmp_path: Path) -> None:
         "-h",
         "--help",
         "--source-path",
-        "--output-dir",
-        "--fold-output-dir",
+        "--feature-contract",
         "--overwrite",
     }
+
+
+def test_multi_fold_runner_fails_before_model_when_fold_artifact_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _config(tmp_path)
+    constructed = False
+
+    class RejectAdapter:
+        def __init__(self, **kwargs: object) -> None:
+            nonlocal constructed
+            constructed = True
+
+    monkeypatch.setattr(runner, "FavoritaLightGBMAdapter", RejectAdapter)
+    with pytest.raises(FileNotFoundError, match="never builds folds"):
+        runner.run_evaluation(config)
+    assert constructed is False
+
+
+def test_profile_roots_are_separate_and_old_shared_root_is_not_used() -> None:
+    contextual = runner.resolve_feature_profile("contextual")
+    time_aware = runner.resolve_feature_profile("time-aware")
+    assert contextual.canonical_artifact_root == Path(
+        "artifacts/features/favorita_2017_four_fold_contextual"
+    )
+    assert time_aware.canonical_artifact_root == Path(
+        "artifacts/features/favorita_2017_four_fold_time_aware"
+    )
+    assert contextual.canonical_artifact_root != time_aware.canonical_artifact_root
+    assert Path("artifacts/features/favorita_2017_four_fold") not in (
+        contextual.canonical_artifact_root,
+        time_aware.canonical_artifact_root,
+    )
+
+
+
+def test_multi_cli_selects_matching_profile_specific_fold_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[runner.FavoritaEvaluationRunConfig] = []
+
+    def fake_run(config: runner.FavoritaEvaluationRunConfig):
+        captured.append(config)
+        return runner._artifact_paths(config.output_dir)
+
+    monkeypatch.setattr(runner, "run_evaluation", fake_run)
+    assert runner.main(["--feature-contract", "contextual"]) == 0
+    assert captured[0].fold_output_dir == Path(
+        "artifacts/features/favorita_2017_four_fold_contextual"
+    )
+    assert captured[0].output_dir == runner.CONTEXTUAL_OUTPUT_DIR

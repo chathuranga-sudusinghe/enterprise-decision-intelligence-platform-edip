@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import tempfile
+import time
 import uuid
 from collections.abc import Iterator, Sequence
 from dataclasses import asdict, dataclass
@@ -34,34 +36,58 @@ from pipelines.evaluation.favorita_temporal_validation import (
     APPROVED_FOLDS,
     FINAL_HOLDOUT,
     FORECAST_HORIZONS,
+    MODELING_TARGET_END,
+    MODELING_TARGET_START,
     TemporalValidationFold,
     validate_approved_contract,
 )
 from pipelines.features.build_favorita_fold_datasets import (
-    ALL_STORE_BATCHES,
+    CANONICAL_FOLD_IDS,
+    CANONICAL_VALIDATION_DESIGN,
     EXECUTION_SCOPE,
-    FoldDatasetBuildConfig,
+    FoldArtifactPaths,
     approved_fold_artifact_paths,
-    build_approved_fold_datasets,
     validate_canonical_fold_output_dir,
+)
+from pipelines.features.build_favorita_fold_datasets import (
+    CONTEXTUAL_OUTPUT_DIR as CONTEXTUAL_FOLD_OUTPUT_DIR,
 )
 from pipelines.features.build_favorita_fold_datasets import (
     DEFAULT_OUTPUT_DIR as DEFAULT_FOLD_OUTPUT_DIR,
 )
+from pipelines.features.build_favorita_fold_datasets import (
+    TIME_AWARE_OUTPUT_DIR as TIME_AWARE_FOLD_OUTPUT_DIR,
+)
 from pipelines.features.favorita_model_ready import (
     MODEL_FEATURE_COLUMNS,
     PARQUET_ROW_GROUP_SIZE,
+    ROW_KEY_TARGET_DIGEST_VERSION,
+    TIME_AWARE_FEATURE_PROFILE,
     TRAINING_OUTPUT_COLUMNS,
+    resolve_feature_profile,
     write_json_atomic,
 )
 from pipelines.models.favorita_lightgbm import (
+    FEATURE_CONTRACTS,
     LIGHTGBM_PARAMETERS,
     NUM_BOOST_ROUND,
+    TIME_AWARE_FEATURE_CONTRACT,
     FavoritaLightGBMAdapter,
+    resolve_feature_contract,
 )
 
 DEFAULT_SOURCE_PATH = Path("data/processed/favorita_cleaned/favorita_cleaned.parquet")
-DEFAULT_OUTPUT_DIR = Path("artifacts/evaluation/favorita_2017_four_fold_lightgbm")
+CONTEXTUAL_OUTPUT_DIR = Path(
+    "artifacts/evaluation/favorita_2017_four_fold_lightgbm_contextual"
+)
+TIME_AWARE_OUTPUT_DIR = Path(
+    "artifacts/evaluation/favorita_2017_four_fold_lightgbm_time_aware"
+)
+DEFAULT_OUTPUT_DIR = TIME_AWARE_OUTPUT_DIR
+FEATURE_CONTRACT_OUTPUT_DIRS = {
+    "contextual": CONTEXTUAL_OUTPUT_DIR,
+    "time-aware": TIME_AWARE_OUTPUT_DIR,
+}
 HISTORICAL_EVALUATION_OUTPUT_DIR = Path("artifacts/evaluation/favorita_lightgbm")
 EXPERIMENTAL_FEASIBILITY_FOLD_OUTPUT_DIR = Path(
     "artifacts/experiments/favorita_six_month_lightgbm_feasibility"
@@ -113,8 +139,20 @@ class FavoritaEvaluationRunConfig:
 
     source_path: Path
     output_dir: Path
+    feature_contract: str = TIME_AWARE_FEATURE_CONTRACT
     fold_output_dir: Path = DEFAULT_FOLD_OUTPUT_DIR
     overwrite: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ExistingFoldArtifactEvidence:
+    """Validated read-only evidence for one canonical persisted fold."""
+
+    fold: TemporalValidationFold
+    paths: FoldArtifactPaths
+    manifest: dict[str, Any]
+    training_rows: int
+    validation_rows: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,6 +164,7 @@ class EvaluationArtifactPaths:
     horizon_metrics: Path
     predictions: Path
     run_manifest: Path
+    evaluation_summary: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,6 +175,7 @@ class StreamingFoldMetricRecord:
     validation_end: date
     metrics: ForecastMetricResults
     row_count: int
+    model_evidence: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,10 +196,11 @@ class StreamingEvaluationSummary:
 def _artifact_paths(output_dir: Path) -> EvaluationArtifactPaths:
     return EvaluationArtifactPaths(
         overall_metrics=output_dir / "overall_metrics.json",
-        fold_metrics=output_dir / "fold_metrics.csv",
-        horizon_metrics=output_dir / "horizon_metrics.csv",
+        fold_metrics=output_dir / "fold_metrics.json",
+        horizon_metrics=output_dir / "horizon_metrics.json",
         predictions=output_dir / "predictions.parquet",
         run_manifest=output_dir / "run_manifest.json",
+        evaluation_summary=output_dir / "evaluation_summary.md",
     )
 
 
@@ -196,7 +237,12 @@ def validate_evaluation_config(config: FavoritaEvaluationRunConfig) -> None:
     """Reject ambiguous origins, unsafe paths, and any holdout exposure."""
 
     validate_approved_contract()
+    resolve_feature_contract(config.feature_contract)
+    profile = resolve_feature_profile(config.feature_contract)
     validate_evaluation_fold_output_dir(config.fold_output_dir)
+    if config.fold_output_dir in (CONTEXTUAL_FOLD_OUTPUT_DIR, TIME_AWARE_FOLD_OUTPUT_DIR):
+        if config.fold_output_dir != profile.canonical_artifact_root:
+            raise ValueError("Feature contract and canonical fold artifact root differ")
     validate_evaluation_result_output_dir(config.output_dir)
     accumulated_results = config.output_dir / ACCUMULATED_RESULTS_FILENAME
     if accumulated_results.exists():
@@ -288,14 +334,16 @@ def load_model_ready_frame(feature_path: Path) -> pd.DataFrame:
 def iter_model_ready_validation_batches(
     feature_path: Path,
     *,
+    feature_profile: str = TIME_AWARE_FEATURE_PROFILE,
     batch_size: int = PARQUET_ROW_GROUP_SIZE,
 ) -> Iterator[pd.DataFrame]:
     """Yield one ordered model-ready validation batch at a time."""
 
     if batch_size <= 0:
         raise ValueError("batch_size must be positive")
+    profile = resolve_feature_profile(feature_profile)
     parquet_file = pq.ParquetFile(feature_path)
-    if tuple(parquet_file.schema_arrow.names) != TRAINING_OUTPUT_COLUMNS:
+    if not parquet_file.schema_arrow.equals(profile.arrow_schema):
         parquet_file.close()
         raise ValueError(
             "Validation Parquet must match the ordered training schema"
@@ -304,10 +352,10 @@ def iter_model_ready_validation_batches(
     try:
         for batch in parquet_file.iter_batches(
             batch_size=batch_size,
-            columns=list(TRAINING_OUTPUT_COLUMNS),
+            columns=list(profile.output_columns),
         ):
             frame = batch.to_pandas()
-            if tuple(frame.columns) != TRAINING_OUTPUT_COLUMNS:
+            if tuple(frame.columns) != profile.output_columns:
                 raise ValueError(
                     "Validation batch must match the ordered training schema"
                 )
@@ -412,8 +460,11 @@ def _validate_validation_batch(
     fold: TemporalValidationFold,
     frame: pd.DataFrame,
     key_tracker: _ValidationKeyTracker,
+    *,
+    feature_profile: str = TIME_AWARE_FEATURE_PROFILE,
 ) -> None:
-    if tuple(frame.columns) != TRAINING_OUTPUT_COLUMNS:
+    profile = resolve_feature_profile(feature_profile)
+    if tuple(frame.columns) != profile.output_columns:
         raise ValueError("Validation batch must match the ordered training schema")
     origins = pd.to_datetime(frame["forecast_origin"])
     forecast_dates = pd.to_datetime(frame["forecast_date"])
@@ -447,6 +498,7 @@ def _validate_validation_batch(
 def _stream_fold_validation(
     *,
     fold: TemporalValidationFold,
+    training_path: Path,
     validation_path: Path,
     model: FavoritaLightGBMAdapter,
     prediction_writer: _StreamingPredictionWriter,
@@ -456,8 +508,15 @@ def _stream_fold_validation(
     fold_accumulator = FavoritaMetricAccumulator()
     key_tracker = _ValidationKeyTracker()
     observed_horizons: set[int] = set()
-    for frame in iter_model_ready_validation_batches(validation_path):
-        _validate_validation_batch(fold, frame, key_tracker)
+    for frame in iter_model_ready_validation_batches(
+        validation_path, feature_profile=model.feature_contract_name
+    ):
+        _validate_validation_batch(
+            fold,
+            frame,
+            key_tracker,
+            feature_profile=model.feature_contract_name,
+        )
         predictions = np.asarray(model.predict_frame(frame), dtype="float64")
         if predictions.ndim != 1 or len(predictions) != len(frame):
             raise ValueError(
@@ -493,6 +552,23 @@ def _stream_fold_validation(
         validation_end=fold.validation_end,
         metrics=fold_accumulator.finalize(),
         row_count=fold_accumulator.count,
+        model_evidence={
+            "feature_contract": model.feature_contract_name,
+            "candidate_feature_columns": list(model.candidate_feature_columns),
+            "fitted_feature_columns": list(model.fitted_feature_columns),
+            "excluded_all_null_features": list(model.excluded_all_null_features),
+            "categorical_feature_columns": list(model.categorical_feature_columns),
+            "model_parameters": dict(model.model_parameters),
+            "num_boost_round": model.num_boost_round,
+            "training_artifact": {
+                "path": training_path.as_posix(),
+                **_source_state(training_path),
+            },
+            "validation_artifact": {
+                "path": validation_path.as_posix(),
+                **_source_state(validation_path),
+            },
+        },
     )
 
 
@@ -597,8 +673,10 @@ def _metrics_record(metrics: ForecastMetricResults) -> dict[str, float]:
     return {name: float(values[name]) for name in _METRIC_NAMES}
 
 
-def _fold_metrics_frame(result: StreamingEvaluationSummary) -> pd.DataFrame:
-    return pd.DataFrame.from_records(
+def _fold_metrics_records(
+    result: StreamingEvaluationSummary,
+) -> list[dict[str, Any]]:
+    return [
         {
             "fold_id": fold.fold_id,
             "forecast_origin": fold.forecast_origin.isoformat(),
@@ -608,18 +686,109 @@ def _fold_metrics_frame(result: StreamingEvaluationSummary) -> pd.DataFrame:
             **_metrics_record(fold.metrics),
         }
         for fold in result.fold_metrics
-    )
+    ]
 
 
-def _horizon_metrics_frame(result: StreamingEvaluationSummary) -> pd.DataFrame:
-    return pd.DataFrame.from_records(
+def _horizon_metrics_records(
+    result: StreamingEvaluationSummary,
+) -> list[dict[str, Any]]:
+    return [
         {
             "forecast_horizon": horizon.forecast_horizon,
-            "validation_rows": horizon.row_count,
+            "row_count": horizon.row_count,
             **_metrics_record(horizon.metrics),
         }
         for horizon in result.horizon_metrics
+    ]
+
+
+def _write_json_list_atomic(payload: list[dict[str, Any]], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        raise FileExistsError(path)
+    temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temp_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        json.loads(temp_path.read_text(encoding="utf-8"))
+        os.replace(temp_path, path)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def _evaluation_summary_markdown(
+    *,
+    config: FavoritaEvaluationRunConfig,
+    result: StreamingEvaluationSummary,
+    started_at: datetime,
+    completed_at: datetime,
+) -> str:
+    lines = [
+        "# Favorita LightGBM Evaluation Summary",
+        "",
+        f"- Experiment: SCRUM-18 {config.feature_contract} LightGBM evaluation",
+        f"- Feature contract: `{config.feature_contract}`",
+        "- Model: `FavoritaLightGBMAdapter`",
+        "- Evaluation: four-fold expanding-window evaluation",
+        f"- Started (UTC): {started_at.isoformat()}",
+        f"- Completed (UTC): {completed_at.isoformat()}",
+        f"- Prediction rows: {result.prediction_row_count}",
+        "- Protected final holdout: unscored",
+        "- Holdout note: the protected final holdout was not materialized or scored.",
+        "",
+        "## Overall metrics",
+        "",
+        "| Metric | Value |",
+        "|---|---:|",
+        *[
+            f"| {name} | {value:.12g} |"
+            for name, value in _metrics_record(result.overall_metrics).items()
+        ],
+        "",
+        "## Per-fold metrics",
+        "",
+        "| Fold | Forecast origin | Validation start | Validation end | Rows | MAE | RMSE | WAPE | Bias | RMSLE | NWRMSLE |",
+        "|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for record in _fold_metrics_records(result):
+        lines.append(
+            "| {fold_id} | {forecast_origin} | {validation_start} | "
+            "{validation_end} | {validation_rows} | {mae:.12g} | {rmse:.12g} | "
+            "{wape:.12g} | {bias:.12g} | {rmsle:.12g} | {nwrmsle:.12g} |".format(
+                **record
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Per-horizon metrics",
+            "",
+            "| Horizon | Rows | MAE | RMSE | WAPE | Bias | RMSLE | NWRMSLE |",
+            "|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
     )
+    for record in _horizon_metrics_records(result):
+        lines.append(
+            "| {forecast_horizon} | {row_count} | {mae:.12g} | {rmse:.12g} | "
+            "{wape:.12g} | {bias:.12g} | {rmsle:.12g} | {nwrmsle:.12g} |".format(
+                **record
+            )
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _write_text_atomic(text: str, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        raise FileExistsError(path)
+    temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temp_path.write_text(text, encoding="utf-8")
+        os.replace(temp_path, path)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def _predictions_frame(result: BacktestResult) -> pd.DataFrame:
@@ -637,9 +806,7 @@ def _write_frame_atomic(
         raise FileExistsError(path)
     temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
-        if path.suffix == ".csv":
-            frame.to_csv(temp_path, index=False)
-        elif path.suffix == ".parquet":
+        if path.suffix == ".parquet":
             frame.to_parquet(temp_path, index=False, compression="zstd")
         else:
             raise ValueError(f"Unsupported dataframe artifact format: {path.suffix}")
@@ -674,7 +841,7 @@ def _manifest(
     *,
     config: FavoritaEvaluationRunConfig,
     paths: EvaluationArtifactPaths,
-    build_result: dict[str, Any],
+    fold_artifact_evidence: dict[str, Any],
     result: StreamingEvaluationSummary,
     started_at: datetime,
     completed_at: datetime,
@@ -707,6 +874,10 @@ def _manifest(
             "recursive_feedback": False,
             "future_promotion_assumption": False,
             "future_holiday_assumption": False,
+            "feature_contract": config.feature_contract,
+            "candidate_feature_columns": list(
+                resolve_feature_contract(config.feature_contract)
+            ),
             "model_parameters": dict(LIGHTGBM_PARAMETERS),
             "num_boost_round": NUM_BOOST_ROUND,
             "hyperparameter_tuning": False,
@@ -718,8 +889,15 @@ def _manifest(
                 "forecast_origin": fold.forecast_origin.isoformat(),
                 "validation_start": fold.validation_start.isoformat(),
                 "validation_end": fold.validation_end.isoformat(),
+                "training_rows": fold_artifact_evidence["folds"][index][
+                    "training_row_count"
+                ],
+                "validation_rows": metric.row_count,
+                **metric.model_evidence,
             }
-            for fold in APPROVED_FOLDS
+            for index, (fold, metric) in enumerate(
+                zip(APPROVED_FOLDS, result.fold_metrics, strict=True)
+            )
         ],
         "final_holdout": {
             "forecast_origin": FINAL_HOLDOUT.forecast_origin.isoformat(),
@@ -728,7 +906,7 @@ def _manifest(
             "scored": False,
             "materialized": False,
         },
-        "feature_materialization": build_result,
+        "fold_artifact_consumption": fold_artifact_evidence,
         "training_memory": {
             "training_input": "Parquet row-group LightGBM Sequence",
             "python_backtest_examples_materialized": False,
@@ -762,6 +940,9 @@ def _publish_completed_artifacts(
     stage_paths: EvaluationArtifactPaths,
     result: StreamingEvaluationSummary,
     manifest: dict[str, Any],
+    config: FavoritaEvaluationRunConfig,
+    started_at: datetime,
+    completed_at: datetime,
 ) -> None:
     """Finish staged summaries, then publish the completed manifest last."""
 
@@ -770,15 +951,22 @@ def _publish_completed_artifacts(
         stage_paths.overall_metrics,
         overwrite=False,
     )
-    _write_frame_atomic(
-        _fold_metrics_frame(result),
+    _write_json_list_atomic(
+        _fold_metrics_records(result),
         stage_paths.fold_metrics,
-        overwrite=False,
     )
-    _write_frame_atomic(
-        _horizon_metrics_frame(result),
+    _write_json_list_atomic(
+        _horizon_metrics_records(result),
         stage_paths.horizon_metrics,
-        overwrite=False,
+    )
+    _write_text_atomic(
+        _evaluation_summary_markdown(
+            config=config,
+            result=result,
+            started_at=started_at,
+            completed_at=completed_at,
+        ),
+        stage_paths.evaluation_summary,
     )
     if not stage_paths.predictions.is_file():
         raise FileNotFoundError(stage_paths.predictions)
@@ -812,10 +1000,207 @@ def _publish_completed_artifacts(
         shutil.rmtree(backup_dir, ignore_errors=True)
 
 
+def _positive_manifest_row_count(
+    manifest: dict[str, Any], *, fold_id: int, key: str
+) -> int:
+    value = manifest.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"Fold {fold_id} manifest {key} must be a positive integer")
+    return value
+
+
+def _validate_existing_fold_parquet(
+    path: Path,
+    *,
+    partition: str,
+    expected_rows: int,
+    fold: TemporalValidationFold,
+    feature_profile: str,
+) -> None:
+    profile = resolve_feature_profile(feature_profile)
+    parquet_file = pq.ParquetFile(path)
+    try:
+        if not parquet_file.schema_arrow.equals(profile.arrow_schema):
+            raise ValueError(
+                f"{partition} Parquet must match the ordered model-ready schema"
+            )
+        if tuple(parquet_file.schema_arrow.names) != profile.output_columns:
+            raise ValueError(
+                f"{partition} Parquet must match the ordered training columns"
+            )
+        if parquet_file.metadata.num_rows != expected_rows:
+            raise ValueError(
+                f"{partition} Parquet row count does not match its fold manifest"
+            )
+        bounds: dict[str, tuple[Any, Any]] = {}
+        for column in ("forecast_origin", "forecast_date", "forecast_horizon"):
+            column_index = parquet_file.schema_arrow.get_field_index(column)
+            statistics = [
+                parquet_file.metadata.row_group(index).column(column_index).statistics
+                for index in range(parquet_file.metadata.num_row_groups)
+            ]
+            if any(
+                value is None
+                or not value.has_min_max
+                or value.null_count
+                for value in statistics
+            ):
+                raise ValueError(
+                    f"{partition} Parquet lacks complete {column} footer statistics"
+                )
+            bounds[column] = (
+                min(value.min for value in statistics),
+                max(value.max for value in statistics),
+            )
+        def as_date(value: Any) -> Any:
+            return value.date() if hasattr(value, "date") else value
+
+        origin_min, origin_max = map(as_date, bounds["forecast_origin"])
+        target_min, target_max = map(as_date, bounds["forecast_date"])
+        horizon_min, horizon_max = map(int, bounds["forecast_horizon"])
+        if (horizon_min, horizon_max) != (1, len(FORECAST_HORIZONS)):
+            raise ValueError(f"{partition} Parquet horizons must span 1 through 16")
+        if partition == "Training":
+            if (target_min, target_max) != (MODELING_TARGET_START, fold.forecast_origin):
+                raise ValueError("Training Parquet target dates are not canonical")
+            if origin_max >= fold.forecast_origin:
+                raise ValueError("Training Parquet origins must precede fold origin")
+        elif (origin_min, origin_max, target_min, target_max) != (
+            fold.forecast_origin,
+            fold.forecast_origin,
+            fold.validation_start,
+            fold.validation_end,
+        ):
+            raise ValueError("Validation Parquet temporal bounds are not canonical")
+    finally:
+        parquet_file.close()
+
+
+def _read_existing_fold_evidence(
+    output_dir: Path, *, feature_profile: str
+) -> tuple[ExistingFoldArtifactEvidence, ...]:
+    """Read and validate all canonical persisted folds without writing artifacts."""
+
+    profile = resolve_feature_profile(feature_profile)
+    evidence: list[ExistingFoldArtifactEvidence] = []
+    for fold, paths in zip(
+        APPROVED_FOLDS, approved_fold_artifact_paths(output_dir), strict=True
+    ):
+        missing = tuple(
+            path
+            for path in (paths.training, paths.validation, paths.manifest)
+            if not path.is_file()
+        )
+        if missing:
+            raise FileNotFoundError(
+                "Canonical fold artifacts must already exist; this runner never "
+                "builds folds: " + ", ".join(path.as_posix() for path in missing)
+            )
+        try:
+            manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"Fold {fold.fold_id} manifest is not valid JSON"
+            ) from exc
+        if not isinstance(manifest, dict):
+            raise ValueError(f"Fold {fold.fold_id} manifest must be a JSON object")
+        expected = {
+            "fold_id": fold.fold_id,
+            "canonical_fold_id": fold.fold_id,
+            "canonical_fold_count": len(APPROVED_FOLDS),
+            "canonical_validation_design": CANONICAL_VALIDATION_DESIGN,
+            "execution_scope": EXECUTION_SCOPE,
+            "experiment_subset": list(CANONICAL_FOLD_IDS),
+            "canonical_contract_enforced": True,
+            "forecast_origin": fold.forecast_origin.isoformat(),
+            "validation_start": fold.validation_start.isoformat(),
+            "validation_end": fold.validation_end.isoformat(),
+            "artifact_root": output_dir.as_posix(),
+            "modeling_target_start": MODELING_TARGET_START.isoformat(),
+            "modeling_target_end": MODELING_TARGET_END.isoformat(),
+            "training_target_start": MODELING_TARGET_START.isoformat(),
+            "training_target_end": fold.forecast_origin.isoformat(),
+            "max_items_per_store": None,
+            "feature_profile": profile.name,
+            "feature_profile_version": profile.version,
+            "model_feature_columns": list(profile.model_feature_columns),
+            "ordered_schema": list(profile.output_columns),
+            "final_holdout_excluded": True,
+            "future_actual_leakage": False,
+        }
+        for key, value in expected.items():
+            if manifest.get(key) != value:
+                raise ValueError(
+                    f"Fold {fold.fold_id} manifest {key} must equal {value!r}"
+                )
+        cross_arm = manifest.get("cross_arm_row_equivalence")
+        if not isinstance(cross_arm, dict):
+            raise ValueError(
+                f"Fold {fold.fold_id} manifest lacks cross-arm row equivalence evidence"
+            )
+        status = cross_arm.get("status")
+        if status != "verified":
+            raise ValueError(
+                f"Fold {fold.fold_id} cross-arm row equivalence must be verified; "
+                f"found {status!r}"
+            )
+
+        for partition in ("training", "validation"):
+            if manifest.get(
+                f"{partition}_row_key_target_digest_version"
+            ) != ROW_KEY_TARGET_DIGEST_VERSION:
+                raise ValueError(
+                    f"Fold {fold.fold_id} manifest {partition} digest version is invalid"
+                )
+            digest = manifest.get(f"{partition}_row_key_target_sha256")
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(
+                    character not in "0123456789abcdef" for character in digest
+                )
+            ):
+                raise ValueError(
+                    f"Fold {fold.fold_id} manifest {partition} digest is invalid"
+                )
+        if fold.validation_end >= FINAL_HOLDOUT.holdout_start:
+            raise ValueError("Canonical validation enters the protected final holdout")
+        training_rows = _positive_manifest_row_count(
+            manifest, fold_id=fold.fold_id, key="training_row_count"
+        )
+        validation_rows = _positive_manifest_row_count(
+            manifest, fold_id=fold.fold_id, key="validation_row_count"
+        )
+        _validate_existing_fold_parquet(
+            paths.training,
+            partition="Training",
+            expected_rows=training_rows,
+            fold=fold,
+            feature_profile=profile.name,
+        )
+        _validate_existing_fold_parquet(
+            paths.validation,
+            partition="Validation",
+            expected_rows=validation_rows,
+            fold=fold,
+            feature_profile=profile.name,
+        )
+        evidence.append(
+            ExistingFoldArtifactEvidence(
+                fold=fold,
+                paths=paths,
+                manifest=manifest,
+                training_rows=training_rows,
+                validation_rows=validation_rows,
+            )
+        )
+    return tuple(evidence)
+
+
 def run_evaluation(
     config: FavoritaEvaluationRunConfig,
 ) -> EvaluationArtifactPaths:
-    """Build, fit, and stream-score each approved fold serially."""
+    """Consume, fit, and stream-score each approved persisted fold serially."""
 
     validate_evaluation_config(config)
     paths = _artifact_paths(config.output_dir)
@@ -823,17 +1208,11 @@ def run_evaluation(
     source_state = _source_state(config.source_path)
     started_at = datetime.now(timezone.utc)
 
-    fold_build_manifests = build_approved_fold_datasets(
-        FoldDatasetBuildConfig(
-            source_path=config.source_path,
-            output_dir=config.fold_output_dir,
-            store_batches=ALL_STORE_BATCHES,
-            max_items_per_store=None,
-            overwrite=config.overwrite,
-        )
+    fold_evidence = _read_existing_fold_evidence(
+        config.fold_output_dir, feature_profile=config.feature_contract
     )
-    if len(fold_build_manifests) != len(APPROVED_FOLDS):
-        raise ValueError("Fold materialization must return exactly 4 manifests")
+    if len(fold_evidence) != len(APPROVED_FOLDS):
+        raise ValueError("Evaluation requires exactly 4 validated persisted folds")
 
     paths.run_manifest.parent.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
@@ -848,17 +1227,27 @@ def run_evaluation(
         }
         fold_metrics: list[StreamingFoldMetricRecord] = []
         try:
-            fold_paths = approved_fold_artifact_paths(config.fold_output_dir)
-            for fold, artifact_paths in zip(
-                APPROVED_FOLDS,
-                fold_paths,
-                strict=True,
-            ):
-                model = FavoritaLightGBMAdapter()
+            for artifact_evidence in fold_evidence:
+                fold = artifact_evidence.fold
+                artifact_paths = artifact_evidence.paths
+                prefix = f"[Fold {fold.fold_id}/{len(APPROVED_FOLDS)}]"
+                print(f"{prefix} validating artifacts...")
+                print(f"{prefix} training LightGBM...")
+                training_started = time.monotonic()
+                model = FavoritaLightGBMAdapter(
+                    feature_columns=resolve_feature_contract(config.feature_contract)
+                )
                 model.fit_parquet(artifact_paths.training)
+                print(
+                    f"{prefix} training completed in "
+                    f"{time.monotonic() - training_started:.1f}s"
+                )
+                print(f"{prefix} evaluating validation rows...")
+                evaluation_started = time.monotonic()
                 fold_metrics.append(
                     _stream_fold_validation(
                         fold=fold,
+                        training_path=artifact_paths.training,
                         validation_path=artifact_paths.validation,
                         model=model,
                         prediction_writer=prediction_writer,
@@ -866,6 +1255,11 @@ def run_evaluation(
                         horizon_accumulators=horizon_accumulators,
                     )
                 )
+                print(
+                    f"{prefix} evaluation completed in "
+                    f"{time.monotonic() - evaluation_started:.1f}s"
+                )
+                print(f"{prefix} completed")
                 del model
             prediction_writer.close()
         except Exception:
@@ -896,16 +1290,18 @@ def run_evaluation(
         completed_at = datetime.now(timezone.utc)
         if _source_state(config.source_path) != source_state:
             raise AssertionError("Cleaned source changed during evaluation")
-        build_result = {
+        artifact_evidence = {
+            "mode": "consumption-only",
             "output_dir": config.fold_output_dir.as_posix(),
-            "fold_count": len(fold_build_manifests),
-            "folds": list(fold_build_manifests),
+            "fold_count": len(fold_evidence),
+            "folds": [item.manifest for item in fold_evidence],
             "consumed_serially": True,
+            "fold_artifacts_mutated": False,
         }
         manifest = _manifest(
             config=config,
             paths=paths,
-            build_result=build_result,
+            fold_artifact_evidence=artifact_evidence,
             result=result,
             started_at=started_at,
             completed_at=completed_at,
@@ -916,10 +1312,14 @@ def run_evaluation(
             stage_paths=stage_paths,
             result=result,
             manifest=manifest,
+            config=config,
+            started_at=started_at,
+            completed_at=completed_at,
         )
     if _source_state(config.source_path) != source_state:
         paths.run_manifest.unlink(missing_ok=True)
         raise AssertionError("Cleaned source changed during artifact publication")
+    print(f"Evaluation completed: {config.output_dir.as_posix()}")
     return paths
 
 
@@ -930,11 +1330,10 @@ def _argument_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument("--source-path", type=Path, default=DEFAULT_SOURCE_PATH)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument(
-        "--fold-output-dir",
-        type=Path,
-        default=DEFAULT_FOLD_OUTPUT_DIR,
+        "--feature-contract",
+        required=True,
+        choices=tuple(FEATURE_CONTRACTS),
     )
     parser.add_argument("--overwrite", action="store_true")
     return parser
@@ -945,8 +1344,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     paths = run_evaluation(
         FavoritaEvaluationRunConfig(
             source_path=args.source_path,
-            output_dir=args.output_dir,
-            fold_output_dir=args.fold_output_dir,
+            output_dir=FEATURE_CONTRACT_OUTPUT_DIRS[args.feature_contract],
+            feature_contract=args.feature_contract,
+            fold_output_dir=resolve_feature_profile(
+                args.feature_contract
+            ).canonical_artifact_root,
             overwrite=args.overwrite,
         )
     )
