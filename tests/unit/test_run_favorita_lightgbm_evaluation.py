@@ -827,15 +827,58 @@ def test_manifest_configuration_matches_unsampled_contract(
         "candidate_feature_columns",
         "model_parameters",
         "num_boost_round",
+        "custom_model_configuration",
         "hyperparameter_tuning",
         "early_stopping",
     }
     assert manifest["configuration"]["store_count"] == 54
     assert manifest["configuration"]["max_items_per_store"] is None
+    assert manifest["configuration"]["model_parameters"] == dict(
+        runner.LIGHTGBM_PARAMETERS
+    )
+    assert manifest["configuration"]["num_boost_round"] == runner.NUM_BOOST_ROUND
+    assert manifest["configuration"]["custom_model_configuration"] is False
+    assert manifest["configuration"]["hyperparameter_tuning"] is False
     assert manifest["final_holdout"]["scored"] is False
     assert manifest["final_holdout"]["materialized"] is False
     assert manifest["evaluation"]["prediction_rows"] == 64
     assert manifest["validation_memory"]["validation_input"] == "Parquet batches"
+
+
+def test_manifest_reports_effective_custom_model_configuration(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    tuned = runner.FavoritaEvaluationRunConfig(
+        source_path=config.source_path,
+        output_dir=config.output_dir,
+        feature_contract=config.feature_contract,
+        fold_output_dir=config.fold_output_dir,
+        model_parameters={"learning_rate": 0.02, "num_leaves": 63},
+        num_boost_round=300,
+    )
+    timestamp = datetime.now(timezone.utc)
+
+    manifest = runner._manifest(
+        config=tuned,
+        paths=runner._artifact_paths(tuned.output_dir),
+        fold_artifact_evidence={
+            "creation_status": "not_run",
+            "folds": [
+                {"training_row_count": 32} for _ in APPROVED_FOLDS
+            ],
+        },
+        result=_streaming_summary(),
+        started_at=timestamp,
+        completed_at=timestamp,
+        source_state={"size_bytes": 16, "mtime_ns": 1},
+    )
+
+    configuration = manifest["configuration"]
+    assert configuration["model_parameters"]["learning_rate"] == 0.02
+    assert configuration["model_parameters"]["num_leaves"] == 63
+    assert configuration["model_parameters"]["objective"] == "regression"
+    assert configuration["num_boost_round"] == 300
+    assert configuration["custom_model_configuration"] is True
+    assert configuration["hyperparameter_tuning"] is True
 
 
 def test_cli_exposes_only_execution_options(tmp_path: Path) -> None:

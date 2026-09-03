@@ -9,7 +9,7 @@ import shutil
 import tempfile
 import time
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -142,6 +142,8 @@ class FavoritaEvaluationRunConfig:
     feature_contract: str = TIME_AWARE_FEATURE_CONTRACT
     fold_output_dir: Path = DEFAULT_FOLD_OUTPUT_DIR
     overwrite: bool = False
+    model_parameters: Mapping[str, object] | None = None
+    num_boost_round: int = NUM_BOOST_ROUND
 
 
 @dataclass(frozen=True, slots=True)
@@ -847,6 +849,12 @@ def _manifest(
     completed_at: datetime,
     source_state: dict[str, int],
 ) -> dict[str, Any]:
+    effective_model_parameters = dict(LIGHTGBM_PARAMETERS)
+    effective_model_parameters.update(config.model_parameters or {})
+    custom_model_configuration = (
+        config.model_parameters is not None
+        or config.num_boost_round != NUM_BOOST_ROUND
+    )
     return {
         "namespace": {
             "execution_scope": EXECUTION_SCOPE,
@@ -878,9 +886,10 @@ def _manifest(
             "candidate_feature_columns": list(
                 resolve_feature_contract(config.feature_contract)
             ),
-            "model_parameters": dict(LIGHTGBM_PARAMETERS),
-            "num_boost_round": NUM_BOOST_ROUND,
-            "hyperparameter_tuning": False,
+            "model_parameters": effective_model_parameters,
+            "num_boost_round": config.num_boost_round,
+            "custom_model_configuration": custom_model_configuration,
+            "hyperparameter_tuning": custom_model_configuration,
             "early_stopping": False,
         },
         "folds": [
@@ -1234,9 +1243,20 @@ def run_evaluation(
                 print(f"{prefix} validating artifacts...")
                 print(f"{prefix} training LightGBM...")
                 training_started = time.monotonic()
-                model = FavoritaLightGBMAdapter(
-                    feature_columns=resolve_feature_contract(config.feature_contract)
-                )
+                feature_columns = resolve_feature_contract(config.feature_contract)
+                if (
+                    config.model_parameters is None
+                    and config.num_boost_round == NUM_BOOST_ROUND
+                ):
+                    model = FavoritaLightGBMAdapter(
+                        feature_columns=feature_columns
+                    )
+                else:
+                    model = FavoritaLightGBMAdapter(
+                        feature_columns=feature_columns,
+                        model_parameters=config.model_parameters,
+                        num_boost_round=config.num_boost_round,
+                    )
                 model.fit_parquet(artifact_paths.training)
                 print(
                     f"{prefix} training completed in "

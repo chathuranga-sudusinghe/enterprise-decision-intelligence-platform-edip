@@ -211,6 +211,65 @@ def test_adapter_fits_and_predicts_with_tiny_synthetic_data() -> None:
     assert isfinite(predictions[0].prediction)
 
 
+def test_custom_configuration_is_copied_exposed_and_used(monkeypatch) -> None:
+    supplied = {
+        "learning_rate": 0.02,
+        "num_leaves": 63,
+        "min_data_in_leaf": 11,
+        "feature_fraction": 0.75,
+    }
+    captured: dict[str, object] = {}
+
+    class Booster:
+        pass
+
+    def fake_train(parameters, dataset, *, num_boost_round):
+        captured["parameters"] = parameters
+        captured["num_boost_round"] = num_boost_round
+        return Booster()
+
+    monkeypatch.setattr("pipelines.models.favorita_lightgbm.lgb.train", fake_train)
+    adapter = FavoritaLightGBMAdapter(
+        model_parameters=supplied,
+        num_boost_round=250,
+    )
+    supplied["learning_rate"] = 0.9
+    adapter.fit(_training_rows())
+
+    assert adapter.model_parameters["learning_rate"] == 0.02
+    assert adapter.model_parameters["num_leaves"] == 63
+    assert adapter.model_parameters["min_data_in_leaf"] == 11
+    assert adapter.model_parameters["feature_fraction"] == 0.75
+    assert adapter.num_boost_round == 250
+    assert captured["parameters"] == dict(adapter.model_parameters)
+    assert captured["num_boost_round"] == 250
+
+
+def test_fit_parquet_uses_custom_configuration(tmp_path: Path, monkeypatch) -> None:
+    frame = _model_ready_frame()
+    training_path = tmp_path / "training.parquet"
+    _write_model_ready_parquet(frame, training_path)
+    captured: dict[str, object] = {}
+
+    class Booster:
+        pass
+
+    def fake_train(parameters, dataset, *, num_boost_round):
+        captured["parameters"] = parameters
+        captured["num_boost_round"] = num_boost_round
+        return Booster()
+
+    monkeypatch.setattr("pipelines.models.favorita_lightgbm.lgb.train", fake_train)
+    adapter = FavoritaLightGBMAdapter(
+        model_parameters={"learning_rate": 0.03},
+        num_boost_round=200,
+    )
+    adapter.fit_parquet(training_path)
+
+    assert captured["parameters"] == dict(adapter.model_parameters)
+    assert captured["num_boost_round"] == 200
+
+
 def test_prediction_before_fit_is_rejected() -> None:
     with pytest.raises(RuntimeError, match="must be fitted"):
         FavoritaLightGBMAdapter().predict((_model_input(),))
