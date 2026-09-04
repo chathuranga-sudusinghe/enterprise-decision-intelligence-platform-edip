@@ -9,7 +9,7 @@ import shutil
 import tempfile
 import time
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -142,6 +142,8 @@ class FavoritaEvaluationRunConfig:
     feature_contract: str = TIME_AWARE_FEATURE_CONTRACT
     fold_output_dir: Path = DEFAULT_FOLD_OUTPUT_DIR
     overwrite: bool = False
+    model_parameters: Mapping[str, object] | None = None
+    num_boost_round: int = NUM_BOOST_ROUND
 
 
 @dataclass(frozen=True, slots=True)
@@ -456,7 +458,7 @@ class _StreamingPredictionWriter:
         self.path.unlink(missing_ok=True)
 
 
-def _validate_validation_batch(
+def _validate_direct_horizon_batch(
     fold: TemporalValidationFold,
     frame: pd.DataFrame,
     key_tracker: _ValidationKeyTracker,
@@ -485,14 +487,32 @@ def _validate_validation_batch(
         raise ValueError(
             f"Fold {fold.fold_id} validation rows are outside O+1..O+16"
         )
-    if not (forecast_dates.dt.date < FINAL_HOLDOUT.holdout_start).all():
-        raise ValueError("Final holdout rows must not be evaluated")
     actual = frame["unit_sales"].to_numpy(dtype="float64", copy=False)
     if not np.isfinite(actual).all():
         raise ValueError("Validation unit_sales must contain only finite values")
     if not frame["perishable"].isin((0, 1, False, True)).all():
         raise ValueError("Validation perishable must contain only binary values")
     key_tracker.update(frame, fold.fold_id)
+
+
+def _validate_validation_batch(
+    fold: TemporalValidationFold,
+    frame: pd.DataFrame,
+    key_tracker: _ValidationKeyTracker,
+    *,
+    feature_profile: str = TIME_AWARE_FEATURE_PROFILE,
+) -> None:
+    """Validate one canonical pre-holdout evaluation batch."""
+
+    _validate_direct_horizon_batch(
+        fold,
+        frame,
+        key_tracker,
+        feature_profile=feature_profile,
+    )
+    forecast_dates = pd.to_datetime(frame["forecast_date"])
+    if not (forecast_dates.dt.date < FINAL_HOLDOUT.holdout_start).all():
+        raise ValueError("Final holdout rows must not be evaluated")
 
 
 def _stream_fold_validation(
@@ -504,6 +524,7 @@ def _stream_fold_validation(
     prediction_writer: _StreamingPredictionWriter,
     overall_accumulator: FavoritaMetricAccumulator,
     horizon_accumulators: dict[int, FavoritaMetricAccumulator],
+    validation_batch_validator: Callable[..., None] = _validate_validation_batch,
 ) -> StreamingFoldMetricRecord:
     fold_accumulator = FavoritaMetricAccumulator()
     key_tracker = _ValidationKeyTracker()
@@ -511,7 +532,7 @@ def _stream_fold_validation(
     for frame in iter_model_ready_validation_batches(
         validation_path, feature_profile=model.feature_contract_name
     ):
-        _validate_validation_batch(
+        validation_batch_validator(
             fold,
             frame,
             key_tracker,
@@ -847,6 +868,12 @@ def _manifest(
     completed_at: datetime,
     source_state: dict[str, int],
 ) -> dict[str, Any]:
+    effective_model_parameters = dict(LIGHTGBM_PARAMETERS)
+    effective_model_parameters.update(config.model_parameters or {})
+    custom_model_configuration = (
+        config.model_parameters is not None
+        or config.num_boost_round != NUM_BOOST_ROUND
+    )
     return {
         "namespace": {
             "execution_scope": EXECUTION_SCOPE,
@@ -878,9 +905,10 @@ def _manifest(
             "candidate_feature_columns": list(
                 resolve_feature_contract(config.feature_contract)
             ),
-            "model_parameters": dict(LIGHTGBM_PARAMETERS),
-            "num_boost_round": NUM_BOOST_ROUND,
-            "hyperparameter_tuning": False,
+            "model_parameters": effective_model_parameters,
+            "num_boost_round": config.num_boost_round,
+            "custom_model_configuration": custom_model_configuration,
+            "hyperparameter_tuning": custom_model_configuration,
             "early_stopping": False,
         },
         "folds": [
@@ -1234,9 +1262,20 @@ def run_evaluation(
                 print(f"{prefix} validating artifacts...")
                 print(f"{prefix} training LightGBM...")
                 training_started = time.monotonic()
-                model = FavoritaLightGBMAdapter(
-                    feature_columns=resolve_feature_contract(config.feature_contract)
-                )
+                feature_columns = resolve_feature_contract(config.feature_contract)
+                if (
+                    config.model_parameters is None
+                    and config.num_boost_round == NUM_BOOST_ROUND
+                ):
+                    model = FavoritaLightGBMAdapter(
+                        feature_columns=feature_columns
+                    )
+                else:
+                    model = FavoritaLightGBMAdapter(
+                        feature_columns=feature_columns,
+                        model_parameters=config.model_parameters,
+                        num_boost_round=config.num_boost_round,
+                    )
                 model.fit_parquet(artifact_paths.training)
                 print(
                     f"{prefix} training completed in "

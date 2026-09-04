@@ -318,7 +318,28 @@ class FavoritaLightGBMAdapter:
         self,
         *,
         feature_columns: Sequence[str] = DEFAULT_FEATURE_COLUMNS,
+        model_parameters: Mapping[str, object] | None = None,
+        num_boost_round: int = NUM_BOOST_ROUND,
     ) -> None:
+        if isinstance(num_boost_round, bool) or not isinstance(
+            num_boost_round, Integral
+        ):
+            raise TypeError("num_boost_round must be an integer")
+        if num_boost_round <= 0:
+            raise ValueError("num_boost_round must be positive")
+        supplied_parameters = dict(model_parameters or {})
+        if any(not isinstance(name, str) or not name for name in supplied_parameters):
+            raise ValueError("model parameter names must be non-empty strings")
+        if "num_boost_round" in supplied_parameters:
+            raise ValueError(
+                "num_boost_round must be supplied through its explicit argument"
+            )
+        effective_parameters = dict(LIGHTGBM_PARAMETERS)
+        effective_parameters.update(supplied_parameters)
+        self._model_parameters: Mapping[str, object] = MappingProxyType(
+            effective_parameters
+        )
+        self._num_boost_round = int(num_boost_round)
         self._candidate_feature_columns = _validate_feature_contract(feature_columns)
         self._feature_contract_name = feature_contract_name(
             self._candidate_feature_columns
@@ -369,11 +390,11 @@ class FavoritaLightGBMAdapter:
 
     @property
     def model_parameters(self) -> Mapping[str, object]:
-        return LIGHTGBM_PARAMETERS
+        return self._model_parameters
 
     @property
     def num_boost_round(self) -> int:
-        return NUM_BOOST_ROUND
+        return self._num_boost_round
 
     def _materialize_frame(
         self,
@@ -484,9 +505,9 @@ class FavoritaLightGBMAdapter:
             free_raw_data=True,
         )
         booster = lgb.train(
-            dict(LIGHTGBM_PARAMETERS),
+            dict(self._model_parameters),
             dataset,
-            num_boost_round=NUM_BOOST_ROUND,
+            num_boost_round=self._num_boost_round,
         )
 
         self._record_fitted_state(
@@ -619,9 +640,9 @@ class FavoritaLightGBMAdapter:
                     free_raw_data=True,
                 )
                 booster = lgb.train(
-                    dict(LIGHTGBM_PARAMETERS),
+                    dict(self._model_parameters),
                     dataset,
-                    num_boost_round=NUM_BOOST_ROUND,
+                    num_boost_round=self._num_boost_round,
                 )
             finally:
                 sequence.close()
