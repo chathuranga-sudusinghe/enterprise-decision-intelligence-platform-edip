@@ -28,12 +28,30 @@ def _artifact_validation(*, validation: bool, digest: str) -> dict[str, object]:
     if validation:
         return {
             "rows": 16,
+            "forecast_date_min": "2017-07-31",
+            "forecast_date_max": "2017-08-15",
+            "horizons": list(range(1, 17)),
+            "row_key_target_sha256": digest,
+        }
+    return {
+        "rows": 100,
+        "forecast_date_min": "2017-01-01",
+        "forecast_date_max": "2017-07-30",
+        "horizons": list(range(1, 17)),
+        "row_key_target_sha256": digest,
+    }
+
+
+def _footer_boundaries(path: Path, *, feature_profile: str) -> dict[str, object]:
+    del feature_profile
+    if path.name == "validation.parquet":
+        return {
+            "rows": 16,
             "forecast_origin_min": "2017-07-30",
             "forecast_origin_max": "2017-07-30",
             "forecast_date_min": "2017-07-31",
             "forecast_date_max": "2017-08-15",
             "horizons": list(range(1, 17)),
-            "row_key_target_sha256": digest,
         }
     return {
         "rows": 100,
@@ -42,7 +60,6 @@ def _artifact_validation(*, validation: bool, digest: str) -> dict[str, object]:
         "forecast_date_min": "2017-01-01",
         "forecast_date_max": "2017-07-30",
         "horizons": list(range(1, 17)),
-        "row_key_target_sha256": digest,
     }
 
 
@@ -136,6 +153,7 @@ def test_final_holdout_runner_enforces_contract_and_publishes_evidence(
     paths = runner.run_final_holdout(
         runner.FinalHoldoutRunConfig(source_path=source, output_dir=output),
         materializer=_fake_materializer(calls),
+        boundary_reader=_footer_boundaries,
         adapter_factory=FakeAdapter,
         stream_evaluator=_fake_stream,
     )
@@ -166,6 +184,8 @@ def test_final_holdout_runner_enforces_contract_and_publishes_evidence(
     assert evidence["same_effective_model_parameters_verified"] is True
     assert evidence["same_num_boost_round_verified"] is True
     assert evidence["cross_arm_validation_row_target_digest_verified"] is True
+    assert "forecast_origin_max" not in evidence["dataset_evidence"]["contextual"]["training"]["artifact_validation"]
+    assert evidence["dataset_evidence"]["contextual"]["training"]["footer_boundaries"]["forecast_origin_max"] == "2017-07-29"
     assert evidence["source_integrity"]["unchanged"] is True
     assert evidence["source_integrity"]["before"] == evidence["source_integrity"]["after"]
     assert evidence["hypothesis_conclusion"] is None
@@ -220,6 +240,7 @@ def test_digest_mismatch_fails_before_scoring_and_cleans_temp(
         runner.run_final_holdout(
             runner.FinalHoldoutRunConfig(source_path=source, output_dir=output),
             materializer=materialize,
+            boundary_reader=_footer_boundaries,
             adapter_factory=FakeAdapter,
             stream_evaluator=_fake_stream,
         )
@@ -249,6 +270,7 @@ def test_scoring_failure_cleans_temporary_artifacts(
         runner.run_final_holdout(
             runner.FinalHoldoutRunConfig(source_path=source, output_dir=output),
             materializer=_fake_materializer(calls),
+            boundary_reader=_footer_boundaries,
             adapter_factory=FakeAdapter,
             stream_evaluator=fail_stream,
         )
