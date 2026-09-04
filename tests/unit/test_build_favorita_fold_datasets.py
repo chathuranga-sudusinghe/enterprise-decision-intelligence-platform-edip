@@ -95,8 +95,9 @@ def test_all_store_no_item_cap_configuration_is_locked() -> None:
     config = builder.FoldDatasetBuildConfig(feature_profile="time-aware")
 
     assert builder.ALL_FAVORITA_STORES == tuple(range(1, 55))
-    assert config.output_dir == Path(
-        "artifacts/features/favorita_2017_four_fold_time_aware"
+    assert config.output_dir == (
+        Path(__file__).resolve().parents[2]
+        / "artifacts/features/favorita_2017_four_fold_time_aware"
     )
     assert config.store_batches == tuple((store,) for store in range(1, 55))
     assert config.max_items_per_store is None
