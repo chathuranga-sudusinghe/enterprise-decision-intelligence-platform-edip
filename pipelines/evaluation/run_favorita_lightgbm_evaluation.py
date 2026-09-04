@@ -75,6 +75,11 @@ from pipelines.models.favorita_lightgbm import (
     FavoritaLightGBMAdapter,
     resolve_feature_contract,
 )
+from pipelines.runtime_paths import (
+    artifact_path,
+    favorita_source_path,
+    resolve_cli_path,
+)
 
 DEFAULT_SOURCE_PATH = Path("data/processed/favorita_cleaned/favorita_cleaned.parquet")
 CONTEXTUAL_OUTPUT_DIR = Path(
@@ -1368,7 +1373,9 @@ def _argument_parser() -> argparse.ArgumentParser:
             "Run the approved serial Favorita four-fold LightGBM evaluation."
         )
     )
-    parser.add_argument("--source-path", type=Path, default=DEFAULT_SOURCE_PATH)
+    parser.add_argument(
+        "--source-path", type=resolve_cli_path, default=favorita_source_path()
+    )
     parser.add_argument(
         "--feature-contract",
         required=True,
@@ -1383,11 +1390,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     paths = run_evaluation(
         FavoritaEvaluationRunConfig(
             source_path=args.source_path,
-            output_dir=FEATURE_CONTRACT_OUTPUT_DIRS[args.feature_contract],
+            output_dir=artifact_path(
+                FEATURE_CONTRACT_OUTPUT_DIRS[args.feature_contract].relative_to("artifacts")
+            ),
             feature_contract=args.feature_contract,
-            fold_output_dir=resolve_feature_profile(
-                args.feature_contract
-            ).canonical_artifact_root,
+            fold_output_dir=artifact_path(
+                resolve_feature_profile(
+                    args.feature_contract
+                ).canonical_artifact_root.relative_to("artifacts")
+            ),
             overwrite=args.overwrite,
         )
     )

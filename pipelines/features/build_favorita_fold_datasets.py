@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -30,6 +30,11 @@ from pipelines.features.favorita_model_ready import (
     source_footer,
     validate_feature_artifact,
     write_json_atomic,
+)
+from pipelines.runtime_paths import (
+    artifact_path,
+    favorita_source_path,
+    resolve_cli_path,
 )
 
 DEFAULT_SOURCE_PATH = Path(
@@ -64,8 +69,12 @@ class FoldDatasetBuildConfig:
     """Inputs for the approved fold-wise model-ready artifact build."""
 
     feature_profile: str
-    source_path: Path = DEFAULT_SOURCE_PATH
-    output_dir: Path = DEFAULT_OUTPUT_DIR
+    source_path: Path = field(default_factory=favorita_source_path)
+    output_dir: Path = field(
+        default_factory=lambda: artifact_path(
+            "features/favorita_2017_four_fold_time_aware"
+        )
+    )
     store_batches: tuple[tuple[int, ...], ...] = ALL_STORE_BATCHES
     max_items_per_store: int | None = None
     overwrite: bool = False
@@ -946,7 +955,9 @@ def _argument_parser() -> argparse.ArgumentParser:
             "Build model-ready training and validation Parquet per approved fold."
         )
     )
-    parser.add_argument("--source-path", type=Path, default=DEFAULT_SOURCE_PATH)
+    parser.add_argument(
+        "--source-path", type=resolve_cli_path, default=favorita_source_path()
+    )
     parser.add_argument(
         "--feature-profile",
         required=True,
@@ -969,9 +980,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         FoldDatasetBuildConfig(
             feature_profile=args.feature_profile,
             source_path=args.source_path,
-            output_dir=FEATURE_PROFILES[
-                args.feature_profile
-            ].canonical_artifact_root,
+            output_dir=artifact_path(
+                FEATURE_PROFILES[args.feature_profile].canonical_artifact_root.relative_to(
+                    "artifacts"
+                )
+            ),
             overwrite=args.overwrite,
         ),
         fold_ids=args.folds,

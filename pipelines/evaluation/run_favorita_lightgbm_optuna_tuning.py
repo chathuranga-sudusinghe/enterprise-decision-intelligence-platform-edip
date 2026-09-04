@@ -8,7 +8,7 @@ import os
 import tempfile
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -38,12 +38,16 @@ from pipelines.evaluation.favorita_temporal_validation import (
     FORECAST_HORIZONS,
 )
 from pipelines.evaluation.run_favorita_lightgbm_evaluation import (
-    DEFAULT_SOURCE_PATH,
     FavoritaEvaluationRunConfig,
     run_evaluation,
     validate_evaluation_result_output_dir,
 )
 from pipelines.features.favorita_model_ready import resolve_feature_profile
+from pipelines.runtime_paths import (
+    artifact_path,
+    favorita_source_path,
+    resolve_cli_path,
+)
 
 DEFAULT_OUTPUT_DIR = Path("artifacts/tuning/favorita_scrum_59_lightgbm_optuna")
 JSON_FILENAME = "scrum_59_lightgbm_optuna_tuning.json"
@@ -53,8 +57,12 @@ ARMS: tuple[str, ...] = ("contextual", "time-aware")
 
 @dataclass(frozen=True, slots=True)
 class TuningRunConfig:
-    source_path: Path = DEFAULT_SOURCE_PATH
-    output_dir: Path = DEFAULT_OUTPUT_DIR
+    source_path: Path = field(default_factory=favorita_source_path)
+    output_dir: Path = field(
+        default_factory=lambda: artifact_path(
+            "tuning/favorita_scrum_59_lightgbm_optuna"
+        )
+    )
     overwrite: bool = False
 
 
@@ -388,8 +396,14 @@ def run_tuning(
 
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-path", type=Path, default=DEFAULT_SOURCE_PATH)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--source-path", type=resolve_cli_path, default=favorita_source_path()
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=resolve_cli_path,
+        default=artifact_path("tuning/favorita_scrum_59_lightgbm_optuna"),
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
