@@ -37,6 +37,7 @@ from pipelines.evaluation.run_favorita_lightgbm_evaluation import (
 )
 from pipelines.features.build_favorita_fold_datasets import (
     ALL_STORE_BATCHES,
+    _artifact_footer_validation,
     derive_training_origins,
 )
 from pipelines.features.favorita_model_ready import (
@@ -105,6 +106,7 @@ class ArmDatasetPaths:
 
 
 Materializer = Callable[..., dict[str, Any]]
+BoundaryReader = Callable[..., dict[str, Any]]
 AdapterFactory = Callable[..., FavoritaLightGBMAdapter]
 StreamEvaluator = Callable[..., Any]
 
@@ -191,6 +193,7 @@ def _materialize_arm(
     arm: str,
     root: Path,
     materializer: Materializer,
+    boundary_reader: BoundaryReader,
 ) -> tuple[ArmDatasetPaths, dict[str, Any]]:
     arm_root = root / arm
     paths = ArmDatasetPaths(
@@ -225,16 +228,41 @@ def _materialize_arm(
         progress_phase="holdout",
     )
     evidence = {
-        "training": training["artifact_validation"],
-        "validation": validation["artifact_validation"],
+        "training": {
+            "artifact_validation": training["artifact_validation"],
+            "footer_boundaries": boundary_reader(
+                paths.training,
+                feature_profile=arm,
+            ),
+        },
+        "validation": {
+            "artifact_validation": validation["artifact_validation"],
+            "footer_boundaries": boundary_reader(
+                paths.validation,
+                feature_profile=arm,
+            ),
+        },
     }
     _validate_materialized_boundaries(evidence)
     return paths, evidence
 
 
 def _validate_materialized_boundaries(evidence: Mapping[str, Any]) -> None:
-    training = evidence["training"]
-    validation = evidence["validation"]
+    training_artifact = evidence["training"]["artifact_validation"]
+    training = evidence["training"]["footer_boundaries"]
+    validation_artifact = evidence["validation"]["artifact_validation"]
+    validation = evidence["validation"]["footer_boundaries"]
+    for artifact, boundaries, partition in (
+        (training_artifact, training, "Training"),
+        (validation_artifact, validation, "Holdout validation"),
+    ):
+        if artifact["rows"] != boundaries["rows"]:
+            raise ValueError(f"{partition} row counts differ between validations")
+        for key in ("forecast_date_min", "forecast_date_max", "horizons"):
+            if artifact[key] != boundaries[key]:
+                raise ValueError(
+                    f"{partition} {key} differs between artifact and footer evidence"
+                )
     if training["forecast_date_max"] != FINAL_HOLDOUT.forecast_origin.isoformat():
         raise ValueError("Training targets must end at 2017-07-30")
     if training["forecast_origin_max"] >= FINAL_HOLDOUT.forecast_origin.isoformat():
@@ -253,7 +281,9 @@ def _validate_materialized_boundaries(evidence: Mapping[str, Any]) -> None:
 
 def _verify_cross_arm_rows(dataset_evidence: Mapping[str, Mapping[str, Any]]) -> str:
     digests = {
-        arm: evidence["validation"]["row_key_target_sha256"]
+        arm: evidence["validation"]["artifact_validation"][
+            "row_key_target_sha256"
+        ]
         for arm, evidence in dataset_evidence.items()
     }
     if len(set(digests.values())) != 1:
@@ -440,6 +470,7 @@ def run_final_holdout(
     config: FinalHoldoutRunConfig,
     *,
     materializer: Materializer = materialize_feature_dataset,
+    boundary_reader: BoundaryReader = _artifact_footer_validation,
     adapter_factory: AdapterFactory = FavoritaLightGBMAdapter,
     stream_evaluator: StreamEvaluator = _stream_fold_validation,
 ) -> FinalHoldoutArtifactPaths:
@@ -461,6 +492,7 @@ def run_final_holdout(
                 arm=arm,
                 root=temporary_root,
                 materializer=materializer,
+                boundary_reader=boundary_reader,
             )
         shared_digest = _verify_cross_arm_rows(dataset_evidence)
         arm_results = {
