@@ -9,7 +9,7 @@ import shutil
 import tempfile
 import time
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -458,7 +458,7 @@ class _StreamingPredictionWriter:
         self.path.unlink(missing_ok=True)
 
 
-def _validate_validation_batch(
+def _validate_direct_horizon_batch(
     fold: TemporalValidationFold,
     frame: pd.DataFrame,
     key_tracker: _ValidationKeyTracker,
@@ -487,14 +487,32 @@ def _validate_validation_batch(
         raise ValueError(
             f"Fold {fold.fold_id} validation rows are outside O+1..O+16"
         )
-    if not (forecast_dates.dt.date < FINAL_HOLDOUT.holdout_start).all():
-        raise ValueError("Final holdout rows must not be evaluated")
     actual = frame["unit_sales"].to_numpy(dtype="float64", copy=False)
     if not np.isfinite(actual).all():
         raise ValueError("Validation unit_sales must contain only finite values")
     if not frame["perishable"].isin((0, 1, False, True)).all():
         raise ValueError("Validation perishable must contain only binary values")
     key_tracker.update(frame, fold.fold_id)
+
+
+def _validate_validation_batch(
+    fold: TemporalValidationFold,
+    frame: pd.DataFrame,
+    key_tracker: _ValidationKeyTracker,
+    *,
+    feature_profile: str = TIME_AWARE_FEATURE_PROFILE,
+) -> None:
+    """Validate one canonical pre-holdout evaluation batch."""
+
+    _validate_direct_horizon_batch(
+        fold,
+        frame,
+        key_tracker,
+        feature_profile=feature_profile,
+    )
+    forecast_dates = pd.to_datetime(frame["forecast_date"])
+    if not (forecast_dates.dt.date < FINAL_HOLDOUT.holdout_start).all():
+        raise ValueError("Final holdout rows must not be evaluated")
 
 
 def _stream_fold_validation(
@@ -506,6 +524,7 @@ def _stream_fold_validation(
     prediction_writer: _StreamingPredictionWriter,
     overall_accumulator: FavoritaMetricAccumulator,
     horizon_accumulators: dict[int, FavoritaMetricAccumulator],
+    validation_batch_validator: Callable[..., None] = _validate_validation_batch,
 ) -> StreamingFoldMetricRecord:
     fold_accumulator = FavoritaMetricAccumulator()
     key_tracker = _ValidationKeyTracker()
@@ -513,7 +532,7 @@ def _stream_fold_validation(
     for frame in iter_model_ready_validation_batches(
         validation_path, feature_profile=model.feature_contract_name
     ):
-        _validate_validation_batch(
+        validation_batch_validator(
             fold,
             frame,
             key_tracker,

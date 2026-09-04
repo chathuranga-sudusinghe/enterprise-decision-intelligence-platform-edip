@@ -300,6 +300,26 @@ def test_cross_batch_duplicate_validation_key_is_rejected() -> None:
         tracker.update(second, fold_id=1)
 
 
+def test_default_validation_batch_still_rejects_final_holdout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        runner,
+        "_validate_direct_horizon_batch",
+        lambda *args, **kwargs: None,
+    )
+    frame = pd.DataFrame(
+        {"forecast_date": pd.to_datetime(["2017-07-31"])}
+    )
+
+    with pytest.raises(ValueError, match="Final holdout rows must not be evaluated"):
+        runner._validate_validation_batch(
+            APPROVED_FOLDS[-1],
+            frame,
+            runner._ValidationKeyTracker(),
+        )
+
+
 def test_multi_fold_runner_has_no_fold_builder_runtime_dependency() -> None:
     assert not hasattr(runner, "FoldDatasetBuildConfig")
     assert not hasattr(runner, "build_approved_fold_datasets")

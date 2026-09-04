@@ -91,7 +91,31 @@ uvicorn.log
 *.backup
 
 # ML / Data Science runtime artifacts
-artifacts/
+
+# Ignore all artifacts by default
+artifacts/**
+
+# Keep lightweight evaluation evidence
+!artifacts/evaluation/
+!artifacts/evaluation/**/
+!artifacts/evaluation/**/*.json
+!artifacts/evaluation/**/*.md
+
+# Keep lightweight tuning evidence
+!artifacts/tuning/
+!artifacts/tuning/**/
+!artifacts/tuning/**/*.json
+!artifacts/tuning/**/*.md
+
+# Always ignore heavy generated artifact formats
+artifacts/**/*.parquet
+artifacts/**/*.csv
+artifacts/**/*.npy
+artifacts/**/*.npz
+artifacts/**/*.pkl
+artifacts/**/*.joblib
+artifacts/**/*.bin
+
 model_artifacts/
 mlruns/
 wandb/
@@ -100,13 +124,6 @@ reports/
 figures/
 plots/
 checkpoints/
-*.pkl
-*.joblib
-*.h5
-*.onnx
-*.pt
-*.pth
-*.ckpt
 
 # Generated data
 # Keep folder structure with .gitkeep
