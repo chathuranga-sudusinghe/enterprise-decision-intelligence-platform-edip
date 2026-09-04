@@ -41,7 +41,9 @@ def configure_logging(
     root_handler_names = ["console"]
 
     if log_to_file:
-        resolved_log_dir = log_dir or (Path("monitoring") / "logs")
+        if log_dir is None:
+            raise ValueError("log_dir is required when log_to_file is enabled")
+        resolved_log_dir = log_dir.expanduser().resolve()
         resolved_log_dir.mkdir(parents=True, exist_ok=True)
         log_path = resolved_log_dir / log_filename
 

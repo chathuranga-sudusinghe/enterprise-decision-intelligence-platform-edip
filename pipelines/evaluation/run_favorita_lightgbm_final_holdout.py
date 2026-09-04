@@ -8,7 +8,7 @@ import os
 import tempfile
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import MappingProxyType
@@ -28,7 +28,6 @@ from pipelines.evaluation.favorita_temporal_validation import (
     validate_holdout_contract,
 )
 from pipelines.evaluation.run_favorita_lightgbm_evaluation import (
-    DEFAULT_SOURCE_PATH,
     _stream_fold_validation,
     _StreamingPredictionWriter,
     _validate_direct_horizon_batch,
@@ -50,6 +49,11 @@ from pipelines.models.favorita_lightgbm import (
     LIGHTGBM_PARAMETERS,
     FavoritaLightGBMAdapter,
     resolve_feature_contract,
+)
+from pipelines.runtime_paths import (
+    artifact_path,
+    favorita_source_path,
+    resolve_cli_path,
 )
 
 JIRA_ID = "SCRUM-19"
@@ -88,8 +92,12 @@ FINAL_HOLDOUT_WINDOW = TemporalValidationFold(
 
 @dataclass(frozen=True, slots=True)
 class FinalHoldoutRunConfig:
-    source_path: Path = DEFAULT_SOURCE_PATH
-    output_dir: Path = DEFAULT_OUTPUT_DIR
+    source_path: Path = field(default_factory=favorita_source_path)
+    output_dir: Path = field(
+        default_factory=lambda: artifact_path(
+            "evaluation/favorita_scrum_19_final_holdout"
+        )
+    )
     overwrite: bool = False
 
 
@@ -575,8 +583,14 @@ def run_final_holdout(
 
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-path", type=Path, default=DEFAULT_SOURCE_PATH)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--source-path", type=resolve_cli_path, default=favorita_source_path()
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=resolve_cli_path,
+        default=artifact_path("evaluation/favorita_scrum_19_final_holdout"),
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser
 

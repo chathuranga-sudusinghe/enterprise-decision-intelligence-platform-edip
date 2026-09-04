@@ -949,7 +949,6 @@ def test_profile_roots_are_separate_and_old_shared_root_is_not_used() -> None:
     )
 
 
-
 def test_multi_cli_selects_matching_profile_specific_fold_root(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -961,7 +960,11 @@ def test_multi_cli_selects_matching_profile_specific_fold_root(
 
     monkeypatch.setattr(runner, "run_evaluation", fake_run)
     assert runner.main(["--feature-contract", "contextual"]) == 0
-    assert captured[0].fold_output_dir == Path(
-        "artifacts/features/favorita_2017_four_fold_contextual"
+    assert captured[0].fold_output_dir == (
+        Path(__file__).resolve().parents[2]
+        / "artifacts/features/favorita_2017_four_fold_contextual"
     )
-    assert captured[0].output_dir == runner.CONTEXTUAL_OUTPUT_DIR
+    assert captured[0].output_dir == (
+        Path(__file__).resolve().parents[2]
+        / "artifacts/evaluation/favorita_2017_four_fold_lightgbm_contextual"
+    )
