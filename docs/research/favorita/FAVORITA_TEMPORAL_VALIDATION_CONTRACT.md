@@ -16,7 +16,7 @@
 
 This document is the current source of truth for Favorita forecast-horizon semantics, temporal validation boundaries, training-label eligibility, fold separation, leakage protection, bounded feature evidence, and final holdout protection.
 
-It consolidates the completed 16-day horizon alignment and executable temporal-validation definition. All four canonical Proposed Time-Aware LightGBM folds have been materialized and trained/evaluated successfully (`completed_folds = [1, 2, 3, 4]`) with the unchanged `FavoritaLightGBMAdapter`. The protected final holdout remains unscored.
+It consolidates the completed 16-day horizon alignment and executable temporal-validation definition. All four canonical Contextual and Time-Aware LightGBM folds and the separately governed SCRUM-19 final holdout have been evaluated. Time-Aware LightGBM is the selected forecasting approach. Final holdout evidence is preserved at `artifacts/evaluation/favorita_scrum_19_final_holdout/`; this completion does not weaken the rule that holdout outcomes must not influence earlier design, tuning, or selection decisions.
 
 Related authorities:
 
@@ -135,7 +135,7 @@ The protected holdout is:
 
 The latest validation window ends on `2017-07-30`, immediately before the protected holdout begins.
 
-The holdout remains unavailable for model selection, preprocessing decisions, metric policy, threshold selection, hyperparameter tuning, sensitivity-design selection, or workflow tuning. Scoring requires a separately approved later work item after all such decisions are frozen.
+The holdout was unavailable for model selection, preprocessing decisions, metric policy, threshold selection, hyperparameter tuning, sensitivity-design selection, or workflow tuning. SCRUM-19 scored it only after the shared Trial 0 configuration and relevant selection decisions were frozen. Its outcomes remain prohibited from retroactively changing those decisions.
 
 ## 8. Bounded feature and training-feasibility evidence
 
@@ -207,18 +207,13 @@ The archived temporal-definition notebook at `notebooks/favorita/archive/09_defi
 
 ## 11. Current execution status and remaining work
 
-SCRUM-15 is complete. All four canonical Proposed Time-Aware LightGBM folds have completed, and their persisted result namespace records `completed_folds = [1, 2, 3, 4]`. The final protected holdout remains unscored.
+SCRUM-15, SCRUM-18, SCRUM-59, and SCRUM-19 are complete for the governed comparison sequence. Both canonical arms were compared, Trial 0 was frozen as the shared final configuration, and the final protected holdout was evaluated. Time-Aware LightGBM is the selected approach; model packaging and Azure serving remain unimplemented.
 
-SCRUM-18 comparators must reuse these exact four canonical folds, training scopes, horizons, leakage rules, and metric contract. Remaining work includes:
+The completed SCRUM-18 comparators reused these exact four canonical folds, training scopes, horizons, leakage rules, and metric contract. Remaining work includes:
 
-- defining the Contextual LightGBM feature boundary without freezing it in this temporal contract;
-- controlling model configuration and all non-feature experimental conditions for the Contextual-versus-Proposed Time-Aware comparison;
-- applying the predeclared comparison and consistency interpretation;
-- selecting a candidate from complete four-fold evidence;
 - optional uncertainty or sensitivity analysis under separate approval;
-- defining later final-holdout promotion criteria after selection decisions are frozen;
 - Kaggle prediction or submission; and
-- model serving and Azure deployment.
+- immutable Time-Aware model packaging, model serving, and Azure deployment.
 
 Those activities require separate approved Jira/SCRUM work items and must consume this contract without weakening its training cutoff, fold isolation, direct 1-through-16 horizon semantics, sparse-row policy, or holdout protection.
 

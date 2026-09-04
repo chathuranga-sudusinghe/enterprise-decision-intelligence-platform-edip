@@ -15,7 +15,7 @@
 
 This document records the redesigned canonical four-fold temporal validation design for Favorita forecasting. It defines the approved windows, the `2017-01-01` modeling-target boundary, expanding training histories, leakage prevention, and limitations that must accompany later model results. It replaces both the earlier eight-fold paired-season design and the superseded four-fold schedule that began on `2016-01-01`.
 
-The fold boundaries remain a research design contract. All four canonical Proposed Time-Aware LightGBM folds have completed successfully, while the final holdout remains unscored.
+The fold boundaries remain a research design contract. All four canonical Contextual and Time-Aware LightGBM folds completed successfully, and SCRUM-19 subsequently completed the protected final-holdout evaluation. Time-Aware LightGBM is the selected forecasting approach.
 
 Related authorities:
 
@@ -115,12 +115,12 @@ Cold-start and insufficient-history handling, weighting or sampling for realized
 
 ## 8. Final untouched holdout
 
-The protected holdout remains:
+The protected holdout contract is:
 
 - origin: `2017-07-30`;
 - target dates: `2017-07-31` through `2017-08-15`.
 
-The latest approved validation date is `2017-07-30`, immediately before the holdout starts. Holdout outcomes must not influence fold selection, preprocessing, metrics, model selection, hyperparameter tuning, threshold setting, or workflow tuning.
+The latest approved validation date is `2017-07-30`, immediately before the holdout starts. SCRUM-19 evaluated the holdout only after the shared final configuration and selection decisions were frozen. Holdout outcomes must not be used retroactively to change fold selection, preprocessing, metrics, model selection, hyperparameter tuning, threshold setting, or workflow tuning.
 
 ## 9. Superseded design and artifact separation
 
@@ -134,18 +134,13 @@ The design provides 64 predeclared validation calendar days across four expandin
 
 Limitations include changing store/item populations, sparse target coverage, incomplete representation of months and business regimes, and the fact that four folds do not prove exhaustive historical robustness.
 
-## 11. Remaining decisions
+## 11. Current outcome and remaining decisions
 
-The unresolved controls include:
+The Contextual-versus-Time-Aware comparison, shared Trial 0 configuration, and SCRUM-19 final holdout are complete. Time-Aware LightGBM is selected. The unresolved controls include:
 
-- the Contextual LightGBM feature schema and the leakage-safe temporal/time-series feature group added by the Proposed Time-Aware LightGBM;
-- controlled model configuration and other experimental conditions for a fair feature-information comparison;
-- the predeclared comparison and consistency interpretation;
-- candidate selection from complete four-fold evidence;
 - optional sensitivity or uncertainty analysis;
-- later final-holdout evaluation after promotion criteria and selection decisions are frozen; and
 - compute, temporary storage, durable artifact, and retention budgets.
 
-Separate approval is still required for SCRUM-18 comparator execution and model selection, uncertainty reporting, optional sensitivity designs, final holdout scoring, Kaggle submission, and deployment.
+Separate approval is still required for uncertainty reporting, optional sensitivity designs, Kaggle submission, model packaging, and deployment.
 
 The four approved folds, the `2017-01-01` modeling target start, the `2017-07-30` evaluation end, the 16-day horizon, expanding-window boundary, and protected final holdout are canonical. The canonical artifact and result roots are implemented and protected from historical reuse.
