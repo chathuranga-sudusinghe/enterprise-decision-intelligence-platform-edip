@@ -22,10 +22,10 @@ The flagship engineering goal is a reviewable enterprise platform rather than an
 | State | Meaning |
 |---|---|
 | **Current implemented state** | A FastAPI health/monitoring foundation, Next.js UI baseline, real Favorita data-preparation workflow, focused feature-contract tests, deployment assets, and monitoring assets exist. Legacy synthetic forecast, RAG, and demo workflow implementations are absent. |
-| **Approved target architecture** | A capability-oriented modular monolith, LangGraph workflows, governed retrieval and integrations, deterministic safety controls, durable audit, and AWS ECS Fargate deployment define V2. |
+| **Approved target architecture** | A capability-oriented modular monolith, LangGraph workflows, governed retrieval and integrations, deterministic safety controls, durable audit, and Microsoft Azure deployment define V2. |
 | **Future implementation** | Phase 1 and later phases must implement, integrate, evaluate, secure, and validate the approved architecture through explicit acceptance gates. |
 
-There is no claim here of complete test-suite health or live Pinecone, OpenAI, Kafka, AWS, or ERP/CRM operation.
+There is no claim here of complete test-suite health or live Pinecone, OpenAI, Microsoft Azure, or ERP/CRM operation.
 
 ## Approved V2 capabilities
 
@@ -39,8 +39,8 @@ There is no claim here of complete test-suite health or live Pinecone, OpenAI, K
 - **Deterministic safety gate** for critical calculations, policy checks, evidence sufficiency, and abstention.
 - **Human-in-the-Loop (HITL) approval** before controlled, consequential execution.
 - **Governed MCP integrations** for bounded ERP/CRM tools; LLMs must not authorize irreversible actions.
-- **Durable audit and observability** using PostgreSQL business records, LangSmith traces, Prometheus/Grafana, and CloudWatch with distinct ownership.
-- **AWS ECS Fargate deployment direction** as the canonical production target.
+- **Durable audit and observability** using PostgreSQL business records, LangSmith traces, Prometheus/Grafana, and Application Insights / Azure Monitor with distinct ownership.
+- **Microsoft Azure deployment direction** using Azure Container Registry and Azure Container Apps as the canonical production target.
 
 Kafka and Airflow are not mandatory V2 core components. They remain gated future options only if measured scale, scheduling, or event-processing needs justify their operational cost. Kubernetes is optional learning evidence, not the canonical deployment target.
 
@@ -57,7 +57,7 @@ Kafka and Airflow are not mandatory V2 core components. They remain gated future
 - Forecasting migrates only after its artifacts, interfaces, and tests are stable.
 - Generated datasets and artifacts stay outside Git, with manifests, versions, provenance, and checksums.
 - LangSmith supports workflow observability but is not the authoritative business audit store.
-- ECS Fargate is canonical; added infrastructure requires evidence-backed decisions.
+- Microsoft Azure is canonical; detailed Azure topology requires a dedicated Architecture Decision Record (ADR) and evidence-backed implementation.
 
 ## Architecture at a glance
 
@@ -72,7 +72,7 @@ flowchart LR
     Gate --> HITL["Human approval"]
     HITL --> MCP["Governed MCP tools"]
     MCP --> Systems["ERP / CRM systems"]
-    API --> Data["PostgreSQL / Pinecone / S3"]
+    API --> Data["PostgreSQL / Pinecone / Azure Blob Storage"]
     API --> Obs["Audit and observability"]
 ```
 
@@ -93,7 +93,7 @@ See the [EDIP V2 Flagship Architecture Plan](docs/architecture/EDIP_V2_FLAGSHIP_
 4. **Analytics:** stabilize forecasting artifacts and tests, then add uncertainty-aware inventory-risk capability.
 5. **Workflow and safety:** implement LangGraph state, controlled stages, deterministic gates, and abstention.
 6. **Approval and execution:** add durable HITL decisions and bounded MCP execution with idempotency and audit.
-7. **Evaluation and operations:** validate retrieval, forecasts, workflows, decisions, safety, reliability, security, and ECS Fargate delivery.
+7. **Evaluation and operations:** validate retrieval, forecasts, workflows, decisions, safety, reliability, security, and Azure Container Apps delivery.
 
 Each phase requires documented evidence and review before the next stable checkpoint is merged.
 
@@ -176,7 +176,7 @@ These are contributor commands, not a claim that the entire suite currently pass
 - No active forecast runtime or model artifact is present; future forecasting must use the Favorita feature contract with temporal evaluation, uncertainty, versioning, provenance, and monitored acceptance thresholds.
 - External evidence needs an approved source registry and provenance, freshness, licensing, and injection-resistance controls.
 - MCP ERP/CRM actions require allow-listed tools, least privilege, schema validation, idempotency, approval binding, and reconciliation testing.
-- ECS Fargate is the approved deployment direction; a production AWS environment has not been demonstrated by this README.
+- Microsoft Azure is the approved deployment direction; a production Azure environment has not been demonstrated by this README.
 - Existing tests, CI, monitoring, Kubernetes, and Terraform assets vary in maturity and do not demonstrate integrated production operation. Kafka and Airflow remain gated future options; the legacy demo assets are not part of the active runtime.
 
 ## Authoritative documents
