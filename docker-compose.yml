@@ -1,4 +1,5 @@
-# docker-compose.yml
+# LOCAL DEVELOPMENT / LOCAL VALIDATION ONLY.
+# Cloud deployments configure the serving image and model delivery separately.
 
 services:
   api: # FastAPI application
@@ -7,13 +8,20 @@ services:
       dockerfile: Dockerfile
     container_name: edip-api
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${FAVORITA_API_HOST_PORT:-8000}:8000"
     env_file:
       - .env
     environment:
       PYTHONPATH: /app
+      APP_ENV: local
+      EDIP_FAVORITA_MODEL_BUNDLE_PATH: /models/favorita
     volumes:
-      - ./:/app
+      - type: bind
+        source: ${FAVORITA_MODEL_BUNDLE_DIR:-./artifacts/models/favorita_time_aware}
+        target: /models/favorita
+        read_only: true
+        bind:
+          create_host_path: false
     command: >
       uvicorn app.main:app
       --host 0.0.0.0

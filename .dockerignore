@@ -26,3 +26,16 @@ htmlcov
 *.jsonl
 .env
 .DS_Store
+
+# Local credentials, frontend dependencies, and temporary validation outputs.
+.env.*
+**/.env
+**/.env.*
+**/node_modules
+**/.next
+**/__pycache__
+tmp
+.codex
+.agents
+*.pem
+*.key
