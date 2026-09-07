@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.config import Settings
+from app.core.config import PROJECT_ROOT, Settings
 
 
 @pytest.fixture(autouse=True)
@@ -15,6 +15,7 @@ def _clear_settings_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "API_PORT",
         "ALLOW_CREDENTIALS",
         "ALLOWED_ORIGINS",
+        "EDIP_FAVORITA_MODEL_BUNDLE_PATH",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -71,3 +72,19 @@ def test_valid_production_configuration(monkeypatch: pytest.MonkeyPatch) -> None
     configured = Settings()
 
     assert configured.allowed_origins == ("https://edip.example.com",)
+
+
+def test_favorita_bundle_path_is_repository_relative(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "EDIP_FAVORITA_MODEL_BUNDLE_PATH", "artifacts/models/test-bundle"
+    )
+
+    configured = Settings()
+
+    assert (
+        configured.favorita_model_bundle_path
+        == (PROJECT_ROOT / "artifacts/models/test-bundle").resolve()
+    )
