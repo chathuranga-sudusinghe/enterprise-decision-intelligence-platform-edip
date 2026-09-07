@@ -361,6 +361,15 @@ class FavoritaLightGBMAdapter:
         return self._booster is not None
 
     @property
+    def fitted_booster(self) -> lgb.Booster:
+        """Return the native fitted Booster for explicit artifact export."""
+        if self._booster is None:
+            raise RuntimeError(
+                "FavoritaLightGBMAdapter must be fitted before model export"
+            )
+        return self._booster
+
+    @property
     def feature_contract_name(self) -> str:
         return self._feature_contract_name
 
