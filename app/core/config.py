@@ -6,6 +6,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from pipelines.runtime_paths import resolve_cli_path
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _LOCAL_ENVIRONMENTS = frozenset({"development", "dev", "local"})
 _EXTERNAL_APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
@@ -56,6 +58,14 @@ class Settings:
     app_env: str = field(default_factory=lambda: _get_env_str("APP_ENV", "development").lower())
     api_host: str = field(default_factory=lambda: _get_env_str("API_HOST", "127.0.0.1"))
     api_port: int = field(default_factory=lambda: _get_env_int("API_PORT", 8000))
+    favorita_model_bundle_path: Path = field(
+        default_factory=lambda: resolve_cli_path(
+            _get_env_str(
+                "EDIP_FAVORITA_MODEL_BUNDLE_PATH",
+                "artifacts/models/favorita_time_aware",
+            )
+        )
+    )
     allow_credentials: bool = field(
         default_factory=lambda: _get_env_bool("ALLOW_CREDENTIALS", True)
     )
