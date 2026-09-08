@@ -146,8 +146,8 @@ CI evidence must identify mocks, skipped tests, unavailable services, and static
 After a human-reviewed release is merged to `main`, the approved GitHub Actions Continuous Deployment (CD) workflow automatically:
 
 1. builds an immutable application container image;
-2. publishes the image to Azure Container Registry;
-3. deploys a new Azure Container Apps revision to the target Azure environment;
+2. publishes immutable backend and frontend images to Amazon ECR by digest;
+3. updates the approved Amazon ECS Fargate services behind the Application Load Balancer;
 4. verifies health, readiness, version, and telemetry after deployment; and
 5. preserves evidence and the ability to roll back to a known revision.
 
@@ -155,9 +155,9 @@ Feature or `dev` pushes do not deploy production. Human approval occurs before t
 
 ### Infrastructure lifecycle
 
-Terraform is the preferred direction for reviewed Azure infrastructure lifecycle. Infrastructure changes require focused IaC review, static validation, plan review, security/cost analysis, and environment-appropriate apply authority.
+Terraform owns the reviewed AWS infrastructure lifecycle. Infrastructure changes require focused IaC review, static validation, plan review, security/cost analysis, and environment-appropriate apply authority. Production infrastructure must not be provisioned manually.
 
-Application release and infrastructure lifecycle are distinct. Terraform is used when infrastructure changes; it is not a mandatory step for every application image deployment. Detailed Azure Terraform, identity, networking, and workflow configuration require a dedicated ADR and implementation task.
+Application release and infrastructure lifecycle are distinct. Terraform is used when infrastructure changes; it is not a mandatory step for every application image deployment. GitHub Actions CD uses AWS OpenID Connect (OIDC) and narrowly scoped roles to publish ECR images and update ECS Fargate services; it must not use long-lived AWS credentials. Detailed AWS Terraform, identity, networking, artifact delivery, and workflow configuration require a dedicated ADR and implementation task.
 
 ## 9. Evidence required by change type
 
@@ -232,7 +232,7 @@ Create or update an ADR when a decision changes a system boundary, public/data c
 
 An ADR records status, date, owner, linked work item, context, constraints, alternatives including status quo, approved decision, non-goals, consequences, security/privacy/licensing implications, validation, observability, migration, rollback, supersession, named human approval, and review date.
 
-The detailed Azure topology, Terraform implementation, identity, networking, managed services, and CD workflow require a dedicated ADR before implementation.
+The detailed AWS topology, Terraform implementation, identity, networking, managed services, S3 model delivery, and GitHub Actions CD workflow require a dedicated ADR before implementation.
 
 ## 15. Academic and professional evidence
 

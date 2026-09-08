@@ -207,13 +207,13 @@ The archived temporal-definition notebook at `notebooks/favorita/archive/09_defi
 
 ## 11. Current execution status and remaining work
 
-SCRUM-15, SCRUM-18, SCRUM-59, and SCRUM-19 are complete for the governed comparison sequence. Both canonical arms were compared, Trial 0 was frozen as the shared final configuration, and the final protected holdout was evaluated. Time-Aware LightGBM is the selected approach; model packaging and Azure serving remain unimplemented.
+SCRUM-15, SCRUM-18, SCRUM-59, and SCRUM-19 are complete for the governed comparison sequence. Both canonical arms were compared, Trial 0 was frozen as the shared final configuration, and the final protected holdout was evaluated. Time-Aware LightGBM is the selected approach; local model packaging and serving have since been validated, while production S3 publication and AWS serving remain unimplemented.
 
 The completed SCRUM-18 comparators reused these exact four canonical folds, training scopes, horizons, leakage rules, and metric contract. Remaining work includes:
 
 - optional uncertainty or sensitivity analysis under separate approval;
 - Kaggle prediction or submission; and
-- immutable Time-Aware model packaging, model serving, and Azure deployment.
+- governed Time-Aware model publication to Amazon S3 and production serving on AWS.
 
 Those activities require separate approved Jira/SCRUM work items and must consume this contract without weakening its training cutoff, fold isolation, direct 1-through-16 horizon semantics, sparse-row policy, or holdout protection.
 

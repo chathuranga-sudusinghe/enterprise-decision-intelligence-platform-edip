@@ -2,7 +2,7 @@
 
 This validates the existing FastAPI application and synchronous `FavoritaBundlePredictor` with an already exported bundle. It does not train, tune, evaluate, or establish production forecast quality.
 
-This Compose configuration and host bind-mount strategy are for **local development and local validation only**. They do not define the future Azure architecture. Azure model delivery will be handled separately later; the same serving image should remain reusable. A future Azure deployment should supply environment configuration externally, including `EDIP_FAVORITA_MODEL_BUNDLE_PATH` pointing to the model location made available inside the container. No Azure resource names, external service URLs, or credentials belong in the image.
+This Compose configuration and host bind-mount strategy are for **local development and local validation only**. They do not define the production AWS architecture. Production model delivery will publish approved bundles to Amazon S3 and stage one verified bundle into task-local storage before the same serving image starts. Amazon ECS Fargate supplies environment configuration externally, including `EDIP_FAVORITA_MODEL_BUNDLE_PATH` pointing to that local bundle. No cloud resource names, external service URLs, or credentials belong in the image.
 
 ## Image and model delivery
 
@@ -54,7 +54,7 @@ docker rm edip-favorita-local
 
 ## Scope and deferred work
 
-No Azure deployment, Terraform, or CI/CD changes are part of this work. Existing Docker CI builds the image only. Production model validation, image hardening, dependency splitting, concurrency/load testing, and cloud deployment are deferred. A small test model can return constant predictions: matching real predictions on reordered rows alone cannot prove ordering. A distinct sentinel prediction check can separately verify that the API preserves row positions.
+No cloud deployment, production Terraform, or CI/CD changes were part of this local validation work. Existing Docker CI builds the image only. Production model validation, image hardening, dependency splitting, concurrency/load testing, and cloud deployment are deferred. A small test model can return constant predictions: matching real predictions on reordered rows alone cannot prove ordering. A distinct sentinel prediction check can separately verify that the API preserves row positions.
 
 ## Recorded validation — 2026-09-07
 
