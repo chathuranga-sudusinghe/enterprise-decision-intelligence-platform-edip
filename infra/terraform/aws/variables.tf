@@ -50,6 +50,10 @@ variable "artifact_bucket_name" {
     error_message = "artifact_bucket_name must satisfy S3 general purpose bucket naming rules."
   }
 }
+variable "github_oidc_provider_arn" {
+  description = "GitHub Actions OIDC provider ARN created by the bootstrap root."
+  type        = string
+}
 variable "github_actions_release_role_name" {
   description = "Optional GitHub Actions release IAM role name override."
   type        = string
