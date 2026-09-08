@@ -1,5 +1,7 @@
 # EDIP Cloud Deployment Readiness Audit
 
+> **Status: superseded historical snapshot.** This audit records repository state and Azure assumptions as observed on 2026-09-04. Its findings are preserved as historical evidence and no longer define the canonical cloud direction. See the [AWS Canonical Cloud Migration Audit](EDIP_AWS_CANONICAL_CLOUD_MIGRATION_AUDIT.md) for the active decision and current implementation gaps.
+
 Audit date: 2026-09-04  
 Repository branch reviewed: `chore/azure-canonical-cloud-cleanup`  
 Scope: tracked application, pipeline, infrastructure, monitoring, UI, CI, test, and research-evidence files. Generated training and evaluation were not run. Historical evidence was inspected but not modified.
