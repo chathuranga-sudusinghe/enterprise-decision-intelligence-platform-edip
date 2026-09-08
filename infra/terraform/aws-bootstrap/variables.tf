@@ -20,6 +20,15 @@ variable "artifact_bucket_name" {
   description = "Separate application artifact bucket name used for IAM scoping."
   type        = string
 }
+variable "bootstrap_state_key" {
+  description = "Bootstrap root state object key used after migration."
+  type        = string
+  default     = "bootstrap/terraform.tfstate"
+  validation {
+    condition     = length(trimspace(var.bootstrap_state_key)) > 0 && !startswith(var.bootstrap_state_key, "/") && !endswith(var.bootstrap_state_key, ".tflock")
+    error_message = "Use a non-empty bootstrap key without a leading slash or .tflock suffix."
+  }
+}
 variable "foundation_state_key" {
   description = "Main foundation state object key."
   type        = string
@@ -27,6 +36,14 @@ variable "foundation_state_key" {
     condition     = length(trimspace(var.foundation_state_key)) > 0 && !startswith(var.foundation_state_key, "/") && !endswith(var.foundation_state_key, ".tflock")
     error_message = "Use a non-empty key without a leading slash or .tflock suffix."
 
+  }
+}
+variable "github_oidc_provider_arn" {
+  description = "ARN of the existing shared account-level GitHub Actions IAM OIDC provider."
+  type        = string
+  validation {
+    condition     = can(regex("^arn:[^:]+:iam::[0-9]{12}:oidc-provider/token\\.actions\\.githubusercontent\\.com$", trimspace(var.github_oidc_provider_arn)))
+    error_message = "github_oidc_provider_arn must be the ARN of the shared token.actions.githubusercontent.com IAM OIDC provider."
   }
 }
 variable "github_actions_plan_role_name" {

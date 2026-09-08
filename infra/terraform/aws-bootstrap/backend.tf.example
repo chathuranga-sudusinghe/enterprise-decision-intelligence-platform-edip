@@ -1,0 +1,4 @@
+# Activate locally only after the bootstrap bucket exists.
+terraform {
+  backend "s3" {}
+}
