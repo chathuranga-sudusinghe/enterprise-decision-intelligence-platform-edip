@@ -1,26 +1,13 @@
 name: EDIP Terraform CI
 
 on:
-  push:
-    branches:
-      - main
-      - master
-      - develop
-      - dev
-      - "feature/**"
-    paths:
-      - "infra/terraform/**"
-      - ".github/workflows/terraform-ci.yml"
   pull_request:
     branches:
-      - main
-      - master
-      - develop
       - dev
+      - main
     paths:
       - "infra/terraform/**"
       - ".github/workflows/terraform-ci.yml"
-  workflow_dispatch:
 
 jobs:
   terraform-local-k8s:
@@ -48,6 +35,7 @@ jobs:
         run: terraform validate
 
   terraform-aws:
+    name: Validate AWS Terraform
     runs-on: ubuntu-latest
     defaults:
       run:
