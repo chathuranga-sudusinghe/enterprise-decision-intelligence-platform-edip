@@ -1,0 +1,113 @@
+name: EDIP Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/terraform/aws/**"
+      - ".github/workflows/terraform-apply.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+  TF_VAR_artifact_bucket_name: ${{ vars.AWS_ARTIFACT_BUCKET_NAME }}
+  TF_VAR_github_oidc_provider_arn: ${{ vars.AWS_GITHUB_OIDC_PROVIDER_ARN }}
+  TF_VAR_github_actions_release_oidc_subjects: ${{ vars.AWS_RELEASE_OIDC_SUBJECTS_JSON }}
+
+jobs:
+  terraform-plan:
+    name: Create post-merge AWS Terraform plan
+    if: vars.AWS_TERRAFORM_AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: infra/terraform/aws
+    steps:
+      - name: Check out triggering main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure read-only Terraform credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
+
+      - name: Initialize Terraform remote state
+        run: terraform init -input=false -backend-config="bucket=${{ vars.AWS_TERRAFORM_STATE_BUCKET }}" -backend-config="key=${{ vars.AWS_TERRAFORM_STATE_KEY }}" -backend-config="region=${{ vars.AWS_REGION }}" -backend-config="encrypt=true" -backend-config="use_lockfile=true"
+
+      - name: Validate Terraform configuration
+        run: terraform validate
+
+      - name: Create saved Terraform plan
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Render human-readable Terraform plan
+        run: terraform show -no-color tfplan > tfplan.txt
+
+      - name: Upload saved Terraform plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ github.sha }}
+          path: |
+            infra/terraform/aws/tfplan
+            infra/terraform/aws/tfplan.txt
+          if-no-files-found: error
+          retention-days: 3
+
+  terraform-apply:
+    name: Apply approved saved AWS Terraform plan
+    if: vars.AWS_TERRAFORM_AUTOMATION_ENABLED == 'true'
+    needs: terraform-plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: ${{ vars.AWS_TERRAFORM_APPLY_ENVIRONMENT }}
+    defaults:
+      run:
+        working-directory: infra/terraform/aws
+    steps:
+      - name: Check out triggering main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Download saved Terraform plan
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan-${{ github.sha }}
+          path: infra/terraform/aws
+
+      - name: Configure Terraform apply credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_APPLY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Initialize Terraform remote state
+        run: terraform init -input=false -backend-config="bucket=${{ vars.AWS_TERRAFORM_STATE_BUCKET }}" -backend-config="key=${{ vars.AWS_TERRAFORM_STATE_KEY }}" -backend-config="region=${{ vars.AWS_REGION }}" -backend-config="encrypt=true" -backend-config="use_lockfile=true"
+
+      - name: Apply saved Terraform plan
+        run: terraform apply -input=false tfplan
