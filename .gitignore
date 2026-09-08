@@ -152,8 +152,11 @@ grafana_data/
 # Track the reviewed AWS provider lock file for reproducible CI.
 !infra/terraform/aws/.terraform.lock.hcl
 !infra/terraform/aws-bootstrap/.terraform.lock.hcl
+# Activated locally after the one-time bootstrap; values stay untracked.
+infra/terraform/aws-bootstrap/backend.tf
 *.tfstate
 *.tfstate.*
+*.tfplan
 crash.log
 override.tf
 override.tf.json
@@ -199,3 +202,8 @@ ui/node_modules/
 ui/.next/
 ui/.env.local
 ui/next-env.d.ts
+# Local Terraform variable values
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json

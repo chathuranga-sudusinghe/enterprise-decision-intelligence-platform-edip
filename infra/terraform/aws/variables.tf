@@ -51,7 +51,7 @@ variable "artifact_bucket_name" {
   }
 }
 variable "github_oidc_provider_arn" {
-  description = "GitHub Actions OIDC provider ARN created by the bootstrap root."
+  description = "Existing shared account-level GitHub Actions OIDC provider ARN."
   type        = string
 }
 variable "github_actions_release_role_name" {

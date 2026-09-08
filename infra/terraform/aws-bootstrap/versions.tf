@@ -3,6 +3,4 @@ terraform {
   required_providers {
     aws = { source = "hashicorp/aws", version = "~> 6.0" }
   }
-  # Initially use -backend=false, then migrate this bootstrap state after the bucket exists.
-  backend "s3" {}
 }

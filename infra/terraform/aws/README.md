@@ -2,13 +2,13 @@
 
 This root defines EDIP's first production AWS foundation: private image and artifact storage plus a GitHub Actions OpenID Connect (OIDC) trust boundary. It does not deploy workloads.
 
-It manages immutable, scan-on-push backend and frontend Amazon Elastic Container Registry (ECR) repositories; a private, versioned, AES-256 encrypted Amazon Simple Storage Service (S3) artifact bucket with public access blocked, customer-provided encryption keys blocked, Transport Layer Security enforced, and incomplete uploads cleaned up; the shared GitHub OIDC provider; and a narrowly scoped application release role.
+It manages immutable, scan-on-push backend and frontend Amazon Elastic Container Registry (ECR) repositories; a private, versioned, AES-256 encrypted Amazon Simple Storage Service (S3) artifact bucket with public access blocked, customer-provided encryption keys blocked, Transport Layer Security enforced, and incomplete uploads cleaned up; and a narrowly scoped application release role. It consumes an externally managed shared GitHub OIDC provider ARN.
 
 ## Release role boundary
 
 The `github_actions_release` role is reserved for future application release and continuous deployment workflows. It can authenticate to ECR, push and read images in the two EDIP repositories, list the EDIP artifact bucket, and publish or read approved artifact objects. It cannot change ECR repository configuration, S3 bucket configuration, its own IAM policy or trust policy, the OIDC provider, or any unrelated infrastructure. It has no resource creation or deletion permissions.
 
-The separate `infra/terraform/aws-bootstrap` root creates narrowly scoped GitHub Actions Terraform plan and apply roles. Those roles own reviewed plan/apply permissions and state-backend access for this root. This release role must not be reused for Terraform applies.
+The separate `infra/terraform/aws-bootstrap` root consumes the external shared OIDC provider and creates narrowly scoped GitHub Actions Terraform plan and apply roles. Those roles own reviewed plan/apply permissions and state-backend access for this root. This release role must not be reused for Terraform applies.
 
 Amazon Elastic Container Service (ECS), Fargate, Application Load Balancer, CloudWatch, Secrets Manager, databases, application deployment, and continuous deployment remain deferred.
 

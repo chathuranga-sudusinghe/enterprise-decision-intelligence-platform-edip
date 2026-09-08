@@ -7,6 +7,10 @@ resource "aws_s3_bucket" "terraform_state" {
       error_message = "Terraform state and application artifacts require separate buckets."
 
     }
+    precondition {
+      condition     = var.bootstrap_state_key != var.foundation_state_key
+      error_message = "Bootstrap and main foundation state must use different object keys."
+    }
 
   }
 }
