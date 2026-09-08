@@ -1,25 +1,59 @@
 # EDIP Terraform bootstrap
 
-This root must be applied once with a separately governed short-lived operator identity before the main `infra/terraform/aws` root can use remote state or GitHub OIDC.
+This root deliberately starts with local Terraform state because it creates the S3 bucket that will later hold its state. The tracked root has no active backend declaration. `backend.tf.example` is an inert template; the locally activated `backend.tf` and all state files are ignored by Git.
 
-## Bootstrap order
+Keep `AWS_TERRAFORM_AUTOMATION_ENABLED` unset or different from the exact lowercase string `true` throughout bootstrap. Static PR validation continues while authenticated plans and applies remain skipped.
 
-1. Leave `AWS_TERRAFORM_AUTOMATION_ENABLED` unset or set to any value other than the exact lowercase string `true`. PR static validation continues, while authenticated plans and applies remain skipped.
-2. Supply the region, dedicated state bucket name, separate artifact bucket name, main state key, exact plan subjects, and exact protected-environment apply subjects outside version control.
-3. Run `terraform init -backend=false`, review a local bootstrap plan, and apply this root with short-lived bootstrap credentials. This is the only unavoidable local-state phase; never commit that state.
-4. Reinitialize this bootstrap root with its own key in the new bucket and `use_lockfile=true`, migrating the bootstrap state when Terraform prompts.
-5. Configure GitHub repository variables from the outputs: state bucket, shared OIDC provider ARN, plan role ARN, apply role ARN, state key, region, artifact bucket, and release-role OIDC subjects.
-6. Configure `AWS_TERRAFORM_APPLY_ENVIRONMENT` as a protected GitHub environment with required reviewers and main-branch deployment protection.
-7. Set `AWS_TERRAFORM_AUTOMATION_ENABLED` to the exact lowercase string `true` only after the bootstrap outputs, repository variables, and protected environment are ready.
-8. PRs to `dev` or `main` can then use the read-only plan role. A merge to `main` invokes a post-merge plan job with that same role; include the exact main-branch OIDC subject in the plan role trust.
-9. Review the uploaded `tfplan.txt` artifact. Approving the protected apply environment then permits the dependent job to apply the matching binary `tfplan` artifact from that workflow run.
 
-The plan role can read the main state and approved foundation resources and can create/delete only the S3 lockfile. The apply role can update the main state and manage only the named ECR repositories, application artifact bucket controls, and application release role. Neither role can manage this bootstrap root, its own policy/trust, or unrelated resources. The release role remains separate.
+## Local bootstrap variables
 
-The state bucket is versioned, encrypted, private, TLS-only, and must differ from the application artifact bucket. Locking uses `<state-key>.tflock`; no DynamoDB table is used.
+`bootstrap.auto.tfvars` is intentionally ignored. Add the existing provider ARN to that local file alongside the other bootstrap inputs:
 
-## Automation gate
+```hcl
+github_oidc_provider_arn = "<existing-token.actions.githubusercontent.com-provider-arn>"
+```
 
-Before activation, relevant PRs always run formatting, backend-disabled initialization, and validation for both AWS Terraform roots. The authenticated remote-state plan job is skipped. Main pushes may trigger the apply workflow, but its apply job is skipped before environment evaluation and AWS authentication.
+Obtain the value from the account owner or a read-only IAM lookup. Do not place an account-specific ARN in tracked files. EDIP owns only its scoped Terraform plan/apply roles and inline policies; the shared provider remains outside EDIP state. Do not import it unless a later account-level architecture decision explicitly transfers ownership to EDIP.
 
-After activation, PRs retain static checks and add authenticated remote-state plans. A main push affecting the AWS foundation creates a new plan from the exact triggering commit with the read-only plan role and uploads its binary and readable forms for three days. Only after that succeeds does the protected-environment apply job request approval. The apply job checks out the same commit and applies the downloaded binary plan without creating another plan. Changing the gate does not replace protected-environment approval.
+## Stage A: create the bootstrap foundation with local state
+
+Supply the region, dedicated state bucket name, separate artifact bucket name, distinct bootstrap and foundation state keys, existing shared GitHub OIDC provider ARN, and exact plan/apply OIDC subjects outside version control. Use a separately governed short-lived operator identity, then run:
+
+```bash
+terraform init
+terraform fmt -check -recursive
+terraform validate
+terraform plan -input=false -out=bootstrap.tfplan
+terraform show -no-color bootstrap.tfplan
+terraform apply -input=false bootstrap.tfplan
+```
+
+Review the saved plan before the final command. This is the only intentional local-state apply. Do not commit `terraform.tfstate`, its backup, the plan, credentials, variable values, or backend values. The bootstrap root creates the dedicated state bucket and separate Terraform plan/apply roles. It consumes the existing shared account-level GitHub OIDC provider and never creates, imports, changes, or destroys that provider. The state bucket is versioned, encrypted, private, TLS-only, and must differ from the application artifact bucket.
+
+## Stage B: migrate bootstrap state to S3
+
+After the Stage A apply succeeds, set `TF_STATE_BUCKET`, `TF_BOOTSTRAP_STATE_KEY`, and `TF_STATE_REGION` from reviewed bootstrap inputs/outputs. The bootstrap key defaults to `bootstrap/terraform.tfstate` and Terraform enforces that it differs from `foundation_state_key`. Activate the backend locally and migrate:
+
+```bash
+cp backend.tf.example backend.tf
+terraform init -migrate-state \
+  -backend-config="bucket=$TF_STATE_BUCKET" \
+  -backend-config="key=$TF_BOOTSTRAP_STATE_KEY" \
+  -backend-config="region=$TF_STATE_REGION" \
+  -backend-config="encrypt=true" \
+  -backend-config="use_lockfile=true"
+terraform state list
+aws s3api head-object \
+  --bucket "$TF_STATE_BUCKET" \
+  --key "$TF_BOOTSTRAP_STATE_KEY"
+```
+
+Confirm the remote object exists and Terraform can read the migrated state before removing local state copies. Preserve any required recovery copy only in encrypted, access-controlled storage outside the repository. Keep `backend.tf` local and protected; it is ignored because backend settings are environment-specific. S3 `.tflock` locking is used, with no DynamoDB table.
+
+## Activate GitHub automation
+
+Configure repository variables from the outputs: state bucket, externally managed shared OIDC provider ARN, plan role ARN, apply role ARN, foundation state key, region, artifact bucket, and release-role OIDC subjects. Configure `AWS_TERRAFORM_APPLY_ENVIRONMENT` with required reviewers and main-branch protection. Include exact pull-request and main-branch subjects in the plan role trust and an exact protected-environment subject in the apply role trust.
+
+Only after migration and GitHub configuration are verified, set `AWS_TERRAFORM_AUTOMATION_ENABLED=true`. PRs then gain authenticated remote-state plans. Main changes create and upload an exact-commit binary and readable plan; protected-environment approval gates the dependent job that applies that saved plan.
+
+The plan role can read main state and foundation resources and manage only its lockfile. The apply role can update main state and only the named ECR repositories, artifact bucket controls, and release role. Neither role can manage this bootstrap root or itself, and the application release role remains separate.
