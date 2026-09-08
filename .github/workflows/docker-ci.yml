@@ -1,20 +1,10 @@
 name: EDIP Docker CI
 
 on:
-  push:
-    branches:
-      - main
-      - master
-      - develop
-      - dev
-      - "feature/**"
   pull_request:
     branches:
-      - main
-      - master
-      - develop
       - dev
-  workflow_dispatch:
+      - main
 
 jobs:
   docker-build:
