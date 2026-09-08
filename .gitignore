@@ -151,6 +151,7 @@ grafana_data/
 .terraform.lock.hcl
 # Track the reviewed AWS provider lock file for reproducible CI.
 !infra/terraform/aws/.terraform.lock.hcl
+!infra/terraform/aws-bootstrap/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 crash.log

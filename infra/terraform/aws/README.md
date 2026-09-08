@@ -8,7 +8,7 @@ It manages immutable, scan-on-push backend and frontend Amazon Elastic Container
 
 The `github_actions_release` role is reserved for future application release and continuous deployment workflows. It can authenticate to ECR, push and read images in the two EDIP repositories, list the EDIP artifact bucket, and publish or read approved artifact objects. It cannot change ECR repository configuration, S3 bucket configuration, its own IAM policy or trust policy, the OIDC provider, or any unrelated infrastructure. It has no resource creation or deletion permissions.
 
-A separate, narrowly scoped GitHub Actions Terraform role will be created by the remote-state/bootstrap infrastructure task. That role will own reviewed Terraform plan and apply permissions and the state-backend access needed for infrastructure lifecycle operations. This release role must not be reused for Terraform applies.
+The separate `infra/terraform/aws-bootstrap` root creates narrowly scoped GitHub Actions Terraform plan and apply roles. Those roles own reviewed plan/apply permissions and state-backend access for this root. This release role must not be reused for Terraform applies.
 
 Amazon Elastic Container Service (ECS), Fargate, Application Load Balancer, CloudWatch, Secrets Manager, databases, application deployment, and continuous deployment remain deferred.
 
@@ -31,7 +31,7 @@ terraform init \
   -backend-config="use_lockfile=true"
 ```
 
-Do not commit backend values. S3 lockfiles are required; DynamoDB locking is deprecated. The first apply requires a separately governed short-lived bootstrap identity because this root creates the OIDC provider and release role. No apply workflow is included.
+Do not commit backend values. S3 lockfiles are required; DynamoDB locking is deprecated. The bootstrap root must be applied first with a separately governed short-lived identity; this root then consumes its OIDC provider ARN and remote backend. The separate `terraform-apply.yml` workflow remains disabled until `AWS_TERRAFORM_AUTOMATION_ENABLED` is exactly `true` and then requires the configured protected environment. When enabled, its read-only plan job uploads the exact post-merge binary and readable plan before the dependent protected-environment job requests approval and applies that saved plan.
 
 ## Local validation
 
