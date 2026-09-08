@@ -29,8 +29,8 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Production deployment direction
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+AWS is the canonical production target. The frontend will be packaged as an OCI image, published to Amazon ECR, and released to its Amazon ECS Fargate service through the approved GitHub Actions CD workflow using AWS OpenID Connect (OIDC). Application Load Balancer routing and `NEXT_PUBLIC_API_BASE_URL` behavior must be defined by the AWS deployment ADR before implementation. No production frontend image or deployment workflow exists yet.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for framework-level runtime guidance.

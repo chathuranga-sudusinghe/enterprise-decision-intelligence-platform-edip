@@ -5,7 +5,7 @@
 | Status | Authoritative target architecture; implementation evidence remains separate |
 | Project | Enterprise Decision Intelligence Platform (EDIP) |
 | Architecture style | Capability-oriented modular monolith |
-| Canonical cloud target | Microsoft Azure |
+| Canonical cloud target | Amazon Web Services (AWS) |
 | Engineering framework | Enterprise AI/ML Engineering Framework v2.1.0 |
 | Project-management model | Jira Sprints and SCRUM work items |
 | Production-readiness claim | None |
@@ -19,6 +19,7 @@ It is a design authority, not proof that a component has been implemented, deplo
 Supporting authorities are:
 
 - [Research and Engineering Delivery Workflow](../governance/EDIP_RESEARCH_ENGINEERING_DELIVERY_WORKFLOW.md);
+- [AWS Canonical Cloud Migration Audit](../audits/EDIP_AWS_CANONICAL_CLOUD_MIGRATION_AUDIT.md);
 - [Favorita Dataset Source and Governance](../governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md);
 - [Favorita Research Hypothesis and Experiment Design](../research/favorita/FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md);
 - [Favorita Temporal Validation Design](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md); and
@@ -60,7 +61,7 @@ Jira Sprint
 -> reviewed release checkpoint
 -> main
 -> automated Continuous Deployment (CD)
--> Azure revision
+-> Amazon ECS Fargate service deployment
 ```
 
 A work item may traverse several framework stages, and a framework gate may span several Sprints. Old numbered delivery phases are historical vocabulary and are not the current execution model.
@@ -79,7 +80,7 @@ A work item may traverse several framework stages, and a framework gate may span
 10. **Immutable provenance.** Data, features, models, prompts, policies, evidence, and releases are versioned and checksummed.
 11. **Durable state for durable decisions.** Workflow, approval, execution, and audit state survive process restarts.
 12. **Observability is not audit.** Operational telemetry, model traces, and authoritative business records have distinct owners.
-13. **One canonical cloud direction.** Microsoft Azure is the deployment target; detailed topology requires a dedicated ADR.
+13. **One canonical cloud direction.** AWS is the deployment target; detailed topology requires a dedicated ADR.
 14. **Small reversible changes.** Work is delivered through bounded branches, reviewed pull requests, validation, and explicit rollback.
 15. **Claims match evidence.** Static validation, local tests, CI, deployment, and live operation are reported separately.
 
@@ -197,15 +198,15 @@ MCP is a governed integration interface, not an authorization system. Tools are 
 |---|---|---|
 | PostgreSQL | Structured durable application, workflow, HITL, execution, policy-reference, and audit state | Large binary artifacts or vector retrieval |
 | Pinecone | Semantic/vector retrieval for approved governed corpora | Source authority, approvals, business state, or audit truth |
-| Azure Blob Storage | Large datasets, model packages, manifests, evaluation reports, evidence payloads, and suitable release artifacts | Transactional approval or authorization state |
-| Azure Key Vault | Production secrets, keys, certificates, and secret references | Ordinary business data or model artifacts |
-| Application Insights / Azure Monitor | Logs, metrics, traces, alerts, and operational diagnostics | Authoritative business decisions or approval records |
+| Amazon S3 | Large datasets, model packages, manifests, evaluation reports, evidence payloads, and suitable release artifacts | Transactional approval or authorization state |
+| AWS Secrets Manager | Production secrets, keys, certificates, and secret references | Ordinary business data or model artifacts |
+| Amazon CloudWatch | Logs, metrics, traces, alerts, and operational diagnostics | Authoritative business decisions or approval records |
 
 Generated data and artifacts remain outside Git. Manifests record immutable IDs, schema/version, producer revision, inputs and checksums, parameters, environment, coverage, validation, approval state, storage URI, retention, and successor/rollback relationships.
 
-## 9. Azure target and delivery architecture
+## 9. AWS target and delivery architecture
 
-Microsoft Azure is the canonical cloud target. The intended high-level deployment path is:
+AWS is the sole canonical production cloud target. The intended high-level deployment path is:
 
 ```text
 local development and training
@@ -213,27 +214,31 @@ local development and training
 -> GitHub pull request and review
 -> GitHub Actions CI
 -> reviewed merge/release checkpoint to main
--> automated Continuous Deployment (CD)
--> immutable image in Azure Container Registry
--> new Azure Container Apps revision
--> health, readiness, telemetry and rollback evidence
+-> GitHub Actions CD authenticated through AWS OpenID Connect (OIDC)
+-> immutable backend and frontend images in Amazon ECR
+-> Amazon ECS Fargate service updates by immutable image digest
+-> Application Load Balancer health, readiness, telemetry and rollback evidence
 ```
 
 Target service responsibilities are:
 
-- **Azure Container Registry:** immutable container images identified by digest;
-- **Azure Container Apps:** revision-based FastAPI application deployment;
-- **Azure Key Vault:** production secret references;
-- **Azure Blob Storage:** large governed artifacts;
-- **PostgreSQL:** structured durable application and workflow state;
-- **Pinecone:** semantic retrieval;
-- **Application Insights / Azure Monitor:** operational observability.
+- **Amazon ECR:** separate immutable backend and frontend OCI images identified by digest;
+- **Amazon ECS Fargate:** separate backend and frontend services without training or evaluation workloads;
+- **Application Load Balancer:** TLS termination, routing, and service health checks;
+- **Amazon S3:** versioned model bundles and large governed artifacts;
+- **IAM execution and task roles:** least-privilege image, log, secret, and application access without static AWS credentials;
+- **AWS Secrets Manager:** production secret references;
+- **PostgreSQL or Amazon RDS for PostgreSQL:** structured durable application and workflow state when persistence is required;
+- **Pinecone:** semantic retrieval; and
+- **Amazon CloudWatch:** operational logs, metrics, dashboards, alarms, and deployment diagnostics.
 
-GitHub Actions is the intended CI/CD automation mechanism. CI validates code, tests, contracts, and builds before release. Feature or development pushes do not deploy production. Human approval occurs before the reviewed `main`/release merge; that merge is the deployment boundary. Continuous Deployment (CD) then automatically publishes the immutable image, deploys a new Azure revision, performs post-deployment validation, and preserves rollback evidence.
+GitHub Actions is the intended CI/CD automation mechanism. CI validates code, tests, contracts, and images before release. Feature or development pushes do not deploy production. Human approval occurs before the reviewed `main`/release merge; that merge is the deployment boundary. Continuous Deployment (CD) then assumes a narrowly scoped AWS role through OIDC, publishes backend and frontend images to ECR, updates ECS Fargate services by digest, performs post-deployment validation, and preserves rollback evidence. Long-lived AWS access keys are forbidden.
 
-Terraform is the preferred Infrastructure as Code direction for Azure resource lifecycle. Infrastructure change and application deployment are distinct workflows: Terraform is reviewed when infrastructure changes, not required for every application revision.
+Terraform owns the AWS infrastructure lifecycle. Production infrastructure is not created or changed manually, and application CD does not provision infrastructure on each release. Infrastructure plans and applies use separately reviewed, environment-appropriate workflows and authority.
 
-Detailed Azure topology, subscriptions, regions, networking, identity, managed PostgreSQL choice, private connectivity, Terraform modules/backends, workflow YAML, scaling, backup, disaster recovery, and cost controls are deferred to a dedicated Azure deployment ADR and implementation task. This document does not claim that Azure infrastructure or CD is already implemented.
+Pre-trained model bundles are published outside Git to versioned S3 keys with manifests and checksums. The backend task obtains the approved bundle through its IAM task role, verifies it into bounded task-local storage, and becomes ready only after `FavoritaBundlePredictor` loads it successfully. AWS serving must not import or run training, feature materialization, Optuna, evaluation, or holdout workflows.
+
+Detailed AWS accounts and environments, region selection, networking, DNS/TLS, ECR repositories, ECS services, ALB routing, S3 layout and retention, IAM policies, Secrets Manager entries, RDS topology, CloudWatch alarms, Terraform modules/backend, and workflow YAML are deferred to a dedicated AWS deployment ADR and separate implementation tasks. This document does not claim that AWS infrastructure or CD is already implemented.
 
 ## 10. Security, trust, and observability
 
@@ -248,7 +253,7 @@ Evaluation must distinguish:
 - cloud deployment evidence; and
 - sustained operational evidence.
 
-Application Insights and Azure Monitor are the target operational telemetry layer. LangGraph or model-provider traces may support development and evaluation but do not replace the durable business audit store.
+Amazon CloudWatch is the target operational telemetry layer. LangGraph or model-provider traces may support development and evaluation but do not replace the durable business audit store.
 
 ## 11. Evaluation and research positioning
 
@@ -260,16 +265,16 @@ Claims such as “reliable,” “trustworthy,” “adaptive,” or “multi-ag
 
 ## 12. Current state and target-state boundary
 
-Confirmed repository evidence includes the Favorita governed source record, leakage-safe feature contracts, exact 16-day forecast horizon, redesigned four-fold expanding-window contract, executable validation, bounded smoke evidence, completed Contextual-versus-Time-Aware comparison, paired Optuna tuning with Trial 0 frozen as the shared final configuration, and the completed SCRUM-19 protected final-holdout evaluation. The final evidence at `artifacts/evaluation/favorita_scrum_19_final_holdout/` selects Time-Aware LightGBM as the forecasting approach; it does not establish deployment readiness. Fold 4, the largest approved canonical fold, used 313,475,735 training rows, 1,672,872 validation rows, an approximately 2.6 GiB training Parquet, approximately 26 minutes elapsed time, approximately 34.7 GiB peak process RAM, zero swap, and the unchanged LightGBM adapter on a 64 GB CPU machine.
+Confirmed repository evidence includes the Favorita governed source record, leakage-safe feature contracts, exact 16-day forecast horizon, redesigned four-fold expanding-window contract, executable validation, bounded smoke evidence, completed Contextual-versus-Time-Aware comparison, paired Optuna tuning with Trial 0 frozen as the shared final configuration, the completed SCRUM-19 protected final-holdout evaluation, and real-model bundle/load-only/FastAPI/Docker validation. The final evidence at `artifacts/evaluation/favorita_scrum_19_final_holdout/` selects Time-Aware LightGBM as the forecasting approach; it does not establish deployment readiness. Fold 4, the largest approved canonical fold, used 313,475,735 training rows, 1,672,872 validation rows, an approximately 2.6 GiB training Parquet, approximately 26 minutes elapsed time, approximately 34.7 GiB peak process RAM, zero swap, and the unchanged LightGBM adapter on a 64 GB CPU machine.
 
 The following remain target work unless separately evidenced:
 
 - optional sensitivity or uncertainty analysis under separate approval;
-- packaging, promotion, and serving of an immutable Time-Aware LightGBM model bundle;
+- governed publication and promotion of the immutable Time-Aware LightGBM bundle through Amazon S3 and AWS serving;
 - governed production RAG and approved corpus;
 - durable identity, HITL, workflow, and audit persistence;
 - controlled enterprise/MCP integrations;
-- Azure infrastructure, CI/CD deployment, and live operations.
+- AWS infrastructure, GitHub Actions CD, and live operations.
 
 ## 13. Historical transition
 
@@ -281,7 +286,7 @@ This short transition explains provenance without making old implementation deta
 
 Dedicated decisions are still required for:
 
-- Azure topology, identity, networking, regions, managed PostgreSQL, Terraform state, scaling, recovery, and cost;
+- AWS account/environment topology, identity, networking, region, RDS decision, Terraform state, scaling, recovery, and cost;
 - exact Claude model/provider configuration and evaluation thresholds;
 - Pinecone index, namespace, corpus, access, retention, and deletion contracts;
 - production identity provider, tenant mapping, and approval authority matrix;
