@@ -140,9 +140,13 @@ python -m venv .venv
 Activate the environment, then install and start the API:
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -e ".[dev]"
 uvicorn app.main:app --reload
 ```
+
+Runtime-only installations use `python -m pip install .`; non-editable development installations use `python -m pip install ".[dev]"`. Python metadata, pinned dependencies, and tool configuration live in `pyproject.toml`. Ruff supplies linting, import sorting, and formatting; Black and isort are not required. MyPy targets `app` and `pipelines`; this newly documented scope still has existing type errors. Formatting also has existing failures, so these checks are not yet CI gates.
+
+Use editable installation for local pipeline work so repository-relative data and artifact defaults retain their meaning. For an installed wheel outside the checkout, configure absolute runtime paths (`EDIP_FAVORITA_SOURCE_PATH`, `EDIP_ARTIFACT_ROOT`, and `EDIP_FAVORITA_MODEL_BUNDLE_PATH`) as needed.
 
 Open `http://localhost:8000/docs` for generated API documentation. The current API exposes foundation health and monitoring behavior; forecast, RAG, and governed workflow APIs require future implementation.
 
@@ -160,6 +164,8 @@ Open `http://localhost:3000`. The current frontend is an existing baseline and d
 
 ```bash
 ruff check .
+ruff format --check .
+mypy
 pytest
 cd ui
 npm run lint
