@@ -1,3 +1,44 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "enterprise-decision-intelligence-platform-edip"
+version = "1.0.0"
+description = "EDIP API and decision intelligence pipelines"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.117.1",
+    "uvicorn==0.41.0",
+    "python-dotenv==1.2.2",
+    "pydantic==2.12.5",
+    "pydantic-settings==2.13.1",
+    "pandas==3.0.1",
+    "numpy==2.4.3",
+    "pyarrow==25.0.0",
+    "langgraph==1.2.10",
+    "requests==2.32.5",
+    "httpx==0.28.1",
+    "prometheus-client==0.24.1",
+    "lightgbm==4.7.0",
+    "optuna==4.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.0.2",
+    "pytest-cov==7.0.0",
+    "ruff==0.16.5",
+    "mypy==1.19.1",
+]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["app", "app.*", "pipelines", "pipelines.*"]
+namespaces = true
+
 [tool.ruff]
 target-version = "py312"
 line-length = 88
@@ -12,3 +53,13 @@ extend-exclude = [
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app", "pipelines"]
+namespace_packages = true
+explicit_package_bases = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

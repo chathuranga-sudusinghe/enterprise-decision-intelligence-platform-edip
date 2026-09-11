@@ -11,14 +11,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
-
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml ./
 
 COPY app/ ./app/
 COPY pipelines/runtime_paths.py ./pipelines/
 COPY pipelines/models/favorita_bundle_inference.py ./pipelines/models/
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir . && \
+    rm -rf build *.egg-info
 
 EXPOSE 8000
 
