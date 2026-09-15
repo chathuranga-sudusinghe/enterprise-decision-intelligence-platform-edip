@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 TERRAFORM_WORKFLOWS = {
+    ".github/workflows/release-orchestrator.yml",
     ".github/workflows/terraform-ci.yml",
     ".github/workflows/terraform-apply.yml",
 }

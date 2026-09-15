@@ -1,16 +1,18 @@
 # EDIP AWS Terraform foundation
 
-This root defines EDIP's first production AWS foundation: private image and artifact storage plus a GitHub Actions OpenID Connect (OIDC) trust boundary. It does not deploy workloads.
+This root defines EDIP's first production AWS foundation: private image and artifact storage plus a GitHub Actions OpenID Connect (OIDC) trust boundary. Optional backend hosting is now defined but defaults off; no hosting apply has been performed.
 
 It manages immutable, scan-on-push backend and frontend Amazon Elastic Container Registry (ECR) repositories; a private, versioned, AES-256 encrypted Amazon Simple Storage Service (S3) artifact bucket with public access blocked, customer-provided encryption keys blocked, Transport Layer Security enforced, and incomplete uploads cleaned up; and a narrowly scoped application release role. It consumes an externally managed shared GitHub OIDC provider ARN.
 
 ## Release role boundary
 
-The `github_actions_release` role is reserved for future application release and continuous deployment workflows. It can authenticate to ECR, push and read images in the two EDIP repositories, list the EDIP artifact bucket, and publish or read approved artifact objects. It cannot change ECR repository configuration, S3 bucket configuration, its own IAM policy or trust policy, the OIDC provider, or any unrelated infrastructure. It has no resource creation or deletion permissions.
+The `github_actions_release` role is reserved for future application release and continuous deployment workflows. It can authenticate to ECR, push and read images in the two EDIP repositories, list the EDIP artifact bucket, and publish or read approved artifact objects. It cannot change ECR repository configuration, S3 bucket configuration, its own IAM policy or trust policy, the OIDC provider, or unrelated infrastructure. When hosting is disabled it has no resource creation or deletion permissions. When enabled it additionally registers tagged task revisions, passes only the two backend roles, and updates only the backend ECS service. It still cannot provision infrastructure.
 
 The separate `infra/terraform/aws-bootstrap` root consumes the external shared OIDC provider and creates narrowly scoped GitHub Actions Terraform plan and apply roles. Those roles own reviewed plan/apply permissions and state-backend access for this root. This release role must not be reused for Terraform applies.
 
-Amazon Elastic Container Service (ECS), Fargate, Application Load Balancer, CloudWatch, Secrets Manager, databases, application deployment, and continuous deployment remain deferred.
+Optional ECS Fargate, ALB and CloudWatch resources are in `../modules/backend-hosting`, with model delivery and a reusable application deployment workflow. Secrets Manager, databases and frontend deployment remain deferred.
+
+See [the deployment runbook](../../../docs/deployment/EDIP_BACKEND_FIRST.md) for the temporary public boundary, model publication, IAM prerequisites and exact commands. `hosting_enabled=false` preserves the working foundation. The new bootstrap hosting permissions are pending review; do not enable CI hosting until that prerequisite and protected-environment release trust are resolved.
 
 ## Inputs and authentication
 

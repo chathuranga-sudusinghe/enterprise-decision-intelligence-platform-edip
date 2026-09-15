@@ -18,7 +18,7 @@ data "aws_iam_policy_document" "github_actions_release_assume_role" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = sort(tolist(var.github_actions_release_oidc_subjects))
+      values   = sort(tolist(setunion(var.github_actions_release_oidc_subjects, var.github_actions_release_environment_subject == null ? toset([]) : toset([var.github_actions_release_environment_subject]))))
     }
   }
 }
@@ -31,6 +31,61 @@ resource "aws_iam_role" "github_actions_release" {
 }
 
 data "aws_iam_policy_document" "github_actions_release" {
+  dynamic "statement" {
+    for_each = var.hosting_enabled ? [module.hosting[0].deployment] : []
+    content {
+      sid       = "DeployBackendService"
+      actions   = ["ecs:UpdateService", "ecs:DescribeServices"]
+      resources = [statement.value.service_arn]
+    }
+  }
+  dynamic "statement" {
+    for_each = var.hosting_enabled ? [module.hosting[0].deployment] : []
+    content {
+      sid       = "ReadBackendTaskTemplate"
+      actions   = ["ecs:DescribeTaskDefinition"]
+      resources = ["*"]
+    }
+  }
+  dynamic "statement" {
+    for_each = var.hosting_enabled ? [1] : []
+    content {
+      sid       = "RegisterTaggedTaskRevision"
+      actions   = ["ecs:RegisterTaskDefinition"]
+      resources = ["${module.hosting[0].deployment.family_arn}:*"]
+      condition {
+        test     = "StringEquals"
+        variable = "aws:RequestTag/Project"
+        values   = [var.name_prefix]
+      }
+      condition {
+        test     = "StringEquals"
+        variable = "aws:RequestTag/Environment"
+        values   = [var.environment]
+      }
+    }
+  }
+  dynamic "statement" {
+    for_each = var.hosting_enabled ? [module.hosting[0].deployment] : []
+    content {
+      sid       = "TagBackendTaskRevisions"
+      actions   = ["ecs:TagResource", "ecs:ListTagsForResource"]
+      resources = ["${statement.value.family_arn}:*"]
+    }
+  }
+  dynamic "statement" {
+    for_each = var.hosting_enabled ? [module.hosting[0].deployment] : []
+    content {
+      sid       = "PassBackendTaskRoles"
+      actions   = ["iam:PassRole"]
+      resources = [statement.value.execution_role_arn, statement.value.task_role_arn]
+      condition {
+        test     = "StringEquals"
+        variable = "iam:PassedToService"
+        values   = ["ecs-tasks.amazonaws.com"]
+      }
+    }
+  }
   statement {
     sid       = "AuthenticateToEcr"
     effect    = "Allow"

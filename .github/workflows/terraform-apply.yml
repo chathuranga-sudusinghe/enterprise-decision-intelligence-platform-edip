@@ -2,6 +2,9 @@ name: EDIP Terraform Apply
 
 on:
   workflow_call:
+    outputs:
+      deployment:
+        value: ${{ jobs.terraform-apply.outputs.deployment }}
 
 permissions:
   contents: read
@@ -11,10 +14,13 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  TF_VAR_hosting_enabled: ${{ vars.AWS_HOSTING_ENABLED || 'false' }}
+  TF_VAR_model_bundle: ${{ vars.AWS_MODEL_BUNDLE_JSON || 'null' }}
   AWS_REGION: ${{ vars.AWS_REGION }}
   TF_VAR_aws_region: ${{ vars.AWS_REGION }}
   TF_VAR_artifact_bucket_name: ${{ vars.AWS_ARTIFACT_BUCKET_NAME }}
   TF_VAR_github_oidc_provider_arn: ${{ vars.AWS_GITHUB_OIDC_PROVIDER_ARN }}
+  TF_VAR_github_actions_release_environment_subject: repo:${{ github.repository }}:environment:${{ vars.AWS_TERRAFORM_APPLY_ENVIRONMENT }}
   TF_VAR_github_actions_release_oidc_subjects: ${{ vars.AWS_RELEASE_OIDC_SUBJECTS_JSON }}
 
 jobs:
@@ -69,6 +75,8 @@ jobs:
           retention-days: 3
 
   terraform-apply:
+    outputs:
+      deployment: ${{ steps.contract.outputs.deployment }}
     name: Apply approved saved AWS Terraform plan
     if: vars.AWS_TERRAFORM_AUTOMATION_ENABLED == 'true'
     needs: terraform-plan
@@ -107,3 +115,9 @@ jobs:
 
       - name: Apply saved Terraform plan
         run: terraform apply -input=false tfplan
+
+      - name: Export deployment contract
+        id: contract
+        if: ${{ vars.AWS_HOSTING_ENABLED == 'true' }}
+        run: |
+          echo "deployment=$(terraform output -json application_hosting | jq -c .)" >> "$GITHUB_OUTPUT"
