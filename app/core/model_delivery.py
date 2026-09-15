@@ -47,8 +47,13 @@ def stage_bundle(client: Any, env: dict[str, str]) -> Path:
                         raise ValueError("Model object exceeds size limit")
                     digest.update(chunk)
                     output.write(chunk)
-            if digest.hexdigest() != env[checksum]:
-                raise ValueError("Model object checksum mismatch")
+            actual_digest = digest.hexdigest()
+            expected_digest = env[checksum]
+            if actual_digest != expected_digest:
+                raise ValueError(
+                    f"Checksum mismatch for {filename}: "
+                    f"expected {expected_digest}, actual {actual_digest}"
+                )
             temporary.replace(root / filename)
         finally:
             body.close()
