@@ -69,7 +69,17 @@ data "aws_iam_policy_document" "apply" {
     resources = local.ecr_repository_arns
   }
   statement {
-    actions   = ["s3:CreateBucket", "s3:DeleteBucket", "s3:DeleteBucketEncryption", "s3:DeleteBucketLifecycle", "s3:DeleteBucketOwnershipControls", "s3:DeleteBucketPolicy", "s3:DeleteBucketPublicAccessBlock", "s3:DeleteBucketTagging", "s3:PutBucketLifecycleConfiguration", "s3:PutBucketOwnershipControls", "s3:PutBucketPolicy", "s3:PutBucketPublicAccessBlock", "s3:PutBucketTagging", "s3:PutBucketVersioning", "s3:PutEncryptionConfiguration"]
+    actions = [
+      "s3:CreateBucket",
+      "s3:DeleteBucket",
+      "s3:PutBucketOwnershipControls",
+      "s3:PutBucketPolicy",
+      "s3:PutBucketPublicAccessBlock",
+      "s3:PutBucketTagging",
+      "s3:PutBucketVersioning",
+      "s3:PutEncryptionConfiguration",
+      "s3:PutLifecycleConfiguration",
+    ]
     resources = [local.artifact_bucket_arn]
   }
   statement {
