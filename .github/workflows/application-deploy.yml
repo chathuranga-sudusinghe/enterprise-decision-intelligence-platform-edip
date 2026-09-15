@@ -1,0 +1,90 @@
+name: EDIP Backend Deployment
+
+on:
+  workflow_call:
+    inputs:
+      deployment:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Publish and deploy backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment:
+      name: ${{ vars.AWS_TERRAFORM_APPLY_ENVIRONMENT }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      DEPLOYMENT: ${{ inputs.deployment }}
+      MODEL_BUNDLE: ${{ toJSON(fromJSON(inputs.deployment).model_bundle) }}
+      MODEL_BUCKET: ${{ fromJSON(inputs.deployment).bucket_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assume EDIP release role
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ fromJSON(inputs.deployment).release_role_arn }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Prepare immutable image tag
+        run: |
+          repository=$(jq -er '.repository_url' <<< "$DEPLOYMENT")
+          echo "REPOSITORY=$repository" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - name: Build backend image
+        run: docker build --platform linux/amd64 -t "$REPOSITORY:$IMAGE_TAG" .
+      - name: Install model download dependency
+        run: python -m pip install boto3==1.40.18
+      - name: Stage and verify approved model for container smoke test
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import boto3
+          from app.core.model_delivery import stage_bundle
+          bundle = json.loads(os.environ["MODEL_BUNDLE"])
+          stage_bundle(boto3.client("s3"), {
+              "EDIP_MODEL_BUCKET": os.environ["MODEL_BUCKET"],
+              "EDIP_MODEL_PREFIX": bundle["prefix"],
+              "EDIP_MODEL_VERSION_ID": bundle["model_version_id"],
+              "EDIP_METADATA_VERSION_ID": bundle["metadata_version_id"],
+              "EDIP_MODEL_SHA256": bundle["model_sha256"],
+              "EDIP_METADATA_SHA256": bundle["metadata_sha256"],
+              "EDIP_FAVORITA_MODEL_BUNDLE_PATH": os.environ["RUNNER_TEMP"] + "/edip-model",
+          })
+          PY
+      - name: Smoke test exact image with approved model
+        run: |
+          docker run -d --name edip-smoke --read-only --memory 1g --cpus .5 \
+            -p 127.0.0.1:18000:8000 \
+            --mount "type=bind,source=$RUNNER_TEMP/edip-model,target=/models/favorita,readonly" \
+            -e APP_ENV=production -e ALLOW_CREDENTIALS=false \
+            -e ALLOWED_ORIGINS=http://edip-smoke.invalid \
+            -e EDIP_FAVORITA_MODEL_BUNDLE_PATH=/models/favorita \
+            -e OMP_NUM_THREADS=1 "$REPOSITORY:$IMAGE_TAG"
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18000/ready; then exit 0; fi
+            sleep 2
+          done
+          docker logs edip-smoke
+          exit 1
+      - name: Clean up smoke container
+        if: ${{ always() }}
+        run: docker rm -f edip-smoke || true
+      - name: Push immutable image
+        run: |
+          registry="${REPOSITORY%%/*}"
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
+          docker push "$REPOSITORY:$IMAGE_TAG"
+          name="${REPOSITORY#*/}"
+          digest=$(aws ecr describe-images --repository-name "$name" --image-ids "imageTag=$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          echo "IMAGE_DIGEST_URI=$REPOSITORY@$digest" >> "$GITHUB_ENV"
+      - name: Deploy and verify public boundary
+        run: python .github/scripts/deploy_backend.py

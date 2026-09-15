@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
     paths:
+      - "app/**"
+      - "pipelines/runtime_paths.py"
+      - "pipelines/models/favorita_bundle_inference.py"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "pyproject.toml"
+      - ".github/workflows/application-deploy.yml"
+      - ".github/scripts/deploy_backend.py"
+      - "infra/terraform/modules/backend-hosting/**"
       - "infra/terraform/aws/**"
       - "infra/terraform/aws-bootstrap/**"
       - ".github/workflows/terraform-apply.yml"
@@ -24,14 +33,27 @@ jobs:
       id-token: write
     uses: ./.github/workflows/terraform-apply.yml
 
+  application:
+    name: Backend production deployment
+    needs: terraform
+    if: ${{ vars.AWS_HOSTING_ENABLED == 'true' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/application-deploy.yml
+    with:
+      deployment: ${{ needs.terraform.outputs.deployment }}
+
   release-gate:
     name: EDIP Release Gate
-    needs: terraform
+    needs: [terraform, application]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - name: Require successful Terraform release
         env:
+          HOSTING_ENABLED: ${{ vars.AWS_HOSTING_ENABLED || 'false' }}
+          APPLICATION_RESULT: ${{ needs.application.result }}
           TERRAFORM_RESULT: ${{ needs.terraform.result }}
         run: |
           if [ "$TERRAFORM_RESULT" != "success" ]; then
@@ -39,4 +61,8 @@ jobs:
             exit 1
           fi
 
-          echo "Terraform release completed successfully."
+          if [ "$HOSTING_ENABLED" = "true" ] && [ "$APPLICATION_RESULT" != "success" ]; then
+            echo "Backend deployment result: $APPLICATION_RESULT"
+            exit 1
+          fi
+          echo "EDIP release completed successfully."
