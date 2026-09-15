@@ -24,7 +24,7 @@ data "aws_iam_policy_document" "foundation_read" {
     resources = local.ecr_repository_arns
   }
   statement {
-    actions   = ["s3:GetBucketLifecycleConfiguration", "s3:GetBucketLocation", "s3:GetBucketOwnershipControls", "s3:GetBucketPolicy", "s3:GetBucketPublicAccessBlock", "s3:GetBucketTagging", "s3:GetBucketVersioning", "s3:GetEncryptionConfiguration", "s3:ListBucket"]
+    actions   = ["s3:GetBucketCORS", "s3:GetBucketLifecycleConfiguration", "s3:GetBucketLocation", "s3:GetBucketOwnershipControls", "s3:GetBucketPolicy", "s3:GetBucketPublicAccessBlock", "s3:GetBucketTagging", "s3:GetBucketVersioning", "s3:GetEncryptionConfiguration", "s3:ListBucket"]
     resources = [local.artifact_bucket_arn]
   }
   statement {
