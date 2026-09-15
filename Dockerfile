@@ -23,4 +23,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 EXPOSE 8000
 
+# Preserve model volume ownership when Fargate mounts it.
+RUN mkdir -p /models && chown 10001:10001 /models
+VOLUME ["/models"]
+USER 10001:10001
+
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

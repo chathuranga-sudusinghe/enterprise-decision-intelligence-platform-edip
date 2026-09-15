@@ -94,3 +94,13 @@ variable "additional_tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "github_actions_release_environment_subject" {
+  description = "Additional exact protected-environment OIDC subject; existing subjects are preserved."
+  type        = string
+  default     = null
+  validation {
+    condition     = var.github_actions_release_environment_subject == null ? true : can(regex("^repo:[^:*?]+/[^:*?]+:environment:[^*?]+$", var.github_actions_release_environment_subject))
+    error_message = "Use one exact repository/environment OIDC subject without wildcards."
+  }
+}
