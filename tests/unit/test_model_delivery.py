@@ -67,3 +67,19 @@ def test_invalid_configuration_never_downloads(tmp_path, key, value):
     with pytest.raises(ValueError):
         stage_bundle(client, env)
     assert not client.calls
+
+
+def test_checksum_mismatch_identifies_metadata_and_both_digests(tmp_path):
+    env = configuration(tmp_path)
+    actual = env["EDIP_METADATA_SHA256"]
+    expected = actual[:-1] + ("0" if actual[-1] != "0" else "1")
+    env["EDIP_METADATA_SHA256"] = expected
+
+    with pytest.raises(ValueError) as error:
+        stage_bundle(S3(), env)
+
+    assert str(error.value) == (
+        f"Checksum mismatch for metadata.json: expected {expected}, actual {actual}"
+    )
+    assert (tmp_path / "bundle" / "model.txt").read_bytes() == b"model"
+    assert not (tmp_path / "bundle" / "metadata.json").exists()
