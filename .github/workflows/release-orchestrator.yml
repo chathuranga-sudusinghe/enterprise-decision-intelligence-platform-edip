@@ -17,6 +17,7 @@ on:
       - "infra/terraform/aws-bootstrap/**"
       - ".github/workflows/terraform-apply.yml"
       - ".github/workflows/release-orchestrator.yml"
+      - "docs/deployment/**"
 
 permissions:
   contents: read
