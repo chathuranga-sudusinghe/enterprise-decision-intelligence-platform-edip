@@ -1,11 +1,7 @@
 name: EDIP Terraform Apply
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "infra/terraform/aws/**"
-      - ".github/workflows/terraform-apply.yml"
+  workflow_call:
 
 permissions:
   contents: read
