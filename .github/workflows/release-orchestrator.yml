@@ -1,0 +1,41 @@
+name: EDIP Release Orchestrator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/terraform/aws/**"
+      - ".github/workflows/terraform-apply.yml"
+      - ".github/workflows/release-orchestrator.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edip-production-release
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    name: Terraform production release
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/terraform-apply.yml
+
+  release-gate:
+    name: EDIP Release Gate
+    needs: terraform
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful Terraform release
+        env:
+          TERRAFORM_RESULT: ${{ needs.terraform.result }}
+        run: |
+          if [ "$TERRAFORM_RESULT" != "success" ]; then
+            echo "Terraform release result: $TERRAFORM_RESULT"
+            exit 1
+          fi
+
+          echo "Terraform release completed successfully."
