@@ -144,3 +144,4 @@ and denied routes, and fails the release gate if any required stage fails.
 CloudWatch logs are in /ecs/<prefix>-<environment>-backend and expire in seven days.
 Terraform ignores service desired_count and task_definition; every release uses
 the current Terraform template so configuration updates are not lost.
+
