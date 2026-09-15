@@ -1,10 +1,10 @@
 name: EDIP Test CI
 
 on:
-  pull_request:
-    branches:
-      - dev
-      - main
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -42,6 +42,19 @@ jobs:
 
       - name: Run Python lint
         run: ruff check .
+
+      # Advisory until the existing MyPy baseline is resolved in separate work.
+      - name: Run MyPy (advisory)
+        id: mypy
+        continue-on-error: true
+        run: mypy
+
+      - name: Report advisory MyPy failure
+        if: ${{ always() && steps.mypy.outcome == 'failure' }}
+        run: |
+          echo "::warning::MyPy found errors. Type checking is advisory during baseline cleanup."
+          echo "### MyPy advisory check" >> "$GITHUB_STEP_SUMMARY"
+          echo "MyPy failed; see the MyPy step log. This does not block the PR during baseline cleanup." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run unit tests
         run: |

@@ -1,0 +1,69 @@
+name: EDIP PR CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Determine required PR checks
+    runs-on: ubuntu-latest
+    outputs:
+      application: ${{ steps.paths.outputs.application }}
+      docker: ${{ steps.paths.outputs.docker }}
+      terraform: ${{ steps.paths.outputs.terraform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test PR routing and gate policy
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
+      - name: Classify changed paths
+        id: paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 .github/scripts/pr_gate.py changes
+
+  application:
+    name: Application CI
+    needs: changes
+    if: needs.changes.outputs.application == 'true'
+    uses: ./.github/workflows/integration-ci.yml
+
+  docker:
+    name: Docker validation
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    uses: ./.github/workflows/docker-ci.yml
+
+  terraform:
+    name: Terraform validation and plan
+    needs: changes
+    if: needs.changes.outputs.terraform == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/terraform-ci.yml
+
+  quality-gate:
+    name: EDIP PR Quality Gate
+    needs: [changes, application, docker, terraform]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require success from every selected workflow
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python3 .github/scripts/pr_gate.py gate
