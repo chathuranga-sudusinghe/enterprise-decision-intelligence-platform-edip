@@ -1,13 +1,10 @@
 name: EDIP Terraform CI
 
 on:
-  pull_request:
-    branches:
-      - dev
-      - main
-    paths:
-      - "infra/terraform/**"
-      - ".github/workflows/terraform-ci.yml"
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   terraform-local-k8s:
@@ -72,7 +69,10 @@ jobs:
 
   terraform-aws-plan:
     name: Plan AWS Terraform
-    if: vars.AWS_TERRAFORM_AUTOMATION_ENABLED == 'true'
+    # Cloud planning uses existing credentials only for same-repository PRs.
+    if: >-
+      vars.AWS_TERRAFORM_AUTOMATION_ENABLED == 'true' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     needs: terraform-aws-static
     runs-on: ubuntu-latest
     permissions:
