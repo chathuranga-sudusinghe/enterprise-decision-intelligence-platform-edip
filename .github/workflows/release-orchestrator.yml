@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "infra/terraform/aws/**"
+      - "infra/terraform/aws-bootstrap/**"
       - ".github/workflows/terraform-apply.yml"
       - ".github/workflows/release-orchestrator.yml"
 
