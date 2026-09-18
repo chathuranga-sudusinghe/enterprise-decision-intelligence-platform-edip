@@ -9,6 +9,7 @@ mock_provider "aws" {
 variables {
   name           = "edip-production"
   region         = "ap-south-1"
+  domain_name    = "edip.vora-technologies.com"
   repository_url = "123456789012.dkr.ecr.ap-south-1.amazonaws.com/edip-production-backend"
   repository_arn = "arn:aws:ecr:ap-south-1:123456789012:repository/edip-production-backend"
   bucket_name    = "edip-test-artifacts"
@@ -24,8 +25,16 @@ variables {
 run "public_boundary" {
   command = plan
   assert {
-    condition     = aws_lb_listener.http.default_action[0].fixed_response[0].status_code == "403"
-    error_message = "Unknown routes must fail closed at the ALB."
+    condition     = aws_lb_listener.http.default_action[0].redirect[0].protocol == "HTTPS" && aws_lb_listener.http.default_action[0].redirect[0].port == "443" && aws_lb_listener.http.default_action[0].redirect[0].status_code == "HTTP_301"
+    error_message = "HTTP must redirect to HTTPS."
+  }
+  assert {
+    condition     = aws_lb_listener.https.default_action[0].fixed_response[0].status_code == "403"
+    error_message = "Unknown HTTPS routes must fail closed at the ALB."
+  }
+  assert {
+    condition     = aws_acm_certificate.backend.domain_name == "edip.vora-technologies.com" && aws_acm_certificate.backend.validation_method == "DNS"
+    error_message = "The stable EDIP hostname must use ACM DNS validation."
   }
   assert {
     condition     = toset(keys(aws_lb_listener_rule.public)) == toset(["/health", "/ready", "/docs", "/openapi.json"])
@@ -50,6 +59,10 @@ run "public_boundary" {
   assert {
     condition     = length(aws_subnet.public) == 2
     error_message = "ALB requires two public subnets."
+  }
+  assert {
+    condition     = aws_vpc_security_group_ingress_rule.https.from_port == 443 && aws_vpc_security_group_ingress_rule.https.to_port == 443
+    error_message = "The ALB must accept public HTTPS traffic."
   }
 }
 
