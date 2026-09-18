@@ -112,6 +112,8 @@ locals {
   hosting_listener     = "${local.hosting_elb}:listener/app/${substr(local.hosting_backend, 0, 32)}/*"
   hosting_rule         = "${local.hosting_elb}:listener-rule/app/${substr(local.hosting_backend, 0, 32)}/*"
   hosting_logs         = "${local.hosting_arn}:logs:${local.hosting_region}:log-group:/ecs/${local.hosting_backend}"
+  hosting_dashboard    = "${local.hosting_arn}:cloudwatch::${local.hosting_account}:dashboard/${local.hosting_backend}-operations"
+  hosting_alarms       = [for suffix in ["unhealthy-target", "high-cpu", "high-memory"] : "${local.hosting_arn}:cloudwatch:${local.hosting_region}:alarm:${local.hosting_backend}-${suffix}"]
   hosting_roles        = [for suffix in ["execution", "task"] : "${local.hosting_arn}:iam::${local.hosting_account}:role/${local.hosting_backend}-${suffix}"]
   hosting_network_arns = [for kind in ["vpc", "subnet", "route-table", "internet-gateway", "security-group", "security-group-rule"] : "${local.hosting_ec2}:${kind}/*"]
   hosting_existing_tags = {
@@ -160,6 +162,18 @@ locals {
       Effect   = "Allow"
       Action   = ["logs:ListTagsForResource", "logs:ListTagsLogGroup"]
       Resource = [local.hosting_logs, "${local.hosting_logs}:*"]
+    },
+    {
+      Sid      = "ReadBackendDashboard"
+      Effect   = "Allow"
+      Action   = ["cloudwatch:GetDashboard"]
+      Resource = local.hosting_dashboard
+    },
+    {
+      Sid      = "ReadBackendAlarms"
+      Effect   = "Allow"
+      Action   = ["cloudwatch:DescribeAlarms", "cloudwatch:ListTagsForResource"]
+      Resource = local.hosting_alarms
     },
     {
       Sid      = "ReadBackendRoles"
@@ -268,6 +282,18 @@ locals {
       Effect   = "Allow"
       Action   = ["logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:PutRetentionPolicy", "logs:DeleteRetentionPolicy", "logs:TagResource", "logs:UntagResource", "logs:TagLogGroup", "logs:UntagLogGroup"]
       Resource = [local.hosting_logs, "${local.hosting_logs}:*"]
+    },
+    {
+      Sid      = "BackendDashboardLifecycle"
+      Effect   = "Allow"
+      Action   = ["cloudwatch:PutDashboard", "cloudwatch:DeleteDashboards"]
+      Resource = local.hosting_dashboard
+    },
+    {
+      Sid      = "BackendAlarmLifecycle"
+      Effect   = "Allow"
+      Action   = ["cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:TagResource", "cloudwatch:UntagResource"]
+      Resource = local.hosting_alarms
     },
     {
       Sid      = "ManageOnlyBackendRoles"
