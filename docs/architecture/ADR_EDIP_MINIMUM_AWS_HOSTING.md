@@ -1,7 +1,7 @@
 # ADR: Minimum EDIP backend hosting
 
 Status: accepted for implementation by the project owner in this task, 2026-09-15.
-Scope: independent EDIP MSc research project; no shared/Vora resource changes.
+Scope: independent EDIP MSc research project plus its one shared Vora DNS name; no unrelated Vora resource changes.
 
 ## Decision
 
@@ -11,13 +11,17 @@ for outbound ECR/S3 access. Do not add NAT, a database, frontend service, or
 CloudFront. Task ingress on port 8000 is permitted only from the ALB security group.
 Start with 0.5 vCPU and 1 GiB memory; validate the real model before increasing.
 
-The temporary URL is HTTP on the generated ALB DNS name. Public listener rules
-allow GET/HEAD only on /health, /ready, /docs and /openapi.json. The schema is
-required for Swagger UI; it documents forecasting but does not permit executing
-it through the ALB. All other paths and methods return 403, including forecast
-and metrics. CORS is not an authorization control. Do not submit sensitive data.
-HTTPS/custom domain and authentication remain prerequisites to exposing forecasts.
-Add a certificate and HTTPS listener later without changing the ECS service.
+The stable public URL is `https://edip.vora-technologies.com`. Port 80 redirects
+to HTTPS. The HTTPS listener allows GET/HEAD only on /health, /ready, /docs and
+/openapi.json. The schema is required for Swagger UI; it documents forecasting
+but does not permit executing it through the ALB. All other paths and methods
+return 403, including forecast and metrics. CORS is not an authorization control.
+Do not submit sensitive data. Authentication remains a prerequisite to exposing
+forecasts.
+
+EDIP owns the DNS-validated ACM certificate and ALB integration. The authoritative
+Route53 zone and the EDIP alias/validation records remain owned by the shared
+`vora-platform-infrastructure` DNS root.
 
 ## Model and image delivery
 

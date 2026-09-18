@@ -33,6 +33,7 @@ module "hosting" {
   bucket_name    = aws_s3_bucket.artifacts.bucket
   bucket_arn     = aws_s3_bucket.artifacts.arn
   model_bundle   = var.model_bundle
+  domain_name    = "edip.vora-technologies.com"
 }
 output "application_hosting" {
   description = "Deployment contract; null until hosting is enabled."
@@ -51,4 +52,16 @@ output "cloudwatch_dashboard_name" {
 output "cloudwatch_log_group_name" {
   description = "ECS backend CloudWatch log group name; null until hosting is enabled."
   value       = var.hosting_enabled ? module.hosting[0].cloudwatch_log_group_name : null
+}
+output "alb_zone_id" {
+  description = "Canonical hosted zone ID of the EDIP ALB; null until hosting is enabled."
+  value       = var.hosting_enabled ? module.hosting[0].alb_zone_id : null
+}
+output "acm_certificate_arn" {
+  description = "ACM certificate ARN for the stable EDIP HTTPS endpoint; null until hosting is enabled."
+  value       = var.hosting_enabled ? module.hosting[0].acm_certificate_arn : null
+}
+output "acm_dns_validation_records" {
+  description = "DNS validation records to pass to the authoritative Vora DNS stack."
+  value       = var.hosting_enabled ? module.hosting[0].acm_dns_validation_records : []
 }

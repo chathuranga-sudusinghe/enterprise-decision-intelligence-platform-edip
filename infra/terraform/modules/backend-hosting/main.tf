@@ -123,18 +123,18 @@ resource "aws_lb_listener" "http" {
   port              = 80
   protocol          = "HTTP"
   default_action {
-    type = "fixed-response"
-    fixed_response {
-      content_type = "text/plain"
-      status_code  = "403"
-      message_body = "Endpoint not publicly available."
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
     }
   }
 }
 # One exact path per rule: ALB limits each path condition to three values.
 resource "aws_lb_listener_rule" "public" {
   for_each     = { "/health" = 10, "/ready" = 20, "/docs" = 30, "/openapi.json" = 40 }
-  listener_arn = aws_lb_listener.http.arn
+  listener_arn = aws_lb_listener.https.arn
   priority     = each.value
   action {
     type             = "forward"
@@ -311,7 +311,7 @@ output "deployment" {
     model_bundle       = var.model_bundle
     bucket_name        = var.bucket_name
     repository_url     = var.repository_url
-    url                = "http://${aws_lb.backend.dns_name}"
+    url                = "https://${var.domain_name}"
   }
 }
 output "alb_dns_name" { value = aws_lb.backend.dns_name }
