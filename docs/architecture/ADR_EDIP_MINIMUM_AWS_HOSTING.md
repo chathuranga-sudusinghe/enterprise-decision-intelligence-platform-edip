@@ -36,6 +36,14 @@ Terraform ignores service task_definition and desired_count to avoid rolling
 back a CD release. Every CD run starts from the Terraform-owned template so
 reviewed environment/role changes reach the next release.
 
+Terraform also owns a compact CloudWatch operations dashboard and three alarms.
+The dashboard covers ECS CPU/memory plus ALB traffic, latency, 5xx responses and
+target health. Alarms cover sustained 80% ECS CPU, sustained 80% ECS memory and
+unhealthy ALB targets; they intentionally have no notification actions during
+the MSc research phase. These metrics and seven-day container logs support
+operational diagnosis. They do not replace the authoritative EDIP decision audit
+trail for model identity, research inputs, outputs and decision provenance.
+
 Existing protected Terraform plan/apply remains first. A protected reusable
 application workflow builds and pushes to the existing ECR, rolls out ECS,
 verifies running tasks use the intended revision and checks public readiness,

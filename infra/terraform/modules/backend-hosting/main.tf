@@ -315,3 +315,5 @@ output "deployment" {
   }
 }
 output "alb_dns_name" { value = aws_lb.backend.dns_name }
+output "cloudwatch_dashboard_name" { value = aws_cloudwatch_dashboard.backend.dashboard_name }
+output "cloudwatch_log_group_name" { value = aws_cloudwatch_log_group.backend.name }

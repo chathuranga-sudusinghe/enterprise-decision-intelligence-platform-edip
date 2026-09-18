@@ -52,3 +52,38 @@ run "public_boundary" {
     error_message = "ALB requires two public subnets."
   }
 }
+
+run "cloudwatch_observability" {
+  command = plan
+
+  assert {
+    condition     = aws_cloudwatch_log_group.backend.retention_in_days == 7
+    error_message = "The existing seven-day ECS log retention must be preserved."
+  }
+  assert {
+    condition     = aws_cloudwatch_dashboard.backend.dashboard_name == "edip-production-backend-operations"
+    error_message = "The backend operations dashboard must use the expected stable name."
+  }
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.unhealthy_target.threshold == 1 && aws_cloudwatch_metric_alarm.unhealthy_target.period == 60 && aws_cloudwatch_metric_alarm.unhealthy_target.evaluation_periods == 2 && aws_cloudwatch_metric_alarm.unhealthy_target.datapoints_to_alarm == 2
+    error_message = "The unhealthy-target alarm must require one unhealthy target for two minutes."
+  }
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.high_cpu.threshold == 80 && aws_cloudwatch_metric_alarm.high_cpu.period == 300 && aws_cloudwatch_metric_alarm.high_cpu.evaluation_periods == 3 && aws_cloudwatch_metric_alarm.high_cpu.datapoints_to_alarm == 3
+    error_message = "The high-CPU alarm must require 80% average utilization for 15 minutes."
+  }
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.high_memory.threshold == 80 && aws_cloudwatch_metric_alarm.high_memory.period == 300 && aws_cloudwatch_metric_alarm.high_memory.evaluation_periods == 3 && aws_cloudwatch_metric_alarm.high_memory.datapoints_to_alarm == 3
+    error_message = "The high-memory alarm must require 80% average utilization for 15 minutes."
+  }
+  assert {
+    condition = alltrue([
+      for alarm in [
+        aws_cloudwatch_metric_alarm.unhealthy_target,
+        aws_cloudwatch_metric_alarm.high_cpu,
+        aws_cloudwatch_metric_alarm.high_memory,
+      ] : alarm.treat_missing_data == "notBreaching" && length(alarm.alarm_actions) == 0 && length(alarm.ok_actions) == 0
+    ])
+    error_message = "Research-phase alarms must ignore missing data and have no notification actions."
+  }
+}
