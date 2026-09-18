@@ -2,12 +2,13 @@
 
 ## Current implementation status
 
-This is HTTP research/demo hosting, not public forecasting. See
-[the ADR](../architecture/ADR_EDIP_MINIMUM_AWS_HOSTING.md).
-The ALB forwards GET/HEAD for /health, /ready, /docs and /openapi.json;
-everything else returns 403. Swagger needs /openapi.json. The schema contains
-the forecast contract, but invoking it through the public ALB remains denied.
-The task security group accepts 8000 only from the ALB.
+This is HTTPS research/demo hosting, not public forecasting. See
+[the ADR](../architecture/ADR_EDIP_MINIMUM_AWS_HOSTING.md). HTTP redirects to
+`https://edip.vora-technologies.com`. The HTTPS listener forwards GET/HEAD for
+/health, /ready, /docs and /openapi.json; everything else returns 403. Swagger
+needs /openapi.json. The schema contains the forecast contract, but invoking it
+through the public ALB remains denied. The task security group accepts 8000 only
+from the ALB.
 
 Hosting defaults off for a new configuration. Terraform creates the service with
 zero tasks; CD starts one task only after pushing a smoke-tested digest. The EDIP
@@ -100,6 +101,26 @@ terraform -chdir=infra/terraform/aws output -raw public_application_url
 This creates zero running tasks, so an ALB URL alone does not mean a healthy app.
 With the real selector and environment trust, the plan also changes release-role
 trust. Do not replace its subject set with a single subject.
+
+## HTTPS and shared DNS deployment order
+
+The Vora Route53 zone is authoritative, while the ACM certificate belongs to
+this EDIP state. Deploy the cross-state dependency in this reviewed order:
+
+1. Apply the EDIP bootstrap IAM update.
+2. Create only `module.hosting[0].aws_acm_certificate.backend` from a separately
+   reviewed targeted plan, then read `acm_dns_validation_records`.
+3. Pass its single object to the Vora DNS root as
+   `TF_VAR_edip_acm_validation_record`; review and apply the alias and validation
+   CNAME plan there.
+4. Run and apply a fresh full EDIP plan. ACM validation completes before the
+   HTTPS listener is created; the four existing public rules move to HTTPS and
+   port 80 becomes a redirect.
+5. Verify HTTPS allowed/denied routes and confirm HTTP returns 301.
+
+This staged handoff is necessary because ACM generates the validation token only
+after certificate creation and the two repositories intentionally use separate
+Terraform states. No registrar or DNS-console change is required.
 
 ## GitHub release configuration and deployment
 

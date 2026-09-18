@@ -114,6 +114,8 @@ locals {
   hosting_logs         = "${local.hosting_arn}:logs:${local.hosting_region}:log-group:/ecs/${local.hosting_backend}"
   hosting_dashboard    = "${local.hosting_arn}:cloudwatch::${local.hosting_account}:dashboard/${local.hosting_backend}-operations"
   hosting_alarms       = [for suffix in ["unhealthy-target", "high-cpu", "high-memory"] : "${local.hosting_arn}:cloudwatch:${local.hosting_region}:alarm:${local.hosting_backend}-${suffix}"]
+  hosting_domain       = "edip.vora-technologies.com"
+  hosting_certificate  = "${local.hosting_arn}:acm:${local.hosting_region}:certificate/*"
   hosting_roles        = [for suffix in ["execution", "task"] : "${local.hosting_arn}:iam::${local.hosting_account}:role/${local.hosting_backend}-${suffix}"]
   hosting_network_arns = [for kind in ["vpc", "subnet", "route-table", "internet-gateway", "security-group", "security-group-rule"] : "${local.hosting_ec2}:${kind}/*"]
   hosting_existing_tags = {
@@ -174,6 +176,13 @@ locals {
       Effect   = "Allow"
       Action   = ["cloudwatch:DescribeAlarms", "cloudwatch:ListTagsForResource"]
       Resource = local.hosting_alarms
+    },
+    {
+      Sid       = "ReadBackendCertificate"
+      Effect    = "Allow"
+      Action    = ["acm:DescribeCertificate", "acm:ListTagsForCertificate"]
+      Resource  = local.hosting_certificate
+      Condition = { StringEquals = local.hosting_existing_tags }
     },
     {
       Sid      = "ReadBackendRoles"
@@ -294,6 +303,34 @@ locals {
       Effect   = "Allow"
       Action   = ["cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:TagResource", "cloudwatch:UntagResource"]
       Resource = local.hosting_alarms
+    },
+    {
+      Sid      = "RequestBackendCertificate"
+      Effect   = "Allow"
+      Action   = ["acm:RequestCertificate"]
+      Resource = "*"
+      Condition = {
+        StringEquals                = merge(local.hosting_new_tags, { "acm:ValidationMethod" = "DNS" })
+        "ForAllValues:StringEquals" = { "acm:DomainNames" = [local.hosting_domain] }
+      }
+    },
+    {
+      Sid       = "TagNewBackendCertificate"
+      Effect    = "Allow"
+      Action    = ["acm:AddTagsToCertificate"]
+      Resource  = local.hosting_certificate
+      Condition = { StringEquals = local.hosting_new_tags }
+    },
+    {
+      Sid    = "ManageBackendCertificate"
+      Effect = "Allow"
+      Action = [
+        "acm:DeleteCertificate",
+        "acm:AddTagsToCertificate",
+        "acm:RemoveTagsFromCertificate",
+      ]
+      Resource  = local.hosting_certificate
+      Condition = { StringEquals = local.hosting_existing_tags }
     },
     {
       Sid      = "ManageOnlyBackendRoles"
