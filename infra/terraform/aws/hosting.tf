@@ -44,3 +44,11 @@ output "public_application_url" {
 output "alb_dns_name" {
   value = var.hosting_enabled ? module.hosting[0].alb_dns_name : null
 }
+output "cloudwatch_dashboard_name" {
+  description = "CloudWatch operations dashboard name; null until hosting is enabled."
+  value       = var.hosting_enabled ? module.hosting[0].cloudwatch_dashboard_name : null
+}
+output "cloudwatch_log_group_name" {
+  description = "ECS backend CloudWatch log group name; null until hosting is enabled."
+  value       = var.hosting_enabled ? module.hosting[0].cloudwatch_log_group_name : null
+}
