@@ -9,8 +9,9 @@ everything else returns 403. Swagger needs /openapi.json. The schema contains
 the forecast contract, but invoking it through the public ALB remains denied.
 The task security group accepts 8000 only from the ALB.
 
-Hosting defaults off. Terraform creates the service with zero tasks; CD starts
-one task only after pushing a smoke-tested digest. No resources have been applied.
+Hosting defaults off for a new configuration. Terraform creates the service with
+zero tasks; CD starts one task only after pushing a smoke-tested digest. The EDIP
+production backend is currently deployed through that release path.
 
 ### Outstanding deployment prerequisites
 
@@ -145,3 +146,17 @@ CloudWatch logs are in /ecs/<prefix>-<environment>-backend and expire in seven d
 Terraform ignores service desired_count and task_definition; every release uses
 the current Terraform template so configuration updates are not lost.
 
+## CloudWatch operational monitoring
+
+The production dashboard collects standard AWS metrics for ECS CPU and memory,
+ALB request count and target response time, load-balancer and target HTTP 5xx
+errors, and healthy/unhealthy target counts. Three alarms identify an unhealthy
+target for two consecutive minutes, or average ECS CPU or memory at or above 80%
+for 15 minutes. Missing data is non-breaching because the research task may be
+deliberately stopped. The alarms have no SNS or email actions in this phase.
+
+CloudWatch provides short-term operational evidence about service health,
+resource pressure, traffic, latency and failures. Container logs remain in the
+existing seven-day log group. This telemetry is not the authoritative EDIP
+decision audit trail: research inputs, model identity, outputs and decision
+provenance must remain in the governed EDIP research records.
