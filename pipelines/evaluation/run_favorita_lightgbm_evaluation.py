@@ -1148,7 +1148,6 @@ def _read_existing_fold_evidence(
             "forecast_origin": fold.forecast_origin.isoformat(),
             "validation_start": fold.validation_start.isoformat(),
             "validation_end": fold.validation_end.isoformat(),
-            "artifact_root": output_dir.as_posix(),
             "modeling_target_start": MODELING_TARGET_START.isoformat(),
             "modeling_target_end": MODELING_TARGET_END.isoformat(),
             "training_target_start": MODELING_TARGET_START.isoformat(),
@@ -1161,6 +1160,15 @@ def _read_existing_fold_evidence(
             "final_holdout_excluded": True,
             "future_actual_leakage": False,
         }
+        recorded_root = manifest.get("artifact_root")
+        if (
+            not isinstance(recorded_root, str)
+            or not recorded_root.strip()
+            or resolve_cli_path(recorded_root) != resolve_cli_path(output_dir)
+        ):
+            raise ValueError(
+                f"Fold {fold.fold_id} manifest artifact_root must identify {output_dir}"
+            )
         for key, value in expected.items():
             if manifest.get(key) != value:
                 raise ValueError(

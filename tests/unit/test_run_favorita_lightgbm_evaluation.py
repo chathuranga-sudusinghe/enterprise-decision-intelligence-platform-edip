@@ -438,14 +438,23 @@ def _install_serial_fakes(
             yield frame
 
     class FakeAdapter:
-        def __init__(self, *, feature_columns) -> None:
+        def __init__(
+            self,
+            *,
+            feature_columns,
+            model_parameters=None,
+            num_boost_round=runner.NUM_BOOST_ROUND,
+        ) -> None:
             self.candidate_feature_columns = tuple(feature_columns)
             self.feature_contract_name = config.feature_contract
             self.fitted_feature_columns = tuple(feature_columns)
             self.excluded_all_null_features = ()
             self.categorical_feature_columns = ()
-            self.model_parameters = runner.LIGHTGBM_PARAMETERS
-            self.num_boost_round = runner.NUM_BOOST_ROUND
+            self.model_parameters = {
+                **runner.LIGHTGBM_PARAMETERS,
+                **(model_parameters or {}),
+            }
+            self.num_boost_round = num_boost_round
             self.fold_id = len(models) + 1
             self.predict_calls = 0
             models.append(self)
@@ -505,6 +514,55 @@ def _install_serial_fakes(
     )
     monkeypatch.setattr(runner, "FavoritaLightGBMAdapter", FakeAdapter)
     return events, models
+
+
+@pytest.mark.parametrize("representation", ["relative", "absolute", "normalized"])
+def test_manifest_root_identity_uses_repository_not_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, representation: str
+) -> None:
+    from pipelines import runtime_paths
+
+    config = _config(tmp_path)
+    _install_serial_fakes(monkeypatch, config)
+    monkeypatch.setattr(runtime_paths, "REPOSITORY_ROOT", tmp_path)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    recorded_root = {
+        "relative": "folds",
+        "absolute": str(config.fold_output_dir),
+        "normalized": "folds/../folds",
+    }[representation]
+    originals = {}
+    for paths in runner.approved_fold_artifact_paths(config.fold_output_dir):
+        manifest = json.loads(paths.manifest.read_text())
+        manifest["artifact_root"] = recorded_root
+        paths.manifest.write_text(json.dumps(manifest))
+        originals[paths.manifest] = (
+            paths.manifest.read_bytes(),
+            paths.manifest.stat().st_mtime_ns,
+        )
+    evidence = runner._read_existing_fold_evidence(
+        config.fold_output_dir, feature_profile="time-aware"
+    )
+    assert len(evidence) == 4
+    assert originals == {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in originals}
+
+
+@pytest.mark.parametrize("recorded_root", ["different-folds", "", None, 42])
+def test_manifest_root_rejects_different_or_malformed_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, recorded_root: object
+) -> None:
+    config = _config(tmp_path)
+    _install_serial_fakes(monkeypatch, config)
+    first = runner.approved_fold_artifact_paths(config.fold_output_dir)[0]
+    manifest = json.loads(first.manifest.read_text())
+    manifest["artifact_root"] = recorded_root
+    first.manifest.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="artifact_root"):
+        runner._read_existing_fold_evidence(
+            config.fold_output_dir, feature_profile="time-aware"
+        )
 
 
 def test_runner_processes_four_fold_artifacts_serially(
