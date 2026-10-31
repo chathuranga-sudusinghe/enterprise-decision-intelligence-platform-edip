@@ -256,7 +256,19 @@ state, and the best next engineering step. State the single most appropriate nex
 terminal command. Group related items and omit irrelevant fields.
 
 When a commit is appropriate, suggest explicit staging commands and an issue-linked
-commit message. When a pull request is appropriate, provide base, head, title,
-description, and testing details. Do not execute these operations without explicit
-authorization. Never imply that an issue, commit, PR, experiment, or deployment
-occurred unless it actually occurred.
+commit message. After providing a GitHub push command for an implementation branch,
+include both copy-ready pull request drafts in the same handoff:
+
+1. Implementation branch → `dev`: base `dev`, actual branch as head, title,
+   description, and testing details scoped to that branch's changes.
+2. `dev` → `main`: base `main`, head `dev`, title, description, and testing details
+   reflecting the full verified release diff. If that diff has not been inspected,
+   label the draft provisional and state that its scope must be verified before use.
+
+Provide both drafts without requiring a separate request. Preparing a release draft
+is not a recommendation to promote every feature; release readiness and explicit
+authorization are still required before creation or merging. When a pull request is
+otherwise appropriate, also provide its base, head, title, description, and testing
+details. Do not execute these operations without explicit authorization. Never imply
+that an issue, commit, PR, experiment, or deployment occurred unless it actually
+occurred.
