@@ -86,9 +86,9 @@ def test_negative_values_are_clipped_only_for_demand_oriented_metrics() -> None:
     assert root_mean_squared_error(actual, prediction) == 3.0
     assert mean_forecast_error(actual, prediction) == -3.0
     assert weighted_absolute_percentage_error(actual, prediction) == 0.75
-    assert root_mean_squared_logarithmic_error(
-        actual, prediction
-    ) == pytest.approx(abs(log1p(1.0) - log1p(4.0)) / sqrt(2.0))
+    assert root_mean_squared_logarithmic_error(actual, prediction) == pytest.approx(
+        abs(log1p(1.0) - log1p(4.0)) / sqrt(2.0)
+    )
     assert actual == original_actual
     assert prediction == original_prediction
 
@@ -110,11 +110,7 @@ def test_wape_rejects_zero_total_evaluation_target() -> None:
 
 def test_rmsle_uses_transformed_non_negative_values() -> None:
     expected = sqrt(
-        (
-            (log1p(0.0) - log1p(0.0)) ** 2
-            + (log1p(3.0) - log1p(1.0)) ** 2
-        )
-        / 2.0
+        ((log1p(0.0) - log1p(0.0)) ** 2 + (log1p(3.0) - log1p(1.0)) ** 2) / 2.0
     )
 
     assert root_mean_squared_logarithmic_error(
@@ -125,10 +121,7 @@ def test_rmsle_uses_transformed_non_negative_values() -> None:
 
 def test_nwrmsle_uses_normalized_favorita_perishability_weights() -> None:
     expected = sqrt(
-        (
-            1.0 * (log1p(1.0) - log1p(0.0)) ** 2
-            + 1.25 * (log1p(3.0) - log1p(0.0)) ** 2
-        )
+        (1.0 * (log1p(1.0) - log1p(0.0)) ** 2 + 1.25 * (log1p(3.0) - log1p(0.0)) ** 2)
         / 2.25
     )
     weighted = normalized_weighted_root_mean_squared_logarithmic_error(

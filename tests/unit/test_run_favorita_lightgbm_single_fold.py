@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from threading import Event
 from threading import enumerate as enumerate_threads
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -54,7 +55,7 @@ def _model_ready_frame(fold_id: int, *, validation: bool) -> pd.DataFrame:
         )
         late["forecast_date"] = pd.Timestamp(fold.forecast_origin)
         return pd.concat((early, late), ignore_index=True).loc[
-            :, TRAINING_OUTPUT_COLUMNS
+            :, list(TRAINING_OUTPUT_COLUMNS)
         ]
     origin = fold.forecast_origin
     frame["forecast_origin"] = pd.Timestamp(origin)
@@ -62,7 +63,7 @@ def _model_ready_frame(fold_id: int, *, validation: bool) -> pd.DataFrame:
         frame["forecast_horizon"],
         unit="D",
     )
-    return frame.loc[:, TRAINING_OUTPUT_COLUMNS]
+    return frame.loc[:, list(TRAINING_OUTPUT_COLUMNS)]
 
 
 def _write_existing_fold(root: Path, fold_id: int) -> runner.FoldArtifactPaths:
@@ -104,9 +105,7 @@ def _write_existing_fold(root: Path, fold_id: int) -> runner.FoldArtifactPaths:
         "future_actual_leakage": False,
         "max_items_per_store": None,
         "feature_profile": "time-aware",
-        "feature_profile_version": runner.resolve_feature_profile(
-            "time-aware"
-        ).version,
+        "feature_profile_version": runner.resolve_feature_profile("time-aware").version,
         "model_feature_columns": list(
             runner.resolve_feature_profile("time-aware").model_feature_columns
         ),
@@ -149,8 +148,9 @@ class _FakeAdapter:
         self.fitted_feature_columns = tuple(feature_columns)
         self.excluded_all_null_features = ()
         self.categorical_feature_columns = ()
-        self.model_parameters = {}
+        self.model_parameters: dict[str, object] = {}
         self.num_boost_round = 150
+
     fitted_paths: list[Path] = []
     prediction_batch_sizes: list[int] = []
 
@@ -162,13 +162,16 @@ class _FakeAdapter:
         return np.full(len(frame), self.prediction_value, dtype="float64")
 
 
-def _install_fake_adapter(monkeypatch: pytest.MonkeyPatch, value: float = 2.0) -> None:
+def _install_fake_adapter(
+    monkeypatch: pytest.MonkeyPatch, value: float = 2.0
+) -> type[_FakeAdapter]:
     class FakeAdapter(_FakeAdapter):
         prediction_value = value
         fitted_paths: list[Path] = []
         prediction_batch_sizes: list[int] = []
 
     monkeypatch.setattr(runner, "FavoritaLightGBMAdapter", FakeAdapter)
+    return FakeAdapter
 
 
 @pytest.mark.parametrize("fold_id", runner.SUPPORTED_FOLD_IDS)
@@ -189,8 +192,10 @@ def test_default_namespaces_belong_to_the_2017_redesign() -> None:
     assert runner.CONTEXTUAL_OUTPUT_DIR == Path(
         "artifacts/evaluation/favorita_2017_four_fold_lightgbm_contextual"
     )
-    assert runner.DEFAULT_OUTPUT_DIR == runner.TIME_AWARE_OUTPUT_DIR == Path(
-        "artifacts/evaluation/favorita_2017_four_fold_lightgbm_time_aware"
+    assert (
+        runner.DEFAULT_OUTPUT_DIR
+        == runner.TIME_AWARE_OUTPUT_DIR
+        == Path("artifacts/evaluation/favorita_2017_four_fold_lightgbm_time_aware")
     )
 
 
@@ -206,8 +211,10 @@ def test_cli_has_only_required_single_fold_selection() -> None:
     )
     assert option_strings == {"-h", "--help", "--fold", "--feature-contract"}
     assert contract_action.required is True
+    assert contract_action.choices is not None
     assert tuple(contract_action.choices) == ("contextual", "time-aware")
     assert fold_action.required is True
+    assert fold_action.choices is not None
     assert tuple(fold_action.choices) == runner.SUPPORTED_FOLD_IDS
 
 
@@ -379,16 +386,20 @@ def test_success_uses_parquet_fit_batched_guards_and_metric_accumulator(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     artifact_paths = _write_existing_fold(tmp_path / "folds", 1)
-    _install_fake_adapter(monkeypatch, value=2.0)
-    adapter_class = runner.FavoritaLightGBMAdapter
+    adapter_class = _install_fake_adapter(monkeypatch, value=2.0)
     guarded_batches: list[int] = []
     metric_batches: list[int] = []
     original_guard = runner._validate_validation_batch
 
-    def tracked_guard(*args: object, **kwargs: object) -> None:
-        frame = args[1]
+    def tracked_guard(
+        fold: runner.TemporalValidationFold,
+        frame: pd.DataFrame,
+        key_tracker: runner._ValidationKeyTracker,
+        *,
+        feature_profile: str = "time-aware",
+    ) -> None:
         guarded_batches.append(len(frame))
-        original_guard(*args, **kwargs)
+        original_guard(fold, frame, key_tracker, feature_profile=feature_profile)
 
     class TrackingAccumulator(FavoritaMetricAccumulator):
         def update(self, actual, prediction, perishable) -> None:
@@ -462,13 +473,14 @@ def test_fit_heartbeat_stops_cleanly_when_fit_fails(
     monkeypatch.setattr(runner, "FIT_HEARTBEAT_INTERVAL_SECONDS", 0.001)
 
     with pytest.raises(RuntimeError, match="training failed"):
-        runner._fit_with_heartbeat(adapter, training_path, fold_id=1)
+        runner._fit_with_heartbeat(
+            cast(runner.FavoritaLightGBMAdapter, adapter), training_path, fold_id=1
+        )
 
     assert adapter.fit_calls == 1
     assert "[Fold 1/4] LightGBM fit active" in capsys.readouterr().out
     assert all(
-        thread.name != "favorita-fold-1-fit-heartbeat"
-        for thread in enumerate_threads()
+        thread.name != "favorita-fold-1-fit-heartbeat" for thread in enumerate_threads()
     )
 
 
@@ -518,8 +530,9 @@ def test_invalid_accumulated_result_fails_before_model_construction(
         training_rows=10,
         validation_rows=10,
         metrics={name: 0.0 for name in runner.METRIC_NAMES},
-        model=_FakeAdapter(
-            feature_columns=runner.resolve_feature_contract("time-aware")
+        model=cast(
+            runner.FavoritaLightGBMAdapter,
+            _FakeAdapter(feature_columns=runner.resolve_feature_contract("time-aware")),
         ),
         training_path=Path("fold_04/training.parquet"),
         validation_path=Path("fold_04/validation.parquet"),
@@ -587,9 +600,7 @@ def test_cli_selects_matching_profile_specific_fold_root(
         return runner._result_paths(config.output_dir)
 
     monkeypatch.setattr(runner, "run_single_fold", fake_run)
-    assert runner.main(
-        ["--feature-contract", "contextual", "--fold", "1"]
-    ) == 0
+    assert runner.main(["--feature-contract", "contextual", "--fold", "1"]) == 0
     assert captured[0].fold_output_dir == Path(
         "artifacts/features/favorita_2017_four_fold_contextual"
     )

@@ -44,9 +44,7 @@ SEARCH_SPACE: Mapping[str, Mapping[str, object]] = MappingProxyType(
         "learning_rate": MappingProxyType(
             {"kind": "float", "low": 0.01, "high": 0.15, "log": True}
         ),
-        "num_leaves": MappingProxyType(
-            {"kind": "int", "low": 16, "high": 128}
-        ),
+        "num_leaves": MappingProxyType({"kind": "int", "low": 16, "high": 128}),
         "min_data_in_leaf": MappingProxyType(
             {"kind": "int", "low": 10, "high": 200, "log": True}
         ),
@@ -122,17 +120,11 @@ def suggest_parameters(trial: OptunaTrial) -> PairedTrialParameters:
     """Suggest exactly the five approved shared tuning dimensions."""
 
     return PairedTrialParameters(
-        learning_rate=trial.suggest_float(
-            "learning_rate", 0.01, 0.15, log=True
-        ),
+        learning_rate=trial.suggest_float("learning_rate", 0.01, 0.15, log=True),
         num_leaves=trial.suggest_int("num_leaves", 16, 128),
-        min_data_in_leaf=trial.suggest_int(
-            "min_data_in_leaf", 10, 200, log=True
-        ),
+        min_data_in_leaf=trial.suggest_int("min_data_in_leaf", 10, 200, log=True),
         feature_fraction=trial.suggest_float("feature_fraction", 0.6, 1.0),
-        num_boost_round=trial.suggest_int(
-            "num_boost_round", 100, 500, step=50
-        ),
+        num_boost_round=trial.suggest_int("num_boost_round", 100, 500, step=50),
     )
 
 
@@ -180,7 +172,9 @@ def validate_tuning_contract() -> None:
         raise ValueError("Search space differs from the five approved parameters")
     if FORECAST_HORIZONS != tuple(range(1, 17)):
         raise ValueError("Tuning horizons must be exactly 1 through 16")
-    if any(fold.validation_end >= FINAL_HOLDOUT.holdout_start for fold in APPROVED_FOLDS):
+    if any(
+        fold.validation_end >= FINAL_HOLDOUT.holdout_start for fold in APPROVED_FOLDS
+    ):
         raise ValueError("Canonical folds must exclude the protected holdout")
 
 

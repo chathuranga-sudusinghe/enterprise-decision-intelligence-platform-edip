@@ -4,13 +4,14 @@ import hashlib
 import json
 import os
 import struct
+import sys
 import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, cast
 
 import numpy as np
 import pandas as pd
@@ -164,9 +165,12 @@ SOURCE_READ_COLUMNS: tuple[str, ...] = (
     "holiday_event_count",
 )
 
+
 def _field_for_output_column(name: str) -> pa.Field:
     required_fields = {
-        "forecast_origin": pa.field("forecast_origin", pa.timestamp("us"), nullable=False),
+        "forecast_origin": pa.field(
+            "forecast_origin", pa.timestamp("us"), nullable=False
+        ),
         "forecast_date": pa.field("forecast_date", pa.timestamp("us"), nullable=False),
         "forecast_horizon": pa.field("forecast_horizon", pa.int8(), nullable=False),
         "store_nbr": pa.field("store_nbr", pa.int16(), nullable=False),
@@ -191,9 +195,16 @@ def _field_for_output_column(name: str) -> pa.Field:
         "is_holiday": pa.field("is_holiday", pa.bool_(), nullable=True),
         "holiday_type": pa.field("holiday_type", pa.large_string(), nullable=True),
         "holiday_locale": pa.field("holiday_locale", pa.large_string(), nullable=True),
-        "holiday_transferred": pa.field("holiday_transferred", pa.bool_(), nullable=True),
-        "holiday_event_count": pa.field("holiday_event_count", pa.int16(), nullable=True),
-        **{name: pa.field(name, pa.float64(), nullable=True) for name in HISTORICAL_FEATURE_COLUMNS},
+        "holiday_transferred": pa.field(
+            "holiday_transferred", pa.bool_(), nullable=True
+        ),
+        "holiday_event_count": pa.field(
+            "holiday_event_count", pa.int16(), nullable=True
+        ),
+        **{
+            name: pa.field(name, pa.float64(), nullable=True)
+            for name in HISTORICAL_FEATURE_COLUMNS
+        },
     }
     try:
         return required_fields.get(name) or nullable_fields[name]
@@ -221,30 +232,32 @@ class FavoritaFeatureProfile:
     canonical_artifact_root: Path
 
 
-FEATURE_PROFILES: Mapping[str, FavoritaFeatureProfile] = MappingProxyType({
-    CONTEXTUAL_FEATURE_PROFILE: FavoritaFeatureProfile(
-        name=CONTEXTUAL_FEATURE_PROFILE,
-        version=FEATURE_PROFILE_VERSION,
-        model_feature_columns=CONTEXTUAL_FEATURE_COLUMNS,
-        output_columns=CONTEXTUAL_OUTPUT_COLUMNS,
-        arrow_schema=CONTEXTUAL_ARROW_SCHEMA,
-        historical_feature_groups_enabled=False,
-        canonical_artifact_root=Path(
-            "artifacts/features/favorita_2017_four_fold_contextual"
+FEATURE_PROFILES: Mapping[str, FavoritaFeatureProfile] = MappingProxyType(
+    {
+        CONTEXTUAL_FEATURE_PROFILE: FavoritaFeatureProfile(
+            name=CONTEXTUAL_FEATURE_PROFILE,
+            version=FEATURE_PROFILE_VERSION,
+            model_feature_columns=CONTEXTUAL_FEATURE_COLUMNS,
+            output_columns=CONTEXTUAL_OUTPUT_COLUMNS,
+            arrow_schema=CONTEXTUAL_ARROW_SCHEMA,
+            historical_feature_groups_enabled=False,
+            canonical_artifact_root=Path(
+                "artifacts/features/favorita_2017_four_fold_contextual"
+            ),
         ),
-    ),
-    TIME_AWARE_FEATURE_PROFILE: FavoritaFeatureProfile(
-        name=TIME_AWARE_FEATURE_PROFILE,
-        version=FEATURE_PROFILE_VERSION,
-        model_feature_columns=TIME_AWARE_FEATURE_COLUMNS,
-        output_columns=TIME_AWARE_OUTPUT_COLUMNS,
-        arrow_schema=TIME_AWARE_ARROW_SCHEMA,
-        historical_feature_groups_enabled=True,
-        canonical_artifact_root=Path(
-            "artifacts/features/favorita_2017_four_fold_time_aware"
+        TIME_AWARE_FEATURE_PROFILE: FavoritaFeatureProfile(
+            name=TIME_AWARE_FEATURE_PROFILE,
+            version=FEATURE_PROFILE_VERSION,
+            model_feature_columns=TIME_AWARE_FEATURE_COLUMNS,
+            output_columns=TIME_AWARE_OUTPUT_COLUMNS,
+            arrow_schema=TIME_AWARE_ARROW_SCHEMA,
+            historical_feature_groups_enabled=True,
+            canonical_artifact_root=Path(
+                "artifacts/features/favorita_2017_four_fold_time_aware"
+            ),
         ),
-    ),
-})
+    }
+)
 
 
 def resolve_feature_profile(name: str) -> FavoritaFeatureProfile:
@@ -979,21 +992,14 @@ def materialize_feature_dataset(
             source_slice,
             forecast_origin=origin,
             max_items_per_store=None,
-            allow_assumed_future_promotion=(
-                config.allow_assumed_future_promotion
-            ),
-            allow_assumed_future_holidays=(
-                config.allow_assumed_future_holidays
-            ),
-            drop_targets_without_origin_history=(
-                drop_targets_without_origin_history
-            ),
+            allow_assumed_future_promotion=(config.allow_assumed_future_promotion),
+            allow_assumed_future_holidays=(config.allow_assumed_future_holidays),
+            drop_targets_without_origin_history=(drop_targets_without_origin_history),
             feature_profile=profile.name,
         )
         if forecast_date_cutoff is not None:
             feature_rows = feature_rows.loc[
-                feature_rows["forecast_date"]
-                <= pd.Timestamp(forecast_date_cutoff)
+                feature_rows["forecast_date"] <= pd.Timestamp(forecast_date_cutoff)
             ].reset_index(drop=True)
         if feature_rows.empty:
             return
@@ -1005,9 +1011,7 @@ def materialize_feature_dataset(
         if reuse_source_across_origins:
             origins = tuple(pd.Timestamp(value) for value in config.forecast_origins)
             broad_start_date = min(origins) - pd.Timedelta(days=28)
-            broad_end_date = max(origins) + pd.Timedelta(
-                days=max(FORECAST_HORIZONS)
-            )
+            broad_end_date = max(origins) + pd.Timedelta(days=max(FORECAST_HORIZONS))
             store_batch_count = len(config.store_batches)
             phase = f" {progress_phase}" if progress_phase else ""
             for store_batch_index, store_batch in enumerate(
@@ -1030,9 +1034,7 @@ def materialize_feature_dataset(
                 source_dates = source_slice["date"]
                 for origin in origins:
                     origin_start_date = origin - pd.Timedelta(days=28)
-                    origin_end_date = origin + pd.Timedelta(
-                        days=max(FORECAST_HORIZONS)
-                    )
+                    origin_end_date = origin + pd.Timedelta(days=max(FORECAST_HORIZONS))
                     start_index = source_dates.searchsorted(
                         origin_start_date,
                         side="left",
@@ -1178,7 +1180,7 @@ def build_feature_manifest(
         "validation": {key: bool(value) for key, value in validation_results.items()},
         "limitations": list(limitations),
         "reproducibility": {
-            "python": os.sys.version.split()[0],
+            "python": sys.version.split()[0],
             "pandas": pd.__version__,
             "numpy": np.__version__,
             "pyarrow": pa.__version__,
@@ -1324,16 +1326,24 @@ def run_deterministic_fixture_validation() -> dict[str, bool]:
     )
     expected_sales_lags = {
         "sales_lag_1": float(
-            source_item_100.loc[origin - pd.Timedelta(days=1), "unit_sales"]
+            cast(
+                float, source_item_100.loc[origin - pd.Timedelta(days=1), "unit_sales"]
+            )
         ),
         "sales_lag_7": float(
-            source_item_100.loc[origin - pd.Timedelta(days=7), "unit_sales"]
+            cast(
+                float, source_item_100.loc[origin - pd.Timedelta(days=7), "unit_sales"]
+            )
         ),
         "sales_lag_14": float(
-            source_item_100.loc[origin - pd.Timedelta(days=14), "unit_sales"]
+            cast(
+                float, source_item_100.loc[origin - pd.Timedelta(days=14), "unit_sales"]
+            )
         ),
         "sales_lag_28": float(
-            source_item_100.loc[origin - pd.Timedelta(days=28), "unit_sales"]
+            cast(
+                float, source_item_100.loc[origin - pd.Timedelta(days=28), "unit_sales"]
+            )
         ),
     }
     for feature_name, expected_value in expected_sales_lags.items():

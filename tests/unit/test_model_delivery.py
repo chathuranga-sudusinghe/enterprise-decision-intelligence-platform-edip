@@ -43,7 +43,8 @@ def test_stages_exact_versions_and_bytes(tmp_path):
     assert [c["VersionId"] for c in client.calls] == ["model-v1", "metadata-v1"]
     assert all(c["Bucket"] == "edip-test" for c in client.calls)
     assert [c["Key"] for c in client.calls] == [
-        "models/reviewed/model.txt", "models/reviewed/metadata.json"
+        "models/reviewed/model.txt",
+        "models/reviewed/metadata.json",
     ]
 
 
@@ -55,11 +56,14 @@ def test_bad_download_fails_closed(tmp_path, failure):
     assert not (tmp_path / "bundle" / "model.txt").exists()
 
 
-@pytest.mark.parametrize("key,value", [
-    ("EDIP_MODEL_VERSION_ID", "null"),
-    ("EDIP_METADATA_SHA256", "invalid"),
-    ("EDIP_MODEL_PREFIX", "../other"),
-])
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("EDIP_MODEL_VERSION_ID", "null"),
+        ("EDIP_METADATA_SHA256", "invalid"),
+        ("EDIP_MODEL_PREFIX", "../other"),
+    ],
+)
 def test_invalid_configuration_never_downloads(tmp_path, key, value):
     env = configuration(tmp_path)
     env[key] = value

@@ -9,7 +9,9 @@ import urllib.request
 
 
 def aws(*args):
-    return json.loads(subprocess.check_output(["aws", *args, "--output", "json"], text=True))
+    return json.loads(
+        subprocess.check_output(["aws", *args, "--output", "json"], text=True)
+    )
 
 
 def successful_service(service, target):
@@ -33,13 +35,20 @@ def check_public_routes(url):
 
     opener = urllib.request.build_opener(NoRedirect)
     for path, method, expected in [
-        ("/health", "GET", 200), ("/ready", "GET", 200),
-        ("/docs", "GET", 200), ("/openapi.json", "GET", 200),
-        ("/api/v1/forecast", "POST", 403), ("/api/v1/forecast", "GET", 403),
-        ("/metrics", "GET", 403), ("/ready", "POST", 403), ("/", "GET", 403),
+        ("/health", "GET", 200),
+        ("/ready", "GET", 200),
+        ("/docs", "GET", 200),
+        ("/openapi.json", "GET", 200),
+        ("/api/v1/forecast", "POST", 403),
+        ("/api/v1/forecast", "GET", 403),
+        ("/metrics", "GET", 403),
+        ("/ready", "POST", 403),
+        ("/", "GET", 403),
     ]:
         try:
-            with opener.open(urllib.request.Request(url + path, method=method), timeout=15) as r:
+            with opener.open(
+                urllib.request.Request(url + path, method=method), timeout=15
+            ) as r:
                 code = r.status
                 body = r.read()
         except urllib.error.HTTPError as error:
@@ -57,13 +66,28 @@ def main():
     image = os.environ["IMAGE_DIGEST_URI"]
     if not image.startswith(contract["repository_url"] + "@sha256:"):
         raise ValueError("Image must use this EDIP repository and an immutable digest")
-    template = aws("ecs", "describe-task-definition", "--task-definition",
-                   contract["template_arn"], "--include", "TAGS")
+    template = aws(
+        "ecs",
+        "describe-task-definition",
+        "--task-definition",
+        contract["template_arn"],
+        "--include",
+        "TAGS",
+    )
     definition = template["taskDefinition"]
     allowed = [
-        "family", "taskRoleArn", "executionRoleArn", "networkMode", "containerDefinitions",
-        "volumes", "placementConstraints", "requiresCompatibilities", "cpu", "memory",
-        "runtimePlatform", "ephemeralStorage",
+        "family",
+        "taskRoleArn",
+        "executionRoleArn",
+        "networkMode",
+        "containerDefinitions",
+        "volumes",
+        "placementConstraints",
+        "requiresCompatibilities",
+        "cpu",
+        "memory",
+        "runtimePlatform",
+        "ephemeralStorage",
     ]
     revision = {key: definition[key] for key in allowed if key in definition}
     revision["tags"] = template.get("tags", [])
@@ -71,20 +95,43 @@ def main():
     if len(containers) != 1 or containers[0]["name"] != "backend":
         raise ValueError("Expected one backend container")
     containers[0]["image"] = image
-    previous = aws("ecs", "describe-services", "--cluster", contract["cluster"],
-                   "--services", contract["service"])
+    previous = aws(
+        "ecs",
+        "describe-services",
+        "--cluster",
+        contract["cluster"],
+        "--services",
+        contract["service"],
+    )
     if previous.get("failures") or len(previous.get("services", [])) != 1:
         raise RuntimeError("Expected existing EDIP service")
     print("Previous task definition:", previous["services"][0]["taskDefinition"])
-    target = aws("ecs", "register-task-definition", "--cli-input-json",
-                 json.dumps(revision))["taskDefinition"]["taskDefinitionArn"]
+    target = aws(
+        "ecs", "register-task-definition", "--cli-input-json", json.dumps(revision)
+    )["taskDefinition"]["taskDefinitionArn"]
     print("Deploying task definition:", target)
-    aws("ecs", "update-service", "--cluster", contract["cluster"], "--service",
-        contract["service"], "--task-definition", target, "--desired-count", "1")
+    aws(
+        "ecs",
+        "update-service",
+        "--cluster",
+        contract["cluster"],
+        "--service",
+        contract["service"],
+        "--task-definition",
+        target,
+        "--desired-count",
+        "1",
+    )
     deadline = time.monotonic() + 900
     while time.monotonic() < deadline:
-        result = aws("ecs", "describe-services", "--cluster", contract["cluster"],
-                     "--services", contract["service"])
+        result = aws(
+            "ecs",
+            "describe-services",
+            "--cluster",
+            contract["cluster"],
+            "--services",
+            contract["service"],
+        )
         if result.get("failures"):
             raise RuntimeError("ECS service lookup failed")
         service = result["services"][0]
@@ -92,9 +139,13 @@ def main():
             check_public_routes(contract["url"])
             print("Public documentation:", contract["url"] + "/docs")
             return
-        if any(d.get("taskDefinition") == target and d.get("rolloutState") == "FAILED"
-               for d in service.get("deployments", [])):
-            raise RuntimeError("ECS deployment failed; inspect circuit-breaker rollback")
+        if any(
+            d.get("taskDefinition") == target and d.get("rolloutState") == "FAILED"
+            for d in service.get("deployments", [])
+        ):
+            raise RuntimeError(
+                "ECS deployment failed; inspect circuit-breaker rollback"
+            )
         if service.get("taskDefinition") != target:
             raise RuntimeError("ECS reverted to a different task definition")
         time.sleep(15)

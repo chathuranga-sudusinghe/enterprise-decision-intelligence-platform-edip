@@ -84,4 +84,6 @@ def tiny_favorita_feature_frame(
             }
         )
         records.append(values)
-    return pd.DataFrame.from_records(records).loc[:, adapter.fitted_feature_columns]
+    return pd.DataFrame.from_records(records).loc[
+        :, list(adapter.fitted_feature_columns)
+    ]

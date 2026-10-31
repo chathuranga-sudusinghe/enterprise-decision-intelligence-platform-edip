@@ -4,6 +4,7 @@ import json
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pyarrow.parquet as pq
@@ -43,9 +44,7 @@ def _isolate_counterpart_manifests(
     }
 
     def isolated_path(feature_profile: str, fold_id: int) -> Path:
-        counterpart = (
-            "time-aware" if feature_profile == "contextual" else "contextual"
-        )
+        counterpart = "time-aware" if feature_profile == "contextual" else "contextual"
         return roots[counterpart] / f"fold_{fold_id:02d}" / "manifest.json"
 
     monkeypatch.setattr(builder, "_counterpart_manifest_path", isolated_path)
@@ -67,8 +66,7 @@ def test_exactly_four_canonical_fold_output_definitions(tmp_path: Path) -> None:
     assert all(path.manifest.name == "manifest.json" for path in paths)
     assert APPROVED_FOLDS[-1].validation_end == MODELING_TARGET_END
     assert all(
-        fold.validation_end < FINAL_HOLDOUT.holdout_start
-        for fold in APPROVED_FOLDS
+        fold.validation_end < FINAL_HOLDOUT.holdout_start for fold in APPROVED_FOLDS
     )
 
 
@@ -78,9 +76,9 @@ def test_canonical_subset_is_exactly_folds_1_through_4() -> None:
     assert len(APPROVED_FOLDS) == 4
     assert builder.CANONICAL_FOLD_IDS == (1, 2, 3, 4)
     assert tuple(fold.fold_id for fold in selected) == (1, 2, 3, 4)
-    args = builder._argument_parser().parse_args([
-        "--feature-profile", "time-aware", "--folds", "1", "2", "3", "4"
-    ])
+    args = builder._argument_parser().parse_args(
+        ["--feature-profile", "time-aware", "--folds", "1", "2", "3", "4"]
+    )
     assert args.folds == [1, 2, 3, 4]
 
 
@@ -116,7 +114,9 @@ def test_training_origins_are_daily_and_end_before_fold_origin(
     assert len(origins) == (fold.forecast_origin - MODELING_TARGET_START).days + 1
 
 
-def _bounded_fold_fixture(tmp_path: Path) -> tuple[
+def _bounded_fold_fixture(
+    tmp_path: Path,
+) -> tuple[
     builder.FoldDatasetBuildConfig,
     TemporalValidationFold,
     builder.FoldArtifactPaths,
@@ -442,7 +442,7 @@ def test_skipped_configured_store_fails(
     )
     original_materialize = builder.materialize_feature_dataset
 
-    def skip_store(*args: object, **kwargs: object) -> dict[str, object]:
+    def skip_store(*args: Any, **kwargs: Any) -> dict[str, Any]:
         result = original_materialize(*args, **kwargs)
         result["processed_stores"] = [1]
         return result
@@ -701,9 +701,7 @@ def test_reuse_refreshes_only_pending_cross_arm_manifest(
     def reject_materialization(*args: object, **kwargs: object) -> dict[str, object]:
         raise AssertionError("manifest refresh must not materialize features")
 
-    monkeypatch.setattr(
-        builder, "materialize_feature_dataset", reject_materialization
-    )
+    monkeypatch.setattr(builder, "materialize_feature_dataset", reject_materialization)
     refreshed = builder.build_one_fold_dataset(
         contextual_config,
         fold,
@@ -748,9 +746,7 @@ def test_reuse_cross_arm_mismatch_fails_without_materialization(
     def reject_materialization(*args: object, **kwargs: object) -> dict[str, object]:
         raise AssertionError("mismatch validation must not materialize features")
 
-    monkeypatch.setattr(
-        builder, "materialize_feature_dataset", reject_materialization
-    )
+    monkeypatch.setattr(builder, "materialize_feature_dataset", reject_materialization)
     with pytest.raises(ValueError, match="cross-arm row equivalence failed"):
         builder.build_one_fold_dataset(
             contextual_config,

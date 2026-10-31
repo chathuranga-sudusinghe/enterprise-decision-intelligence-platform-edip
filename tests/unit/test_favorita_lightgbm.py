@@ -513,15 +513,13 @@ def test_contextual_parquet_fit_projects_only_contextual_columns(
         feature_profile="contextual",
     )
     training_path = tmp_path / "training.parquet"
-    _write_model_ready_parquet(
-        frame, training_path, feature_profile="contextual"
-    )
-    adapter = FavoritaLightGBMAdapter(
-        feature_columns=CONTEXTUAL_FEATURE_COLUMNS
-    )
+    _write_model_ready_parquet(frame, training_path, feature_profile="contextual")
+    adapter = FavoritaLightGBMAdapter(feature_columns=CONTEXTUAL_FEATURE_COLUMNS)
     adapter.fit_parquet(training_path)
     assert adapter.fitted_feature_columns == CONTEXTUAL_FEATURE_COLUMNS
-    assert not any(column.startswith("sales_lag_") for column in adapter.fitted_feature_columns)
+    assert not any(
+        column.startswith("sales_lag_") for column in adapter.fitted_feature_columns
+    )
 
 
 @pytest.mark.parametrize(
@@ -569,10 +567,6 @@ def test_cross_profile_parquet_and_model_contract_mismatch_fails_closed(
         feature_profile=artifact_profile,
     )
     path = tmp_path / f"{artifact_profile}.parquet"
-    _write_model_ready_parquet(
-        frame, path, feature_profile=artifact_profile
-    )
+    _write_model_ready_parquet(frame, path, feature_profile=artifact_profile)
     with pytest.raises(ValueError, match="ordered training schema"):
-        FavoritaLightGBMAdapter(
-            feature_columns=feature_columns
-        ).fit_parquet(path)
+        FavoritaLightGBMAdapter(feature_columns=feature_columns).fit_parquet(path)
