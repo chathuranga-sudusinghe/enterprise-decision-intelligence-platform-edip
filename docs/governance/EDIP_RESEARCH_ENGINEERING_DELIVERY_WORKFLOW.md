@@ -3,11 +3,11 @@
 | Field | Value |
 |---|---|
 | Status | Active governance |
-| Owner and accountable decision-maker | Human project owner/researcher |
+| Decision control | Explicit human approval; acceptance is recorded separately |
 | Engineering lifecycle | Enterprise AI/ML Engineering Framework v2.1.0 |
-| Execution management | Jira Sprints and SCRUM work items |
+| Execution management | Approved GitHub Issues |
 | Architecture authority | [EDIP V2 Flagship Architecture Plan](../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md) |
-| AI-use policy | [AI Usage](../../AI_USAGE.md) |
+| Coding-agent and AI-assistance policy | [Agent instructions](../../AGENTS.md) |
 
 ## 1. Purpose and scope
 
@@ -31,27 +31,37 @@ The Enterprise AI/ML Engineering Framework v2.1.0 supplies the lifecycle:
 Problem -> Data -> Baseline -> Advanced AI -> Evaluation -> Delivery -> Production -> Maintenance
 ```
 
-Each stage defines questions, controls, evidence, and promotion gates. The lifecycle is not a Sprint plan and does not prescribe ticket numbering.
+Each stage defines questions, controls, evidence, and promotion gates. The lifecycle does not prescribe delivery schedules or issue numbering.
 
-### Jira Sprint and SCRUM execution layer
+### GitHub issue execution layer
 
-Jira Sprints and SCRUM work items define planned delivery:
+Delivery is governed through approved GitHub Issues:
 
 ```text
-Sprint goal
--> approved SCRUM work item
--> acceptance criteria and protected scope
--> feature branch from dev
--> implementation and local validation
--> pull request to dev
--> CI and human review
--> Sprint/release review
--> reviewed dev-to-main release checkpoint
--> approved CD
+Finding/problem
+-> proposed issue content
+-> review and explicit approval
+-> issue creation
+-> local branch command
+-> separately authorized implementation
+-> proportional validation
+-> review
+-> authorized pull request to dev
+-> acceptance decision
+-> separately approved release checkpoint and deployment
 -> measured outcome and reflection
 ```
 
-A work item may cover part of one framework stage or evidence spanning several stages. A framework quality gate may require several work items across several Sprints.
+Issue creation is not automatic. An applicable existing issue may be reused.
+Implementation, Git mutations, experiment execution, and deployment have distinct
+approval boundaries under [AGENTS.md](../../AGENTS.md).
+
+Legacy Jira/SCRUM labels are historical provenance, not active execution authority.
+This clarification is transitional and may be removed after active planning
+references have been reconciled and verified. Historical evidence remains intact.
+
+A work item may cover part of one framework stage or evidence spanning several
+stages. A framework quality gate may require several issues.
 
 ## 3. Evidence hierarchy
 
@@ -59,7 +69,7 @@ A work item may cover part of one framework stage or evidence spanning several s
 |---|---|---|
 | Architecture plan | Approved target, boundaries, principles, and non-goals | Design authority unless formally superseded |
 | Governance record | Repeatable evidence, decision, accountability, and release controls | Must conform to architecture and legal/research duties |
-| Jira work item | Sprint scope, acceptance criteria, exclusions, owner, and dependencies | Execution authority for the bounded change |
+| GitHub issue | Approved scope, acceptance criteria, exclusions, and dependencies | Execution record; separate authorization is required for implementation and consequential operations |
 | ADR | Architecture-significant decision, alternatives, consequences, and rollback | Required for material or difficult-to-reverse decisions |
 | Dataset/corpus governance record | Source, licence, access, provenance, lineage, retention, and restrictions | Data-use authority for the named asset |
 | Research design | Hypothesis, methodology, baseline, split, metrics, limitations, and approval | Evaluation authority for the named study |
@@ -70,18 +80,21 @@ A work item may cover part of one framework stage or evidence spanning several s
 
 Records should link instead of duplicating large bodies. Historical records may be summarized or removed after unique evidence is consolidated, while Git history preserves their original form.
 
-## 4. Roles and accountability
+## 4. Approval and accountability
 
-| Role | Contribution | Boundary |
-|---|---|---|
-| Human project owner/researcher | Frames questions, approves work and architecture, accepts risk, reviews evidence, owns academic integrity | Sole accountable decision-maker for project direction and claims |
-| ChatGPT discussion and decision-support assistant | Explores evidence, alternatives, risks, questions, and draft plans | Advisory only; cannot approve work or validate unobserved facts |
-| Codex bounded implementation assistant | Inspects authorized scope, implements approved changes, and runs proportionate checks | Cannot broaden scope, approve its own output, or manufacture evidence |
-| Jira | Preserves Sprint goals, work-item scope, decisions, ownership, and status | Planning evidence; ticket closure alone is not technical completion |
-| GitHub and CI/CD | Preserve branches, reviews, checks, releases, and deployment automation | Evidence surfaces; a merge or green check is not production readiness |
-| Reviewer, supervisor, or stakeholder | Challenges requirements, design, ethics, method, and outcomes | Authority must be explicit; participation does not transfer owner accountability |
+Project direction, architecture, risk acceptance, research integrity, implementation
+acceptance, and publication remain subject to human review. AI output is advisory
+and must not be treated as approval or as validation of unobserved facts.
 
-AI tools are not authors, approvers, or accountable decision-makers. The human owner verifies material AI-assisted claims, citations, code, test interpretation, and decisions. AI use must be disclosed consistently with `AI_USAGE.md`. Credentials, restricted data, personal data, and unpublished confidential material require explicit authority and appropriate handling.
+Coding and independent-review responsibilities, reviewer-driven change approval,
+and AI-assistance disclosure are defined in [AGENTS.md](../../AGENTS.md). Material
+claims, citations, code, test interpretation, and decisions require verification.
+Credentials, restricted data, personal data, and unpublished confidential material
+require explicit authority and appropriate handling.
+
+GitHub and CI/CD preserve bounded revision, review, check, release, and deployment
+evidence. Issue closure, merges, and green checks alone do not establish acceptance
+or production readiness.
 
 ## 5. Mandatory evidence chain
 
@@ -93,7 +106,7 @@ finding -> risk -> decision -> implementation -> validation -> outcome -> reflec
 
 - **Finding:** What was observed, at which revision, from which evidence?
 - **Risk:** Why does it matter, to whom, with what likelihood and impact?
-- **Decision:** What did the human owner approve, reject, or defer?
+- **Decision:** What was approved, rejected, or deferred, and what evidence records that decision?
 - **Implementation:** What changed and what remained protected?
 - **Validation:** Which checks ran, with which environment and evidence boundary?
 - **Outcome:** Did the change produce the intended technical or research result?
@@ -104,21 +117,22 @@ A missing link is stated explicitly; it is never inferred or fabricated.
 ## 6. Work-item workflow
 
 1. Inspect current evidence and applicable architecture, governance, research, and data contracts.
-2. Define the problem, affected users, decision value, scope, non-goals, protected assets, and risk.
+2. Define the problem, decision value, scope, non-goals, protected assets, and risk.
 3. Compare alternatives, including a simple or non-AI baseline where appropriate.
-4. Obtain human approval for the direction and consequential external actions.
-5. Create or refine the Jira SCRUM work item with acceptance criteria, dependencies, evidence, rollback, and exclusions.
-6. Branch from `dev` using a short-lived feature or chore branch.
-7. Implement the smallest coherent change without unrelated cleanup.
-8. Validate locally using evidence proportionate to risk.
-9. Create a pull request to `dev`; interpret CI results and review feedback.
-10. Record changed files, failures, limitations, rollback, and completion evidence.
-11. Review the outcome in the Sprint and decide whether it contributes to a release checkpoint.
-12. Obtain human approval for the reviewed release and merge the release checkpoint from `dev` to `main`.
-13. Allow the approved GitHub Actions Continuous Deployment (CD) workflow to deploy the immutable application image automatically, perform post-deployment validation, and preserve rollback evidence.
+4. Present proposed GitHub issue content and obtain explicit approval before creation; reuse an applicable existing issue where appropriate.
+5. Record acceptance criteria, dependencies, evidence, rollback, and exclusions in the issue.
+6. Provide the local branch command from `dev`; branch creation requires separate authorization when automated.
+7. Obtain implementation approval and make the smallest coherent change without unrelated cleanup.
+8. Validate proportionately. Training-related commands, real-model execution, protected evaluation, and consequential operations require separate explicit permission under AGENTS.md.
+9. Review evidence and obtain explicit approval before reviewer-driven edits.
+10. Prepare a pull request to `dev`; creation and Git mutations require explicit authorization.
+11. Record changed files, failures, limitations, rollback, and completion evidence.
+12. Assess release readiness separately; a completed feature does not automatically justify promotion to `main`.
+13. Obtain explicit authorization for release and deployment operations after workflow triggers and impact have been inspected.
 14. Measure outcomes and record negative or inconclusive results.
 
-Emergency exceptions require a named human approver, documented risk, minimum safe validation, bounded authority, and a follow-up completion/reflection record.
+Emergency exceptions require explicit approval, documented risk, minimum safe
+validation, bounded authority, and a follow-up completion/reflection record.
 
 ## 7. Branch, pull-request, and release controls
 
@@ -127,9 +141,9 @@ Emergency exceptions require a named human approver, documented risk, minimum sa
 - Short-lived feature/chore branches start from `dev` and return through pull-request review.
 - A feature or `dev` push is not a production release.
 - CI must complete before the relevant merge or release decision.
-- Human approval must occur before the reviewed release is merged to `main`.
+- Explicit approval is required before the reviewed release is merged to `main`.
 - The approved `main`/release merge is the deployment boundary.
-- Continuous Deployment (CD) is then triggered automatically by the approved GitHub Actions workflow.
+- Deployment triggers must be inspected before release operations; automated deployment is authorized only within the explicitly approved workflow and environment.
 - Commits and pull requests remain focused and do not conceal unrelated generated changes.
 - Force-push, history rewrite, production deployment, data publication, or irreversible external action requires explicit authority.
 
@@ -143,7 +157,7 @@ CI evidence must identify mocks, skipped tests, unavailable services, and static
 
 ### Continuous Deployment (CD)
 
-After a human-reviewed release is merged to `main`, the approved GitHub Actions Continuous Deployment (CD) workflow automatically:
+For the target release design, an explicitly approved GitHub Actions Continuous Deployment (CD) workflow is intended to perform the following after an approved release merge to `main`. This list is a design contract, not evidence that these capabilities are implemented or deployed:
 
 1. builds an immutable application container image;
 2. publishes immutable backend and frontend images to Amazon ECR by digest;
@@ -151,7 +165,7 @@ After a human-reviewed release is merged to `main`, the approved GitHub Actions 
 4. verifies health, readiness, version, and telemetry after deployment; and
 5. preserves evidence and the ability to roll back to a known revision.
 
-Feature or `dev` pushes do not deploy production. Human approval occurs before the `main`/release merge; that merge is the deployment boundary, after which CD performs the automated deployment and post-deployment validation.
+In the target release design, feature or `dev` pushes do not deploy production. Explicit approval is required before the `main`/release merge. Actual workflow triggers and environment evidence must be verified before deployment behavior is claimed or a release operation is authorized.
 
 ### Infrastructure lifecycle
 
@@ -169,7 +183,7 @@ Application release and infrastructure lifecycle are distinct. Terraform is used
 | RAG/corpus | Approved source registry/licences, corpus and chunk manifests, ACL model, compatibility, retrieval baseline, grounding/citation/abstention/injection tests |
 | LangGraph/workflow | State and transition contract, tool allowlist, identity, deterministic safety, HITL, idempotency, failure/resume/reconciliation tests |
 | MCP/integration | Versioned tools, read/write separation, authorization, approval, idempotency, simulation, reconciliation, threat model |
-| Infrastructure | ADR where required, environment owner, Terraform/backend contract, immutable versions, secrets, plan/security/cost/rollback evidence |
+| Infrastructure | ADR where required, environment accountability, Terraform/backend contract, immutable versions, secrets, plan/security/cost/rollback evidence |
 | Application release | Reviewed revision, CI, immutable image digest, deployment approval, health/readiness, telemetry, rollback |
 | Research outcome | Protocol, comparator, results, uncertainty, threats, ethics/licensing, negative evidence, critical discussion |
 
@@ -202,13 +216,13 @@ An LLM must not authorize irreversible action. Human approval binds a known acto
 
 A work item is ready only when:
 
-- the finding, risk, user/research value, and Sprint relationship are evidence-based;
+- the finding, risk, decision value, and applicable GitHub issue are evidence-based;
 - architecture, governance, data/research contracts, and relevant ADRs are linked;
-- scope, non-goals, protected assets, dependencies, and owner are clear;
+- scope, non-goals, protected assets, dependencies, and approval boundaries are clear;
 - alternatives and a non-AI baseline are considered where appropriate;
 - data access, licensing, privacy, ethics, and external authority are resolved or gated;
 - acceptance criteria, evidence types, rollback, and review are written; and
-- the human owner approves implementation.
+- implementation has been explicitly approved.
 
 ## 13. Definition of Done
 
@@ -230,7 +244,7 @@ A work item is done only when:
 
 Create or update an ADR when a decision changes a system boundary, public/data contract, security/tenant model, persistence, external provider, model/corpus strategy, deterministic safety rule, deployment topology, irreversible-action control, or other difficult-to-reverse choice.
 
-An ADR records status, date, owner, linked work item, context, constraints, alternatives including status quo, approved decision, non-goals, consequences, security/privacy/licensing implications, validation, observability, migration, rollback, supersession, named human approval, and review date.
+An ADR records status, date, approval record, linked work item, context, constraints, alternatives including status quo, approved decision, non-goals, consequences, security/privacy/licensing implications, validation, observability, migration, rollback, supersession, explicit approval evidence, and review date.
 
 The detailed AWS topology, Terraform implementation, identity, networking, managed services, S3 model delivery, and GitHub Actions CD workflow require a dedicated ADR before implementation.
 
@@ -244,6 +258,6 @@ A future PhD pathway requires a precise gap, reproducible method, credible compa
 
 ## 16. Supersession and review
 
-Review this workflow when architecture, Jira practice, branch/release policy, CI/CD, regulated data, safety controls, research obligations, or repeated delivery failures change.
+Review this workflow when architecture, issue workflow, branch/release policy, CI/CD, regulated data, safety controls, research obligations, or repeated delivery failures change.
 
 Changes require human approval and a focused pull request. A new governance record must identify what it supersedes. Historical evidence must not be silently rewritten to claim that it originally described a later state.
