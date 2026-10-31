@@ -2,7 +2,7 @@
 
 ## Status and engineering scope
 
-The offline implementation is governed by [GitHub Issue #128](https://github.com/chathuranga-sudusinghe/enterprise-decision-intelligence-platform-edip/issues/128). GitHub Issues is the sole active execution-management system. The full selected-candidate backtesting run and real-data uncertainty evaluation each require separate owner approval; neither has been executed for this issue. No empirical coverage or width results are claimed. The implementation does not publish a model, modify serving, or implement stockout risk, overstock risk, or replenishment.
+The offline implementation is governed by [GitHub Issue #128](https://github.com/chathuranga-sudusinghe/enterprise-decision-intelligence-platform-edip/issues/128). GitHub Issues is the sole active execution-management system. The full selected-candidate backtesting run and real-data uncertainty evaluation each require separate explicit approval; neither has been executed for this issue. No empirical coverage or width results are claimed. The implementation does not publish a model, modify serving, or implement stockout risk, overstock risk, or replenishment.
 
 The engineering objective is to assess whether a deterministic empirical residual layer around the already-selected Time-Aware LightGBM forecasts provides useful 90% prediction intervals under sequential pre-holdout validation.
 
@@ -98,7 +98,7 @@ Uncertainty outputs under `artifacts/evaluation/favorita_uncertainty/`:
 - `calibration.json`: sequential quantiles, residual counts, date cutoffs, and separate final calibration.
 - `overall_metrics.json`, `fold_metrics.json`, `horizon_metrics.json`: PICP and MPIW.
 - `run_manifest.json`: input checksums, the saved producer code/runtime identity, separate current consumer code/runtime identity, frozen candidate, output checksums, active GitHub issue, and explicit holdout exclusion.
-- `evaluation_summary.md`: all reporting views and research limitations.
+- `evaluation_summary.md`: all reporting views and evaluation limitations.
 
 The uncertainty runner refuses incomplete or mismatched candidate provenance, different global or per-fold parameters, incorrect feature contracts, holdout exposure, invalid dates/horizons, missing folds/horizons, duplicate prediction keys, non-finite numbers, invalid identifiers, row-count mismatches, and changed source artifacts. Prediction identity is `(forecast_origin, forecast_date, store_nbr, item_nbr)`; canonical checks establish its fold and horizon.
 
@@ -106,7 +106,7 @@ A generic `run.status: completed` is not selected-candidate acceptance: the cons
 
 Existing output directories are never overwritten. The uncertainty artifacts are built in a temporary sibling directory; publication reserves the destination exclusively and writes the completion manifest last. A failed selected-candidate run may leave an incomplete directory; inspect it before choosing a new output namespace. There is deliberately no automatic destructive cleanup or overwrite option.
 
-Heavy Parquet files remain ignored by Git under existing conventions. Reviewed lightweight JSON/Markdown engineering evidence is eligible for version control; official publication still requires owner approval. No ignore-rule changes are required.
+Heavy Parquet files remain ignored by Git under existing conventions. Reviewed lightweight JSON/Markdown engineering evidence is eligible for version control; official publication still requires explicit approval. No ignore-rule changes are required.
 
 ## Reproducibility and resource requirements
 
@@ -127,7 +127,7 @@ Run from the repository root in WSL. The following expensive command is prepared
   --output-dir artifacts/evaluation/favorita_selected_candidate
 ```
 
-The following real-data uncertainty command also requires separate owner approval after backtesting succeeds:
+The following real-data uncertainty command also requires separate explicit approval after backtesting succeeds:
 
 ```bash
 .venv/bin/python -m pipelines.evaluation.run_favorita_uncertainty_evaluation \

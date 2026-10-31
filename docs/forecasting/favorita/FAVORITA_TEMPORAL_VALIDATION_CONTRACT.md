@@ -21,7 +21,7 @@ It consolidates the completed 16-day horizon alignment and executable temporal-v
 Related authorities:
 
 - [Favorita Dataset Source and Governance](../../governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md);
-- [Favorita Research Hypothesis and Experiment Design](FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md);
+- [Favorita Forecasting Experiment Design](FAVORITA_FORECASTING_EXPERIMENT_DESIGN.md);
 - [Favorita Temporal Validation Design](FAVORITA_TEMPORAL_VALIDATION_DESIGN.md);
 - [Favorita Forecasting Evaluation Metric Contract](FAVORITA_FORECASTING_EVALUATION_METRICS.md); and
 - [EDIP Architecture Plan](../../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md).
@@ -203,7 +203,7 @@ The redesigned executable boundary requires deterministic structures and functio
 - validate the exact holdout dates and separation; and
 - validate the canonical contract on demand.
 
-The archived temporal-definition notebook at `notebooks/favorita/archive/09_define_temporal_validation_and_backtesting.ipynb` records the superseded eight-fold design and is not the current canonical authority. The executable Python contract and these aligned research documents define the redesigned boundaries.
+The archived temporal-definition notebook at `notebooks/favorita/archive/09_define_temporal_validation_and_backtesting.ipynb` records the superseded eight-fold design and is not the current canonical authority. The executable Python contract and these aligned forecasting documents define the redesigned boundaries.
 
 ## 11. Current execution status and remaining work
 
@@ -211,14 +211,15 @@ SCRUM-15, SCRUM-18, SCRUM-59, and SCRUM-19 are complete for the governed compari
 
 The completed SCRUM-18 comparators reused these exact four canonical folds, training scopes, horizons, leakage rules, and metric contract. Remaining work includes:
 
-- optional uncertainty or sensitivity analysis under separate approval;
+- real-data uncertainty execution under separate approval; offline implementation and synthetic validation are documented in [Favorita Forecast Uncertainty](FAVORITA_FORECAST_UNCERTAINTY.md), with no empirical interval results claimed;
+- optional sensitivity analysis under separate approval;
 - Kaggle prediction or submission; and
 - governed Time-Aware model publication to Amazon S3 and production serving on AWS.
 
-Those activities require separate approved Jira/SCRUM work items and must consume this contract without weakening its training cutoff, fold isolation, direct 1-through-16 horizon semantics, sparse-row policy, or holdout protection.
+Those activities require separately approved GitHub issues and explicit execution permission and must consume this contract without weakening its training cutoff, fold isolation, direct 1-through-16 horizon semantics, sparse-row policy, or holdout protection.
 
 ## 12. Change discipline
 
-If a future approved decision changes the horizon, folds, or holdout, update the canonical definitions, derived assertions, focused tests, research design, and this current contract together.
+If a future approved decision changes the horizon, folds, or holdout, update the canonical definitions, derived assertions, focused tests, forecasting experiment design, and this current contract together.
 
 Do not globally replace numeric values. Preserve legitimate historical lag/window features and use Git history, rather than active documentation, for superseded intermediate alignment records.

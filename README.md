@@ -2,7 +2,7 @@
 
 EDIP Version 2 is the approved architecture for a trustworthy enterprise decision-intelligence platform: grounded evidence, forecasting, governed agent workflows, deterministic controls, and accountable human decisions.
 
-> **Current status:** The real Favorita data foundation and the FastAPI health/monitoring boundary are implemented. Legacy synthetic forecast, RAG, and demo workflow runtimes have been retired; their governed V2 replacements have not been built.
+> **Current status:** The governed Favorita forecasting baseline, local load-only FastAPI forecast path, and offline uncertainty implementation are present. Their bounded validation is documented separately. Real-data uncertainty results and the broader governed RAG and workflow targets are not established by those implementations. Legacy synthetic forecast, RAG, and demo workflow runtimes have been retired.
 
 EDIP is not currently production-ready. Capabilities below are explicitly distinguished as current, approved target, or future work.
 
@@ -15,15 +15,15 @@ Operational teams often have data and dashboards but still lack a defensible pat
 - whether evidence is sufficient to decide or the system should abstain; and
 - which actions require human approval and what was ultimately executed.
 
-The flagship engineering goal is a reviewable enterprise platform rather than an unconstrained chatbot. Its research direction is: **Trustworthy Human-in-the-Loop multi-agent systems for safe, explainable, and auditable decision-making.**
+The flagship engineering goal is a reviewable enterprise platform rather than an unconstrained chatbot. Its target decision-support direction is: **Trustworthy Human-in-the-Loop multi-agent systems for safe, explainable, and auditable decision-making.**
 
 ## Status and evidence boundary
 
 | State | Meaning |
 |---|---|
-| **Current implemented state** | A FastAPI health/monitoring foundation, Next.js UI baseline, real Favorita data-preparation workflow, focused feature-contract tests, deployment assets, and monitoring assets exist. Legacy synthetic forecast, RAG, and demo workflow implementations are absent. |
+| **Current implemented state** | Governed Favorita data/feature and forecasting workflows, model-bundle/load-only API code, offline uncertainty code with synthetic validation, a Next.js UI baseline, and deployment/monitoring assets exist. Real-data uncertainty execution and integrated decision workflows are not established. |
 | **Approved target architecture** | A capability-oriented modular monolith, LangGraph workflows, governed retrieval and integrations, deterministic safety controls, durable audit, and Amazon Web Services (AWS) deployment define V2. |
-| **Future implementation** | Phase 1 and later phases must implement, integrate, evaluate, secure, and validate the approved architecture through explicit acceptance gates. |
+| **Future implementation** | Remaining baseline gaps and later capabilities require implementation, integration, evaluation, security, and validation through explicit acceptance gates. Existing components must be assessed before their work is treated as pending. |
 
 There is no claim here of complete test-suite health or live Pinecone, OpenAI, AWS, or ERP/CRM operation.
 
@@ -81,7 +81,7 @@ See the [EDIP V2 Flagship Architecture Plan](docs/architecture/EDIP_V2_FLAGSHIP_
 ## Phased V2 roadmap
 
 1. **Phase 0 — completed:** establish repository truth, audit the baseline, and complete controlled cleanup.
-2. **Phase 1 — Stable local baseline (next, not implemented):**
+2. **Phase 1 — Stable local baseline (acceptance pending):**
    - one supported Python runtime;
    - dependency reconciliation;
    - clean application and LangGraph imports;
@@ -103,13 +103,19 @@ EDIP adopts the [Enterprise AI/ML Engineering Framework](https://github.com/chat
 
 **Problem → Data → Baseline → Advanced AI → Evaluation → Delivery → Production → Maintenance**
 
-The architecture plan maps each stage to EDIP gates, required artifacts, validation evidence, owners, and review outcomes. Advanced AI follows adequate problem, data, and baseline evidence; deployment assets alone do not establish production readiness.
+The architecture plan maps each stage to EDIP gates, required artifacts, validation evidence, approval boundaries, and review outcomes. Advanced AI follows adequate problem, data, and baseline evidence; deployment assets alone do not establish production readiness.
 
-## Professional and research alignment
+## Engineering evidence and traceability
 
-- **BCS CITP evidence:** responsibility and autonomy, architecture judgement, alternatives and trade-offs, stakeholder influence, security and ethical decisions, measurable outcomes, review, and professional reflection. No SFIA level is claimed.
-- **MSc evidence:** applied architecture, reproducible evaluation, forecasting, RAG, deployment, observability, and critical analysis.
-- **PhD direction:** trustworthy HITL multi-agent systems, reliable RAG, uncertainty-aware decisions, evidence sufficiency, abstention, safe execution, and auditable outcomes.
+Engineering claims require defined objectives, governed inputs, reproducible methods,
+proportionate validation, security and operational evidence, and explicit limitations.
+The forecasting foundation is documented in the [experiment design](docs/forecasting/favorita/FAVORITA_FORECASTING_EXPERIMENT_DESIGN.md),
+[metric contract](docs/forecasting/favorita/FAVORITA_FORECASTING_EVALUATION_METRICS.md),
+[temporal design](docs/forecasting/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md),
+[temporal contract](docs/forecasting/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md),
+and [offline uncertainty baseline](docs/forecasting/favorita/FAVORITA_FORECAST_UNCERTAINTY.md).
+The uncertainty implementation has synthetic validation; real-data interval coverage
+and width results have not been produced for Issue #128.
 
 The traceability chain is: **finding → risk → decision → implementation → validation → outcome → reflection**.
 
@@ -148,7 +154,7 @@ Runtime-only installations use `python -m pip install .`; non-editable developme
 
 Use editable installation for local pipeline work so repository-relative data and artifact defaults retain their meaning. For an installed wheel outside the checkout, configure absolute runtime paths (`EDIP_FAVORITA_SOURCE_PATH`, `EDIP_ARTIFACT_ROOT`, and `EDIP_FAVORITA_MODEL_BUNDLE_PATH`) as needed.
 
-Open `http://localhost:8000/docs` for generated API documentation. The current API exposes foundation health and monitoring behavior; forecast, RAG, and governed workflow APIs require future implementation.
+Open `http://localhost:8000/docs` for generated API documentation. The local load-only forecast path and its validation boundary are described in [the inference validation record](docs/validation/FAVORITA_REAL_MODEL_INFERENCE_VALIDATION.md). That evidence does not establish public forecast access, RAG, or governed decision workflows.
 
 ### Frontend
 
@@ -179,21 +185,18 @@ These are contributor commands, not a claim that the entire suite currently pass
 - The local Python import and test baseline is established, but controlled PostgreSQL initialization and API container health/readiness still require validation.
 - No active RAG implementation or corpus is present; governed ingestion, retrieval, isolation, freshness, citation, and evaluation capabilities require a new implementation.
 - LangGraph remains a declared foundation dependency, but orchestration, evidence-sufficiency rules, abstention, durable HITL resume, and deterministic execution gates require a new implementation and validation.
-- The local load-only Favorita forecast path and real model bundle have been validated; durable S3 publication, production retrieval, promotion, and AWS serving remain unimplemented.
+- Local load-only Favorita forecasting and model-bundle validation are recorded. Production publication, promotion, and serving claims require separate revision-specific artifact and deployment evidence; local validation does not establish those states.
 - External evidence needs an approved source registry and provenance, freshness, licensing, and injection-resistance controls.
 - MCP ERP/CRM actions require allow-listed tools, least privilege, schema validation, idempotency, approval binding, and reconciliation testing.
-- AWS is the approved deployment direction; no production AWS environment or deployment workflow is currently implemented.
+- AWS is the approved deployment direction and deployment assets are present. Actual environment state must be established from deployment evidence; see the [backend deployment runbook](docs/deployment/EDIP_BACKEND_FIRST.md) for controls and recorded limitations. This documentation update performs no live verification.
 - Existing tests, CI, monitoring, Kubernetes, and Terraform assets vary in maturity and do not demonstrate integrated production operation. Kafka and Airflow remain gated future options; the legacy demo assets are not part of the active runtime.
 
 ## Authoritative documents
 
 - [EDIP V2 Flagship Architecture Plan](docs/architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md)
 - [AWS Canonical Cloud Migration Audit](docs/audits/EDIP_AWS_CANONICAL_CLOUD_MIGRATION_AUDIT.md)
-- [EDIP Research and Engineering Delivery Workflow](docs/governance/EDIP_RESEARCH_ENGINEERING_DELIVERY_WORKFLOW.md)
-- [Phase 0 Completion Review](docs/audits/PHASE_0_COMPLETION_REVIEW.md)
-- [Legacy Synthetic-Asset Cleanup Completion Review](docs/audits/LEGACY_SYNTHETIC_ASSET_CLEANUP_COMPLETION_REVIEW.md)
-- [Favorita Dataset Source and Governance](docs/phase-1/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md)
-- [Favorita Post-Download Verification](docs/phase-1/FAVORITA_POST_DOWNLOAD_VERIFICATION.md)
+- [EDIP Engineering Delivery Workflow](docs/governance/EDIP_RESEARCH_ENGINEERING_DELIVERY_WORKFLOW.md)
+- [Favorita Dataset Source and Governance](docs/governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md)
 - [All repository audits](docs/audits/)
 
 ## Contribution workflow
@@ -202,7 +205,7 @@ V2 work integrates through `dev`, using short-lived branches from `dev`. Reviewe
 
 ## Responsible AI use
 
-AI-assisted development may support drafting, review, tests, and documentation. Contributors remain responsible for technical correctness, security, evidence quality, licensing, and professional judgement.
+AI-assisted development may support drafting, review, tests, and documentation. Technical correctness, security, evidence quality, licensing, and professional judgement remain subject to human verification and acceptance under [AGENTS.md](AGENTS.md).
 
 ## License
 
@@ -210,4 +213,4 @@ EDIP is publicly available for portfolio, professional evaluation, educational r
 
 ## Project statement
 
-EDIP V2 is an approved architecture and a phased engineering/research programme. It is not a claim of production readiness, complete integration, or completed Phase 1 delivery.
+EDIP V2 is an approved architecture and a phased AI/ML engineering programme. It is not a claim of production readiness, complete integration, or completed Phase 1 delivery.

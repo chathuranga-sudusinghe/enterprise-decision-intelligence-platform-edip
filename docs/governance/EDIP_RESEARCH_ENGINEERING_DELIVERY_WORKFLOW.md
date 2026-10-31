@@ -1,4 +1,4 @@
-# EDIP Research and Engineering Delivery Workflow
+# EDIP Engineering Delivery Workflow
 
 | Field | Value |
 |---|---|
@@ -11,13 +11,13 @@
 
 ## 1. Purpose and scope
 
-This document defines how EDIP research questions, architecture decisions, engineering changes, releases, and outcomes move from evidence to a reviewed result. It operationalizes the architecture plan without converting target design into implementation evidence.
+This document defines how EDIP evaluation questions, architecture decisions, engineering changes, releases, and outcomes move from evidence to a reviewed result. It operationalizes the architecture plan without converting target design into implementation evidence.
 
 The workflow applies to APIs, data, feature engineering, forecasting, machine learning, RAG, LangGraph workflows, Human-in-the-Loop controls, MCP integrations, infrastructure, deployment, security, governance, and documentation that affects technical or research claims.
 
 Current verified repository and execution evidence has priority for current implementation truth. The architecture plan and approved ADRs define target decisions. Dated historical records describe only the revision and boundary they inspected.
 
-The current MSc study has one primary hypothesis-driven experiment: the Favorita forecasting comparison defined by the approved research design. RAG, LangGraph orchestration, Human-in-the-Loop controls, and enterprise integration remain applied EDIP system capabilities unless a separately approved research protocol introduces another research question. This positioning does not change the evidence hierarchy or governance workflow below.
+The Favorita forecasting comparison provides controlled evaluation evidence for the selected forecasting baseline. Its original hypotheses, methodology, and protected results remain preserved in the forecasting documents. RAG, LangGraph orchestration, HITL controls, and enterprise integrations remain target capabilities unless separately implemented and validated. Each capability requires an appropriate evaluation contract; architecture intent is not execution evidence.
 
 ## 2. Two-layer operating model
 
@@ -55,10 +55,6 @@ Finding/problem
 Issue creation is not automatic. An applicable existing issue may be reused.
 Implementation, Git mutations, experiment execution, and deployment have distinct
 approval boundaries under [AGENTS.md](../../AGENTS.md).
-
-Legacy Jira/SCRUM labels are historical provenance, not active execution authority.
-This clarification is transitional and may be removed after active planning
-references have been reconciled and verified. Historical evidence remains intact.
 
 A work item may cover part of one framework stage or evidence spanning several
 stages. A framework quality gate may require several issues.
@@ -189,7 +185,7 @@ Application release and infrastructure lifecycle are distinct. Terraform is used
 
 ## 10. Data, feature, and research integrity
 
-Favorita work follows the [dataset source and governance record](FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md), [research hypothesis and experiment design](../research/favorita/FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md), [temporal validation design](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md), and [temporal validation contract](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
+Favorita work follows the [dataset source and governance record](FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md), [forecasting experiment design](../forecasting/favorita/FAVORITA_FORECASTING_EXPERIMENT_DESIGN.md), [temporal validation design](../forecasting/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md), and [temporal validation contract](../forecasting/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
 
 Research records must preserve:
 
@@ -248,13 +244,20 @@ An ADR records status, date, approval record, linked work item, context, constra
 
 The detailed AWS topology, Terraform implementation, identity, networking, managed services, S3 model delivery, and GitHub Actions CD workflow require a dedicated ADR before implementation.
 
-## 15. Academic and professional evidence
+## 15. Engineering evidence and evaluation quality
 
-MSc evidence requires a defensible research question, context/literature, justified method, governed data, comparative baselines, reproducibility, evaluation, ethics/licensing, limitations, negative results, and critical discussion. Repository activity alone is not academic contribution.
+A defensible evaluation requires a clear question, justified methodology, governed
+data, fair comparative baselines, reproducibility, predeclared metrics, relevant
+ethics/licensing review, limitations, negative results, and critical interpretation.
+Repository activity alone does not establish model quality or decision value.
 
-Professional evidence connects decisions and outcomes to responsibility, complexity, stakeholders, risk, quality, security, ethics, learning, and influence. AI output, commit volume, or document volume does not establish competence or an SFIA level.
+Engineering evidence connects decisions and outcomes to operational risk, quality,
+security, maintainability, and measurable behavior. AI output, commit volume, or
+document volume does not establish correctness or readiness.
 
-A future PhD pathway requires a precise gap, reproducible method, credible comparators, repeated evaluation, threats to validity, ethical approval where required, and supervisor/peer challenge. Architecture ambition or LLM use does not establish novelty.
+Exploratory work must identify its scope, comparators, repeatability, threats to
+validity, and approval boundaries. Architectural ambition or LLM use does not
+establish novelty, reliability, or deployment readiness.
 
 ## 16. Supersession and review
 
