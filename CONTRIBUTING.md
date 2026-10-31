@@ -11,17 +11,26 @@ Good contributions include:
 - Small, focused bug fixes
 - Examples that clarify supported workflows
 - Setup and troubleshooting improvements
-- Feature improvements that have been clearly discussed with the maintainers
+- Feature improvements with an approved scope
 
-## Maintainer-Led Roadmap
+## Issue-First Workflow
 
-EDIP follows a maintainer-led roadmap to keep the architecture and project direction coherent. Before starting major features, broad refactors, architectural changes, or work that affects several parts of the system, open an issue or comment on an existing issue and wait for maintainer agreement.
+The roadmap is governed through approved GitHub Issues. Before material implementation,
+identify an applicable issue or prepare a proposed issue with the problem, evidence,
+scope, exclusions, acceptance criteria, and validation. Proposed issue content must
+be reviewed and explicitly approved before creation. Implementation requires separate
+approval; issue creation alone is insufficient.
 
-Unsolicited large changes may be declined even when the implementation is technically sound.
+Read-only inspection, discussion, and drafts do not require an issue. Contributions
+outside approved scope may be declined even when technically sound.
+
+[AGENTS.md](AGENTS.md) defines coding-agent permissions, AI-assistance standards,
+protected evidence, and independent-review requirements. Suggested workflow steps
+are not permission for automated Git or GitHub operations.
 
 ## Contribution Guidelines
 
-- Open or comment on an issue before beginning major work.
+- Identify an applicable approved issue before material implementation.
 - Keep pull requests small, focused, and easy to review.
 - Do not add large or new runtime dependencies without prior approval.
 - Do not commit datasets, secrets, credentials, model artifacts, or large generated files.
@@ -32,11 +41,11 @@ Unsolicited large changes may be declined even when the implementation is techni
 ## Fork, Branch, and Pull Request Workflow
 
 1. Fork the repository and clone your fork.
-2. Create a focused branch from the current development base, using a descriptive name such as `docs/improve-setup-guide` or `fix/forecast-validation`.
+2. After scope approval, create a focused branch from `dev`, such as `docs/issue-130-edip-agent-governance`. Reuse an appropriate existing branch.
 3. Make the smallest change needed to address the issue.
 4. Run the relevant tests, checks, or documentation validation.
 5. Commit with a clear, concise message.
-6. Push the branch to your fork and open a pull request.
+6. Push the branch to your fork and open a pull request targeting `dev`. Each Git operation requires explicit authorization when performed by an AI coding agent.
 7. Complete the pull request template and link the related issue.
 
 ## Good First Contributions
@@ -54,6 +63,6 @@ Look for issues labeled `good first issue` for tasks with a defined scope.
 
 ## Pull Request Review
 
-Maintainers review contributions for correctness, scope, clarity, tests, security, maintainability, and alignment with the project roadmap. Review may include requests for changes, a narrower scope, or additional validation.
+Contributions are reviewed for correctness, scope, clarity, tests, security, maintainability, and alignment with the project roadmap. Review may include requests for changes, a narrower scope, or additional validation.
 
-Approval is not guaranteed, and maintainers may close pull requests that are out of scope, duplicate planned work, introduce unnecessary complexity, or do not follow these guidelines. Please keep discussion professional and allow maintainers reasonable time to review.
+Approval is not guaranteed. Pull requests may be closed when scope is exceeded, planned work is duplicated, unnecessary complexity is introduced, or these guidelines are not followed. Professional discussion and reasonable review time are expected.
