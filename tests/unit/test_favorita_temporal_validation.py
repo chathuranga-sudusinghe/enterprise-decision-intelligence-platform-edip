@@ -104,6 +104,7 @@ def test_exact_modeling_target_scope() -> None:
     assert MODELING_TARGET_END == date(2017, 7, 30)
     assert APPROVED_FOLDS[-1].validation_end == MODELING_TARGET_END
 
+
 def test_training_target_on_origin_is_eligible() -> None:
     origin = APPROVED_FOLDS[0].forecast_origin
     assert is_training_target_eligible(origin, origin)

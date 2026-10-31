@@ -384,9 +384,7 @@ def run_tuning(
         "metric_names": list(METRIC_NAMES),
         "trials": trial_records,
         "best_optuna_trial_by_shared_mae": best_record,
-        "best_optuna_parameter_configuration_by_shared_mae": best_record[
-            "parameters"
-        ],
+        "best_optuna_parameter_configuration_by_shared_mae": best_record["parameters"],
         "holdout_touched": False,
     }
     paths = _artifact_paths(config.output_dir)

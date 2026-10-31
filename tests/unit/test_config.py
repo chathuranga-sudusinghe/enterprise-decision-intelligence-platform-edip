@@ -20,7 +20,9 @@ def _clear_settings_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-def test_environment_values_override_local_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_environment_values_override_local_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("APP_NAME", "Deployed EDIP")
     monkeypatch.setenv("API_PORT", "9000")
 

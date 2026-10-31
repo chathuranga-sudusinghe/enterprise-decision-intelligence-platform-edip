@@ -21,9 +21,7 @@ def _config(
     return integration.integration_config_for_profile(
         profile,
         source_path=source_path,
-        output_dir=(
-            tmp_path / "artifacts" / "integration" / f"{profile}_bounded"
-        ),
+        output_dir=(tmp_path / "artifacts" / "integration" / f"{profile}_bounded"),
     )
 
 

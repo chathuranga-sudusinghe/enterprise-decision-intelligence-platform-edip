@@ -143,9 +143,7 @@ def test_finalizer_writes_only_missing_manifest(
     assert manifest["configured_stores"] == list(range(1, 55))
     assert manifest["processed_stores"] == list(range(1, 55))
     assert manifest["observed_stores"] == [1]
-    assert manifest["processed_store_evidence"] == (
-        finalizer.PROCESSED_STORE_EVIDENCE
-    )
+    assert manifest["processed_store_evidence"] == (finalizer.PROCESSED_STORE_EVIDENCE)
     assert manifest["training_origin_count"] == len(
         builder.canonical_training_origins(APPROVED_FOLDS[0])
     )

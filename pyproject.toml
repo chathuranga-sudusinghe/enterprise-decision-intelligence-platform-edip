@@ -31,6 +31,12 @@ dev = [
     "pytest-cov==7.0.0",
     "ruff==0.16.5",
     "mypy==1.19.1",
+    "pandas-stubs==3.0.0.260204",
+    "boto3-stubs[s3]==1.40.18",
+    "botocore-stubs==1.40.76",
+    "mypy-boto3-s3==1.40.61",
+    "types-s3transfer==0.13.1",
+    "types-awscrt==0.37.0",
 ]
 
 [tool.setuptools]
@@ -57,9 +63,18 @@ ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
-files = ["app", "pipelines"]
+files = ["app", "pipelines", "tests"]
 namespace_packages = true
 explicit_package_bases = true
+# Generated copies and retained evidence are not maintained Python source.
+exclude = '(^|/)(build|dist|artifacts|data|notebooks|tmp|ui|\.venv|venv)(/|$)'
+
+# PyArrow 25 has no bundled typing marker; available community stubs target 20.
+# Keep only this external boundary dynamic rather than use incompatible stubs.
+# Application, pipeline, and test diagnostics remain enabled.
+[[tool.mypy.overrides]]
+module = ["pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

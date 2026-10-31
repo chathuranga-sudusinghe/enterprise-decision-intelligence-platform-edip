@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import MutableMapping, Sequence
 from datetime import date, timedelta
 from math import nan
+from typing import cast
 
 import pytest
 
@@ -128,8 +129,7 @@ def test_fold_training_rows_enforce_label_eligibility() -> None:
     datasets = build_approved_fold_datasets(_canonical_examples())
 
     assert all(
-        min(row.forecast_date for row in dataset.training_rows)
-        == MODELING_TARGET_START
+        min(row.forecast_date for row in dataset.training_rows) == MODELING_TARGET_START
         for dataset in datasets
     )
     assert all(
@@ -358,4 +358,4 @@ def test_input_sequence_and_feature_mapping_are_not_mutated() -> None:
     assert tuple(examples) == original_order
     assert feature_values == {"constant": 1.0}
     with pytest.raises(TypeError):
-        first.features["constant"] = 2.0
+        cast(MutableMapping[str, object], first.features)["constant"] = 2.0

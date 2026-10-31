@@ -54,8 +54,12 @@ class Settings:
     """Application settings loaded from authoritative environment variables."""
 
     app_name: str = field(default_factory=lambda: _get_env_str("APP_NAME", "EDIP API"))
-    app_version: str = field(default_factory=lambda: _get_env_str("APP_VERSION", "1.0.0"))
-    app_env: str = field(default_factory=lambda: _get_env_str("APP_ENV", "development").lower())
+    app_version: str = field(
+        default_factory=lambda: _get_env_str("APP_VERSION", "1.0.0")
+    )
+    app_env: str = field(
+        default_factory=lambda: _get_env_str("APP_ENV", "development").lower()
+    )
     api_host: str = field(default_factory=lambda: _get_env_str("API_HOST", "127.0.0.1"))
     api_port: int = field(default_factory=lambda: _get_env_int("API_PORT", 8000))
     favorita_model_bundle_path: Path = field(
@@ -78,7 +82,9 @@ class Settings:
 
     def __post_init__(self) -> None:
         if self.app_env not in {*_LOCAL_ENVIRONMENTS, "test", "staging", "production"}:
-            raise ValueError("APP_ENV must be development, dev, local, test, staging, or production")
+            raise ValueError(
+                "APP_ENV must be development, dev, local, test, staging, or production"
+            )
         if not 1 <= self.api_port <= 65535:
             raise ValueError("API_PORT must be between 1 and 65535")
         if not self.api_host:

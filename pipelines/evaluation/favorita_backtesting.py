@@ -464,24 +464,16 @@ def aggregate_fold_backtest_results(
                 f"Fold result {result.fold_id} does not match canonical dates"
             )
 
-    predictions = tuple(
-        row for result in results for row in result.predictions
-    )
+    predictions = tuple(row for result in results for row in result.predictions)
     if not predictions:
         raise ValueError("Completed fold results contain no prediction evidence")
     horizon_results = tuple(
         HorizonBacktestResult(
             forecast_horizon=horizon,
             metrics=_metric_results(
-                tuple(
-                    row
-                    for row in predictions
-                    if row.forecast_horizon == horizon
-                )
+                tuple(row for row in predictions if row.forecast_horizon == horizon)
             ),
-            row_count=sum(
-                row.forecast_horizon == horizon for row in predictions
-            ),
+            row_count=sum(row.forecast_horizon == horizon for row in predictions),
         )
         for horizon in FORECAST_HORIZONS
     )

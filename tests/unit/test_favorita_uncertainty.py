@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -143,7 +145,9 @@ def test_invalid_prediction_evidence(mutation: str, match: str) -> None:
     elif mutation == "origin":
         frame.loc[0, "forecast_origin"] = pd.Timestamp("2017-02-27")
     elif mutation == "date":
-        frame.loc[0, "forecast_date"] += pd.Timedelta(days=17)
+        frame.loc[0, "forecast_date"] = cast(
+            pd.Timestamp, frame.loc[0, "forecast_date"]
+        ) + pd.Timedelta(days=17)
     elif mutation == "missing_fold":
         frame = frame.loc[frame.fold_id != 1]
     elif mutation == "missing_horizon":

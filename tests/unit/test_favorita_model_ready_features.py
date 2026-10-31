@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pyarrow.parquet as pq
@@ -104,7 +105,7 @@ def test_sixteen_day_row_generation_is_deterministic() -> None:
     assert set(first["forecast_horizon"]) == set(FORECAST_HORIZONS)
     group_horizons = first.groupby(
         ["forecast_origin", "store_nbr", "item_nbr"], observed=True
-    )["forecast_horizon"].agg(lambda values: tuple(sorted(values)))
+    )["forecast_horizon"].apply(lambda values: tuple(sorted(values)))
     assert (group_horizons == tuple(FORECAST_HORIZONS)).all()
     assert not first.duplicated(
         ["forecast_origin", "forecast_date", "store_nbr", "item_nbr"]
@@ -147,7 +148,7 @@ def test_store_major_materialization_matches_origin_major_reference(
     active_path = "reference"
     original_reader = model_ready._read_filtered_source_slice
 
-    def counting_reader(*args: object, **kwargs: object) -> pd.DataFrame:
+    def counting_reader(*args: Any, **kwargs: Any) -> pd.DataFrame:
         read_counts[active_path] += 1
         return original_reader(*args, **kwargs)
 

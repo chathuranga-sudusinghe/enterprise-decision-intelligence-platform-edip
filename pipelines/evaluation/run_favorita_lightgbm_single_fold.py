@@ -209,9 +209,7 @@ def _validate_manifest(
     for key in ("store_count", "observed_store_count"):
         value = manifest.get(key)
         if isinstance(value, bool) or not isinstance(value, int):
-            raise ValueError(
-                f"Fold {fold.fold_id} manifest {key} must be an integer"
-            )
+            raise ValueError(f"Fold {fold.fold_id} manifest {key} must be an integer")
     expected: tuple[tuple[str, object], ...] = (
         ("fold_id", fold.fold_id),
         ("canonical_fold_id", fold.fold_id),
@@ -247,9 +245,10 @@ def _validate_manifest(
         if manifest.get(key) != value:
             raise ValueError(f"Fold {fold.fold_id} manifest {key} must equal {value!r}")
     for partition in ("training", "validation"):
-        if manifest.get(
-            f"{partition}_row_key_target_digest_version"
-        ) != ROW_KEY_TARGET_DIGEST_VERSION:
+        if (
+            manifest.get(f"{partition}_row_key_target_digest_version")
+            != ROW_KEY_TARGET_DIGEST_VERSION
+        ):
             raise ValueError(
                 f"Fold {fold.fold_id} manifest {partition} digest version is invalid"
             )
@@ -392,13 +391,17 @@ def validate_existing_fold(
     validate_evaluation_fold_output_dir(config.fold_output_dir)
     validate_evaluation_result_output_dir(config.output_dir)
     profile = resolve_feature_profile(config.feature_contract)
-    if config.fold_output_dir in tuple(
-        item.canonical_artifact_root
-        for item in (
-            resolve_feature_profile("contextual"),
-            resolve_feature_profile("time-aware"),
+    if (
+        config.fold_output_dir
+        in tuple(
+            item.canonical_artifact_root
+            for item in (
+                resolve_feature_profile("contextual"),
+                resolve_feature_profile("time-aware"),
+            )
         )
-    ) and config.fold_output_dir != profile.canonical_artifact_root:
+        and config.fold_output_dir != profile.canonical_artifact_root
+    ):
         raise ValueError("Feature contract and canonical fold artifact root differ")
     fold = _resolve_fold(config.fold_id)
     paths = _fold_artifact_paths(fold.fold_id, config.fold_output_dir)
@@ -505,9 +508,7 @@ def _load_existing_results(path: Path, *, feature_contract: str) -> dict[str, An
         for field in ("training_rows", "validation_rows"):
             value = record.get(field)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-                raise ValueError(
-                    f"Existing fold {key} result {field} must be positive"
-                )
+                raise ValueError(f"Existing fold {key} result {field} must be positive")
         runtime_seconds = record.get("runtime_seconds")
         if (
             isinstance(runtime_seconds, bool)

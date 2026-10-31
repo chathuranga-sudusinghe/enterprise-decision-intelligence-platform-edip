@@ -19,7 +19,12 @@ def stage_bundle(client: Any, env: dict[str, str]) -> Path:
     root = Path(env["EDIP_FAVORITA_MODEL_BUNDLE_PATH"])
     objects = (
         ("model.txt", "EDIP_MODEL_VERSION_ID", "EDIP_MODEL_SHA256", 64 * 1024 * 1024),
-        ("metadata.json", "EDIP_METADATA_VERSION_ID", "EDIP_METADATA_SHA256", 2 * 1024 * 1024),
+        (
+            "metadata.json",
+            "EDIP_METADATA_VERSION_ID",
+            "EDIP_METADATA_SHA256",
+            2 * 1024 * 1024,
+        ),
     )
     for _, version, checksum, _ in objects:
         if not env[version] or env[version] == "null":
@@ -68,7 +73,9 @@ def main() -> None:
     try:
         client = boto3.client(
             "s3",
-            config=Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}),
+            config=Config(
+                connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}
+            ),
         )
         stage_bundle(client, dict(os.environ))
     except Exception:

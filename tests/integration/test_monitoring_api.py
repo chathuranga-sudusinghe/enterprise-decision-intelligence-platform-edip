@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from starlette.routing import Route
 
 from app.main import app
 
@@ -21,7 +22,11 @@ def test_app_main_imports_successfully() -> None:
 
 
 def test_exactly_one_metrics_route_is_registered() -> None:
-    metrics_routes = [route for route in app.routes if route.path == "/metrics"]
+    metrics_routes = [
+        route
+        for route in app.routes
+        if isinstance(route, Route) and route.path == "/metrics"
+    ]
 
     assert len(metrics_routes) == 1
 

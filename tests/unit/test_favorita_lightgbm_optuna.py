@@ -24,12 +24,16 @@ def test_fixed_trial_search_and_temporal_contracts() -> None:
 
     assert TRIAL_BUDGET == 6
     assert OPTUNA_SEED == 42
-    assert tuple(SEARCH_SPACE) == TUNABLE_PARAMETER_NAMES == (
-        "learning_rate",
-        "num_leaves",
-        "min_data_in_leaf",
-        "feature_fraction",
-        "num_boost_round",
+    assert (
+        tuple(SEARCH_SPACE)
+        == TUNABLE_PARAMETER_NAMES
+        == (
+            "learning_rate",
+            "num_leaves",
+            "min_data_in_leaf",
+            "feature_fraction",
+            "num_boost_round",
+        )
     )
     assert FORECAST_HORIZONS == tuple(range(1, 17))
     assert len(APPROVED_FOLDS) == 4
@@ -87,4 +91,3 @@ def test_compute_mode_is_resolved_once_and_shared_for_gpu_or_cpu() -> None:
     assert gpu.model_parameters == {"device_type": "gpu"}
     assert cpu.mode == "cpu"
     assert cpu.model_parameters == {"device_type": "cpu"}
-

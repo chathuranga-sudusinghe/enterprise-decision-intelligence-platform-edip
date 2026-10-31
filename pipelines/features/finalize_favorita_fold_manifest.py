@@ -35,9 +35,7 @@ from pipelines.features.favorita_model_ready import (
     write_json_atomic,
 )
 
-PROCESSED_STORE_EVIDENCE = (
-    "operator_confirmed_redesigned_canonical_materialization"
-)
+PROCESSED_STORE_EVIDENCE = "operator_confirmed_redesigned_canonical_materialization"
 
 
 def _normalise_date(value: Any, *, column: str) -> date:
@@ -106,8 +104,7 @@ def finalize_existing_fold_manifest(
         raise FileNotFoundError(source_path)
 
     paths_by_id = {
-        paths.fold_id: paths
-        for paths in approved_fold_artifact_paths(output_dir)
+        paths.fold_id: paths for paths in approved_fold_artifact_paths(output_dir)
     }
     paths = paths_by_id[fold.fold_id]
     if paths.manifest.exists():
@@ -155,9 +152,7 @@ def finalize_existing_fold_manifest(
         )
 
     progress("validating validation origin, dates, and horizons...")
-    if _unique_dates(paths.validation, "forecast_origin") != {
-        fold.forecast_origin
-    }:
+    if _unique_dates(paths.validation, "forecast_origin") != {fold.forecast_origin}:
         raise AssertionError("Validation forecast origins are not canonical")
     expected_validation_dates = {
         fold.validation_start + timedelta(days=offset)
@@ -165,9 +160,7 @@ def finalize_existing_fold_manifest(
     }
     if _unique_dates(paths.validation, "forecast_date") != expected_validation_dates:
         raise AssertionError("Validation dates are not the complete O+1 through O+16")
-    if _unique_integers(paths.validation, "forecast_horizon") != set(
-        FORECAST_HORIZONS
-    ):
+    if _unique_integers(paths.validation, "forecast_horizon") != set(FORECAST_HORIZONS):
         raise AssertionError("Validation horizons are not exactly 1 through 16")
 
     progress("validating observed store and item evidence...")
@@ -182,10 +175,10 @@ def finalize_existing_fold_manifest(
     if not observed_stores.issubset(set(ALL_FAVORITA_STORES)):
         raise AssertionError("Fold artifacts contain a store outside 1 through 54")
 
-    if {
-        path: _source_state(path) for path in immutable_paths
-    } != state_before:
-        raise AssertionError("Source or existing Parquet artifacts changed during validation")
+    if {path: _source_state(path) for path in immutable_paths} != state_before:
+        raise AssertionError(
+            "Source or existing Parquet artifacts changed during validation"
+        )
 
     config = FoldDatasetBuildConfig(
         feature_profile=feature_profile,

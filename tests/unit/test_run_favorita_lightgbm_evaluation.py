@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any, Protocol, cast
 
 import numpy as np
 import pandas as pd
@@ -90,8 +92,10 @@ def test_default_namespaces_belong_to_the_2017_redesign() -> None:
     assert runner.CONTEXTUAL_OUTPUT_DIR == Path(
         "artifacts/evaluation/favorita_2017_four_fold_lightgbm_contextual"
     )
-    assert runner.DEFAULT_OUTPUT_DIR == runner.TIME_AWARE_OUTPUT_DIR == Path(
-        "artifacts/evaluation/favorita_2017_four_fold_lightgbm_time_aware"
+    assert (
+        runner.DEFAULT_OUTPUT_DIR
+        == runner.TIME_AWARE_OUTPUT_DIR
+        == Path("artifacts/evaluation/favorita_2017_four_fold_lightgbm_time_aware")
     )
 
 
@@ -203,7 +207,7 @@ def test_load_backtest_examples_combines_parquet_batches(tmp_path: Path) -> None
             int(row.store_nbr),
             int(row.item_nbr),
         )
-        for row in frame.itertuples(index=False)
+        for row in cast(Iterable[Any], frame.itertuples(index=False))
     )
 
 
@@ -308,9 +312,7 @@ def test_default_validation_batch_still_rejects_final_holdout(
         "_validate_direct_horizon_batch",
         lambda *args, **kwargs: None,
     )
-    frame = pd.DataFrame(
-        {"forecast_date": pd.to_datetime(["2017-07-31"])}
-    )
+    frame = pd.DataFrame({"forecast_date": pd.to_datetime(["2017-07-31"])})
 
     with pytest.raises(ValueError, match="Final holdout rows must not be evaluated"):
         runner._validate_validation_batch(
@@ -326,15 +328,22 @@ def test_multi_fold_runner_has_no_fold_builder_runtime_dependency() -> None:
     assert not hasattr(runner, "ALL_STORE_BATCHES")
 
 
+class _RecordedAdapter(Protocol):
+    predict_calls: int
+
+    @property
+    def model_parameters(self) -> Mapping[str, object]: ...
+
+
 def _install_serial_fakes(
     monkeypatch: pytest.MonkeyPatch,
     config: runner.FavoritaEvaluationRunConfig,
     *,
     fail_fold: int | None = None,
     fail_batch: tuple[int, int] | None = None,
-) -> tuple[list[tuple[str, int]], list[object]]:
+) -> tuple[list[tuple[str, int]], list[_RecordedAdapter]]:
     events: list[tuple[str, int]] = []
-    models: list[object] = []
+    models: list[_RecordedAdapter] = []
     evaluation_paths = runner._artifact_paths(config.output_dir)
     source, fixture_origin = _fixture_source_frame()
     base_frame = build_feature_rows_for_origin(
@@ -343,9 +352,7 @@ def _install_serial_fakes(
         allow_assumed_future_promotion=True,
         allow_assumed_future_holidays=True,
     )
-    base_frame = base_frame.loc[base_frame["item_nbr"] == 100].reset_index(
-        drop=True
-    )
+    base_frame = base_frame.loc[base_frame["item_nbr"] == 100].reset_index(drop=True)
     for fold, paths in zip(
         APPROVED_FOLDS,
         runner.approved_fold_artifact_paths(config.fold_output_dir),
@@ -399,9 +406,7 @@ def _install_serial_fakes(
                 ).model_feature_columns
             ),
             "ordered_schema": list(
-                runner.resolve_feature_profile(
-                    config.feature_contract
-                ).output_columns
+                runner.resolve_feature_profile(config.feature_contract).output_columns
             ),
             "final_holdout_excluded": True,
             "future_actual_leakage": False,
@@ -577,7 +582,9 @@ def test_runner_processes_four_fold_artifacts_serially(
         for artifact in runner.approved_fold_artifact_paths(config.fold_output_dir)
         for path in (artifact.training, artifact.validation, artifact.manifest)
     )
-    fold_state_before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in fold_files}
+    fold_state_before = {
+        path: (path.read_bytes(), path.stat().st_mtime_ns) for path in fold_files
+    }
 
     paths = runner.run_evaluation(config)
 
@@ -652,7 +659,7 @@ def test_runner_processes_four_fold_artifacts_serially(
     assert tuple(sorted(predictions["forecast_horizon"].unique())) == (
         FORECAST_HORIZONS
     )
-    for row in predictions.itertuples(index=False):
+    for row in cast(Iterable[Any], predictions.itertuples(index=False)):
         fold = APPROVED_FOLDS[row.fold_id - 1]
         assert pd.Timestamp(row.forecast_origin).date() == fold.forecast_origin
         assert pd.Timestamp(row.forecast_date).date() == (
@@ -682,11 +689,17 @@ def test_runner_processes_four_fold_artifacts_serially(
     )
     assert [record["row_count"] for record in horizon_metrics] == [4] * 16
     assert set(fold_metrics[0]) == {
-        "fold_id", "forecast_origin", "validation_start", "validation_end",
-        "validation_rows", *runner._METRIC_NAMES,
+        "fold_id",
+        "forecast_origin",
+        "validation_start",
+        "validation_end",
+        "validation_rows",
+        *runner._METRIC_NAMES,
     }
     assert set(horizon_metrics[0]) == {
-        "forecast_horizon", "row_count", *runner._METRIC_NAMES,
+        "forecast_horizon",
+        "row_count",
+        *runner._METRIC_NAMES,
     }
     assert not (config.output_dir / "fold_metrics.csv").exists()
     assert not (config.output_dir / "horizon_metrics.csv").exists()
@@ -694,13 +707,15 @@ def test_runner_processes_four_fold_artifacts_serially(
     assert "# Favorita LightGBM Evaluation Summary" in summary
     assert "four-fold expanding-window evaluation" in summary
     assert "protected final holdout was not materialized or scored" in summary
-    for fold_id, group in predictions.groupby("fold_id", sort=True):
+    for grouped_fold_id, group in predictions.groupby("fold_id", sort=True):
         expected_fold = evaluate_favorita_forecasts(
             group["actual_unit_sales"],
             group["prediction"],
             group["perishable"],
         )
-        record = next(item for item in fold_metrics if item["fold_id"] == fold_id)
+        record = next(
+            item for item in fold_metrics if item["fold_id"] == grouped_fold_id
+        )
         for metric_name in runner._METRIC_NAMES:
             assert record[metric_name] == pytest.approx(
                 getattr(expected_fold, metric_name),
@@ -714,8 +729,7 @@ def test_runner_processes_four_fold_artifacts_serially(
             group["perishable"],
         )
         record = next(
-            item for item in horizon_metrics
-            if item["forecast_horizon"] == horizon
+            item for item in horizon_metrics if item["forecast_horizon"] == horizon
         )
         for metric_name in runner._METRIC_NAMES:
             assert record[metric_name] == pytest.approx(
@@ -755,9 +769,9 @@ def test_unverified_cross_arm_evidence_fails_before_model_construction(
 ) -> None:
     config = _config(tmp_path)
     _, models = _install_serial_fakes(monkeypatch, config)
-    first_manifest = runner.approved_fold_artifact_paths(
-        config.fold_output_dir
-    )[0].manifest
+    first_manifest = runner.approved_fold_artifact_paths(config.fold_output_dir)[
+        0
+    ].manifest
     payload = json.loads(first_manifest.read_text(encoding="utf-8"))
     payload["cross_arm_row_equivalence"]["status"] = status
     first_manifest.write_text(json.dumps(payload), encoding="utf-8")
@@ -877,9 +891,7 @@ def test_manifest_configuration_matches_unsampled_contract(
         paths=paths,
         fold_artifact_evidence={
             "creation_status": "not_run",
-            "folds": [
-                {"training_row_count": 32} for _ in APPROVED_FOLDS
-            ],
+            "folds": [{"training_row_count": 32} for _ in APPROVED_FOLDS],
         },
         result=_streaming_summary(),
         started_at=timestamp,
@@ -940,9 +952,7 @@ def test_manifest_reports_effective_custom_model_configuration(tmp_path: Path) -
         paths=runner._artifact_paths(tuned.output_dir),
         fold_artifact_evidence={
             "creation_status": "not_run",
-            "folds": [
-                {"training_row_count": 32} for _ in APPROVED_FOLDS
-            ],
+            "folds": [{"training_row_count": 32} for _ in APPROVED_FOLDS],
         },
         result=_streaming_summary(),
         started_at=timestamp,

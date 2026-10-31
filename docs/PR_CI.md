@@ -1,5 +1,13 @@
 # EDIP pull-request CI orchestration
 
+> **Issue #141 follow-up:** The formatter/type-error counts below describe the
+> earlier implementation snapshot. The local Python quality baseline has since
+> been cleaned up, with tests included in the configured MyPy scope and generated
+> build/artifact paths excluded. Approved pandas/AWS typing stubs are development-only;
+> PyArrow remains a documented untyped external boundary. Current definitions are
+> maintained in [pyproject.toml](../pyproject.toml). CI gate behavior is unchanged:
+> MyPy remains advisory, and formatting is not a required CI check.
+
 `pr-gate.yml` is the only PR-triggered CI workflow. It targets `dev` and `main` and calls the three focused specialist workflows through `workflow_call`. The stable required check is **EDIP PR Quality Gate**.
 
 ## Files changed
