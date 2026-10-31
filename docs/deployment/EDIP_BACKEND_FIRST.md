@@ -2,7 +2,7 @@
 
 ## Current implementation status
 
-This is HTTPS research/demo hosting, not public forecasting. See
+This is HTTPS demonstration hosting, not public forecasting. See
 [the ADR](../architecture/ADR_EDIP_MINIMUM_AWS_HOSTING.md). HTTP redirects to
 `https://edip.vora-technologies.com`. The HTTPS listener forwards GET/HEAD for
 /health, /ready, /docs and /openapi.json; everything else returns 403. Swagger
@@ -79,7 +79,7 @@ export TF_VAR_hosting_enabled=true
 
 The publication commands deliberately refuse overwriting existing keys. If keys
 already exist, verify the existing object versions/hashes or choose a new reviewed
-prefix. Do not upload the small local-api-test bundles as the research model.
+prefix. Do not upload the small local-api-test bundles as the selected forecasting bundle.
 
 ## Review and apply the hosting plan
 
@@ -173,11 +173,11 @@ The production dashboard collects standard AWS metrics for ECS CPU and memory,
 ALB request count and target response time, load-balancer and target HTTP 5xx
 errors, and healthy/unhealthy target counts. Three alarms identify an unhealthy
 target for two consecutive minutes, or average ECS CPU or memory at or above 80%
-for 15 minutes. Missing data is non-breaching because the research task may be
+for 15 minutes. Missing data is non-breaching because the backend task may be
 deliberately stopped. The alarms have no SNS or email actions in this phase.
 
 CloudWatch provides short-term operational evidence about service health,
 resource pressure, traffic, latency and failures. Container logs remain in the
 existing seven-day log group. This telemetry is not the authoritative EDIP
-decision audit trail: research inputs, model identity, outputs and decision
-provenance must remain in the governed EDIP research records.
+decision audit trail: evaluation inputs, model identity, outputs and decision
+provenance must remain in the governed EDIP evaluation records.

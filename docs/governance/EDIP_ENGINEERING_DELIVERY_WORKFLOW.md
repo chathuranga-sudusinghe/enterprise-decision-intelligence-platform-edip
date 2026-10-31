@@ -13,7 +13,7 @@
 
 This document defines how EDIP evaluation questions, architecture decisions, engineering changes, releases, and outcomes move from evidence to a reviewed result. It operationalizes the architecture plan without converting target design into implementation evidence.
 
-The workflow applies to APIs, data, feature engineering, forecasting, machine learning, RAG, LangGraph workflows, Human-in-the-Loop controls, MCP integrations, infrastructure, deployment, security, governance, and documentation that affects technical or research claims.
+The workflow applies to APIs, data, feature engineering, forecasting, machine learning, RAG, LangGraph workflows, Human-in-the-Loop controls, MCP integrations, infrastructure, deployment, security, governance, and documentation that affects technical or evaluation claims.
 
 Current verified repository and execution evidence has priority for current implementation truth. The architecture plan and approved ADRs define target decisions. Dated historical records describe only the revision and boundary they inspected.
 
@@ -64,11 +64,11 @@ stages. A framework quality gate may require several issues.
 | Record | Purpose | Authority |
 |---|---|---|
 | Architecture plan | Approved target, boundaries, principles, and non-goals | Design authority unless formally superseded |
-| Governance record | Repeatable evidence, decision, accountability, and release controls | Must conform to architecture and legal/research duties |
+| Governance record | Repeatable evidence, decision, accountability, and release controls | Must conform to architecture and applicable legal/evaluation duties |
 | GitHub issue | Approved scope, acceptance criteria, exclusions, and dependencies | Execution record; separate authorization is required for implementation and consequential operations |
 | ADR | Architecture-significant decision, alternatives, consequences, and rollback | Required for material or difficult-to-reverse decisions |
 | Dataset/corpus governance record | Source, licence, access, provenance, lineage, retention, and restrictions | Data-use authority for the named asset |
-| Research design | Hypothesis, methodology, baseline, split, metrics, limitations, and approval | Evaluation authority for the named study |
+| Evaluation design | Hypothesis, methodology, baseline, split, metrics, limitations, and approval | Evaluation authority for the named study |
 | Implementation record | Files and behavior changed, migration, and rollback | Proves what changed, not that it is correct or deployed |
 | Validation record | Commands, environment, inputs, outputs, failures, and evidence limits | Proves only the executed boundary |
 | Release/deployment record | Approved immutable release and environment outcome | Proves the named deployment, not sustained operation |
@@ -78,7 +78,7 @@ Records should link instead of duplicating large bodies. Historical records may 
 
 ## 4. Approval and accountability
 
-Project direction, architecture, risk acceptance, research integrity, implementation
+Project direction, architecture, risk acceptance, evaluation integrity, implementation
 acceptance, and publication remain subject to human review. AI output is advisory
 and must not be treated as approval or as validation of unobserved facts.
 
@@ -105,14 +105,14 @@ finding -> risk -> decision -> implementation -> validation -> outcome -> reflec
 - **Decision:** What was approved, rejected, or deferred, and what evidence records that decision?
 - **Implementation:** What changed and what remained protected?
 - **Validation:** Which checks ran, with which environment and evidence boundary?
-- **Outcome:** Did the change produce the intended technical or research result?
+- **Outcome:** Did the change produce the intended technical or evaluation result?
 - **Reflection:** What was learned and what changes next?
 
 A missing link is stated explicitly; it is never inferred or fabricated.
 
 ## 6. Work-item workflow
 
-1. Inspect current evidence and applicable architecture, governance, research, and data contracts.
+1. Inspect current evidence and applicable architecture, governance, evaluation, and data contracts.
 2. Define the problem, decision value, scope, non-goals, protected assets, and risk.
 3. Compare alternatives, including a simple or non-AI baseline where appropriate.
 4. Present proposed GitHub issue content and obtain explicit approval before creation; reuse an applicable existing issue where appropriate.
@@ -175,19 +175,19 @@ Application release and infrastructure lifecycle are distinct. Terraform is used
 |---|---|
 | API/schema | Versioned contract, identity/authorization impact, stable errors, compatibility, migration/rollback, unit/integration/security tests |
 | Data/features | Source/version/provenance, grain/schema, lineage, leakage/temporal controls, preservation rules, quality assertions, manifest |
-| Forecasting/ML | Research question, governed data, chronological split, baseline, predeclared metrics, reproducibility, uncertainty/error analysis, artifact lineage |
+| Forecasting/ML | Evaluation question, governed data, chronological split, baseline, predeclared metrics, reproducibility, uncertainty/error analysis, artifact lineage |
 | RAG/corpus | Approved source registry/licences, corpus and chunk manifests, ACL model, compatibility, retrieval baseline, grounding/citation/abstention/injection tests |
 | LangGraph/workflow | State and transition contract, tool allowlist, identity, deterministic safety, HITL, idempotency, failure/resume/reconciliation tests |
 | MCP/integration | Versioned tools, read/write separation, authorization, approval, idempotency, simulation, reconciliation, threat model |
 | Infrastructure | ADR where required, environment accountability, Terraform/backend contract, immutable versions, secrets, plan/security/cost/rollback evidence |
 | Application release | Reviewed revision, CI, immutable image digest, deployment approval, health/readiness, telemetry, rollback |
-| Research outcome | Protocol, comparator, results, uncertainty, threats, ethics/licensing, negative evidence, critical discussion |
+| Evaluation outcome | Protocol, comparator, results, uncertainty, threats, ethics/licensing, negative evidence, critical discussion |
 
-## 10. Data, feature, and research integrity
+## 10. Data, feature, and evaluation integrity
 
 Favorita work follows the [dataset source and governance record](FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md), [forecasting experiment design](../forecasting/favorita/FAVORITA_FORECASTING_EXPERIMENT_DESIGN.md), [temporal validation design](../forecasting/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md), and [temporal validation contract](../forecasting/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
 
-Research records must preserve:
+Evaluation records must preserve:
 
 - question or hypothesis and decision relevance;
 - dataset identity, permitted use, provenance, grain, date coverage, and checksums;
@@ -213,7 +213,7 @@ An LLM must not authorize irreversible action. Human approval binds a known acto
 A work item is ready only when:
 
 - the finding, risk, decision value, and applicable GitHub issue are evidence-based;
-- architecture, governance, data/research contracts, and relevant ADRs are linked;
+- architecture, governance, data/evaluation contracts, and relevant ADRs are linked;
 - scope, non-goals, protected assets, dependencies, and approval boundaries are clear;
 - alternatives and a non-AI baseline are considered where appropriate;
 - data access, licensing, privacy, ethics, and external authority are resolved or gated;
@@ -261,6 +261,6 @@ establish novelty, reliability, or deployment readiness.
 
 ## 16. Supersession and review
 
-Review this workflow when architecture, issue workflow, branch/release policy, CI/CD, regulated data, safety controls, research obligations, or repeated delivery failures change.
+Review this workflow when architecture, issue workflow, branch/release policy, CI/CD, regulated data, safety controls, evaluation obligations, or repeated delivery failures change.
 
 Changes require human approval and a focused pull request. A new governance record must identify what it supersedes. Historical evidence must not be silently rewritten to claim that it originally described a later state.

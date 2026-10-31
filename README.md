@@ -195,7 +195,7 @@ These are contributor commands, not a claim that the entire suite currently pass
 
 - [EDIP V2 Flagship Architecture Plan](docs/architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md)
 - [AWS Canonical Cloud Migration Audit](docs/audits/EDIP_AWS_CANONICAL_CLOUD_MIGRATION_AUDIT.md)
-- [EDIP Engineering Delivery Workflow](docs/governance/EDIP_RESEARCH_ENGINEERING_DELIVERY_WORKFLOW.md)
+- [EDIP Engineering Delivery Workflow](docs/governance/EDIP_ENGINEERING_DELIVERY_WORKFLOW.md)
 - [Favorita Dataset Source and Governance](docs/governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md)
 - [All repository audits](docs/audits/)
 
