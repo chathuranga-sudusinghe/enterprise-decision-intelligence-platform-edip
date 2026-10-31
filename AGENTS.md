@@ -23,14 +23,6 @@ Identify conflicting guidance before consequential action. A target design does 
 authorize implementation or execution. Explicit task instructions take precedence
 over default guidance within their stated scope.
 
-## Temporary transition guidance
-
-While the repository transition remains incomplete, academic positioning such as
-MSc study, professional-accreditation evidence, and PhD positioning must be treated
-as historical context rather than the primary product identity. Remove this
-paragraph after the affected repository documentation has been correctly updated
-and the transition has been verified complete.
-
 ## Issue-first workflow and approval
 
 The default workflow is:

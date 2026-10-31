@@ -18,7 +18,7 @@ It is a design authority, not proof that a component has been implemented, deplo
 
 Supporting authorities are:
 
-- [Engineering Delivery Workflow](../governance/EDIP_RESEARCH_ENGINEERING_DELIVERY_WORKFLOW.md);
+- [Engineering Delivery Workflow](../governance/EDIP_ENGINEERING_DELIVERY_WORKFLOW.md);
 - [AWS Canonical Cloud Migration Audit](../audits/EDIP_AWS_CANONICAL_CLOUD_MIGRATION_AUDIT.md);
 - [Favorita Dataset Source and Governance](../governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md);
 - [Favorita Forecasting Experiment Design](../forecasting/favorita/FAVORITA_FORECASTING_EXPERIMENT_DESIGN.md);
