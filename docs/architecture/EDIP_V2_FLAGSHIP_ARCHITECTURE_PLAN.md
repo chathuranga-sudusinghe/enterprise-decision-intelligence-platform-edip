@@ -7,23 +7,23 @@
 | Architecture style | Capability-oriented modular monolith |
 | Canonical cloud target | Amazon Web Services (AWS) |
 | Engineering framework | Enterprise AI/ML Engineering Framework v2.1.0 |
-| Project-management model | Jira Sprints and SCRUM work items |
+| Project-management model | Approved GitHub Issues |
 | Production-readiness claim | None |
 
 ## 1. Purpose and authority
 
-This document defines the approved target architecture for EDIP: a trustworthy enterprise decision-intelligence platform for inventory and demand-planning decisions. It records system boundaries, technology direction, engineering principles, delivery gates, research positioning, and unresolved decisions.
+This document defines the approved target architecture for EDIP: a trustworthy enterprise decision-intelligence platform for inventory and demand-planning decisions. It records system boundaries, technology direction, engineering principles, delivery gates, evaluation requirements, and unresolved decisions.
 
 It is a design authority, not proof that a component has been implemented, deployed, or operated. Current truth comes from verified repository code, tests, data manifests, reviewed implementation records, and deployment evidence. Target components shown here require separately approved implementation work.
 
 Supporting authorities are:
 
-- [Research and Engineering Delivery Workflow](../governance/EDIP_RESEARCH_ENGINEERING_DELIVERY_WORKFLOW.md);
+- [Engineering Delivery Workflow](../governance/EDIP_RESEARCH_ENGINEERING_DELIVERY_WORKFLOW.md);
 - [AWS Canonical Cloud Migration Audit](../audits/EDIP_AWS_CANONICAL_CLOUD_MIGRATION_AUDIT.md);
 - [Favorita Dataset Source and Governance](../governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md);
-- [Favorita Research Hypothesis and Experiment Design](../research/favorita/FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md);
-- [Favorita Temporal Validation Design](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md); and
-- [Favorita Temporal Validation Contract](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
+- [Favorita Forecasting Experiment Design](../forecasting/favorita/FAVORITA_FORECASTING_EXPERIMENT_DESIGN.md);
+- [Favorita Temporal Validation Design](../forecasting/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md); and
+- [Favorita Temporal Validation Contract](../forecasting/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
 
 ## 2. Vision and decision scope
 
@@ -49,22 +49,26 @@ The Enterprise AI/ML Engineering Framework v2.1.0 supplies the engineering lifec
 Problem -> Data -> Baseline -> Advanced AI -> Evaluation -> Delivery -> Production -> Maintenance
 ```
 
-The lifecycle is not a project schedule. Jira Sprints and SCRUM work items provide the active execution-management layer.
+The lifecycle is not a project schedule. Approved GitHub Issues provide the active
+execution-management layer, subject to [AGENTS.md](../../AGENTS.md):
 
 ```text
-Jira Sprint
--> approved SCRUM work item
--> feature branch from dev
--> bounded implementation and local validation
--> pull request to dev
--> CI and human review
--> reviewed release checkpoint
--> main
--> automated Continuous Deployment (CD)
--> Amazon ECS Fargate service deployment
+Finding/problem
+-> proposed issue content
+-> review and explicit approval
+-> issue creation
+-> local branch command
+-> separately authorized implementation and proportional validation
+-> review and authorized pull request to dev
+-> acceptance decision
+-> separately approved release checkpoint to main
+-> explicitly authorized deployment workflow
 ```
 
-A work item may traverse several framework stages, and a framework gate may span several Sprints. Old numbered delivery phases are historical vocabulary and are not the current execution model.
+An applicable existing issue may be reused. Issue creation does not authorize
+implementation or consequential operations. A work item may traverse several
+framework stages, and a framework gate may span several issues. Historical
+planning identifiers remain evidence references rather than active execution authority.
 
 ## 4. Architecture principles
 
@@ -124,9 +128,9 @@ External providers remain adapters behind typed interfaces. Business behavior mu
 
 ### 7.1 Forecasting and inventory risk
 
-The forecasting capability uses the governed Favorita foundation for the primary MSc research contribution. The principal hypothesis comparison was Contextual LightGBM versus Proposed Time-Aware LightGBM. The Proposed Time-Aware LightGBM adds leakage-safe temporal and time-series features to the same Contextual LightGBM baseline; this added feature group was the intended experimental difference. SCRUM-18 froze the implemented feature contracts, SCRUM-59 froze the shared Trial 0 model configuration, and SCRUM-19 completed the protected final-holdout evaluation. Time-Aware LightGBM is the selected forecasting approach. Credible naive or statistical baselines may provide secondary reference evidence, but they are not the principal hypothesis comparison.
+The forecasting baseline is grounded in the governed Favorita data and controlled evaluation foundation. The principal hypothesis comparison was Contextual LightGBM versus Proposed Time-Aware LightGBM. The Proposed Time-Aware LightGBM adds leakage-safe temporal and time-series features to the same Contextual LightGBM baseline; this added feature group was the intended experimental difference. SCRUM-18 froze the implemented feature contracts, SCRUM-59 froze the shared Trial 0 model configuration, and SCRUM-19 completed the protected final-holdout evaluation. Time-Aware LightGBM is the selected forecasting approach. Credible naive or statistical baselines may provide secondary reference evidence, but they are not the principal hypothesis comparison.
 
-The current temporal contract uses direct horizon-aware global forecasting for `unit_sales`, exact horizons 1 through 16, and no recursive prediction feedback. The approved four-fold expanding-window design covers modeling and evaluation targets from `2017-01-01` through `2017-07-30`; the protected final holdout covers `2017-07-31` through `2017-08-15`. The linked research documents define the exact boundaries.
+The current temporal contract uses direct horizon-aware global forecasting for `unit_sales`, exact horizons 1 through 16, and no recursive prediction feedback. The approved four-fold expanding-window design covers modeling and evaluation targets from `2017-01-01` through `2017-07-30`; the protected final holdout covers `2017-07-31` through `2017-08-15`. The linked forecasting documents define the exact boundaries.
 
 Forecast artifacts must identify their dataset, feature schema, model, baseline, training window, evaluation protocol, generation time, compatibility status, uncertainty representation, and checksum. Online services resolve approved immutable artifacts rather than developer-local “latest” files.
 
@@ -255,13 +259,24 @@ Evaluation must distinguish:
 
 Amazon CloudWatch is the target operational telemetry layer. LangGraph or model-provider traces may support development and evaluation but do not replace the durable business audit store.
 
-## 11. Evaluation and research positioning
+## 11. Engineering evaluation and evidence
 
-EDIP is an engineering and research platform, not a production-readiness claim. The Favorita forecasting experiment is the primary MSc research contribution. RAG, LangGraph orchestration, Human-in-the-Loop approval, deterministic controls, external evidence, MCP integration, and the production decision-support workflow are applied EDIP system contributions, not a second independent MSc hypothesis unless a separately approved research protocol introduces another research question.
+EDIP is a production-oriented AI/ML engineering platform for evidence-grounded demand
+and inventory decisions; this identity is not a production-readiness claim. The
+Favorita comparison supplies bounded forecasting evidence. RAG, LangGraph
+orchestration, HITL approval, deterministic safety, external evidence, MCP integration,
+and enterprise decision workflows remain target capabilities unless implementation
+and validation are separately evidenced.
 
-Academic evidence requires a defensible question, governed data, justified methodology, declared baselines, reproducible experiments, quantitative and qualitative evaluation, negative results, uncertainty, threats to validity, ethics/licensing review, and critical discussion.
+Evaluation requires a defined question, governed data, justified methodology,
+declared baselines, reproducible experiments, quantitative and qualitative evidence
+where applicable, negative results, uncertainty, threats to validity, and relevant
+ethics/licensing review. Original forecasting hypotheses and historical outcomes
+remain preserved in the linked experiment design.
 
-Claims such as “reliable,” “trustworthy,” “adaptive,” or “multi-agent” require defined measures and comparative evidence. Repository size, model complexity, or use of an LLM does not establish novelty or value.
+Claims such as “reliable,” “trustworthy,” “adaptive,” or “multi-agent” require defined
+measures and comparative evidence. Repository size, model complexity, or use of an
+LLM does not establish engineering value or novelty.
 
 ## 12. Current state and target-state boundary
 
@@ -269,7 +284,8 @@ Confirmed repository evidence includes the Favorita governed source record, leak
 
 The following remain target work unless separately evidenced:
 
-- optional sensitivity or uncertainty analysis under separate approval;
+- real-data uncertainty execution and empirical interval reporting under separate approval; the [offline implementation](../forecasting/favorita/FAVORITA_FORECAST_UNCERTAINTY.md) and synthetic checks do not establish real-data coverage or width;
+- optional sensitivity execution under separate approval;
 - governed publication and promotion of the immutable Time-Aware LightGBM bundle through Amazon S3 and AWS serving;
 - governed production RAG and approved corpus;
 - durable identity, HITL, workflow, and audit persistence;
@@ -278,7 +294,7 @@ The following remain target work unless separately evidenced:
 
 ## 13. Historical transition
 
-EDIP began as a broad engineering prototype. Legacy synthetic retail, event-streaming, and orchestration demonstrations, including Kafka and Airflow assets, were removed through bounded cleanup. The project then established the real-data Favorita foundation and moved to the current evidence-based architecture, governance, temporal-validation, and research direction.
+EDIP began as a broad engineering prototype. Legacy synthetic retail, event-streaming, and orchestration demonstrations, including Kafka and Airflow assets, were removed through bounded cleanup. The project then established the real-data Favorita foundation and moved to the current evidence-based architecture, governance, temporal-validation, and forecasting direction.
 
 This short transition explains provenance without making old implementation details the active roadmap or current project-management model.
 

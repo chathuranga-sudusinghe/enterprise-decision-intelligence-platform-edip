@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Active SCRUM-17 metric contract |
+| Status | Active forecasting metric contract; originally recorded under SCRUM-17 |
 | Target | `unit_sales` |
 | Primary selection metric | MAE (Mean Absolute Error) |
 | Forecast horizons | Exact integers 1 through 16 |
@@ -41,7 +41,7 @@ WAPE is returned as a ratio and multiplied by 100 only for percentage display. I
 
 ## 3. Selection and interpretation
 
-SCRUM-18 compares Contextual LightGBM and Proposed Time-Aware LightGBM under this identical metric contract. MAE remains the primary selection metric; RMSE, WAPE, RMSLE, and NWRMSLE remain supporting evidence, and Bias remains diagnostic.
+The historical SCRUM-18 comparison evaluated Contextual LightGBM and Proposed Time-Aware LightGBM under this identical metric contract. MAE remains the primary selection metric; RMSE, WAPE, RMSLE, and NWRMSLE remain supporting evidence, and Bias remains diagnostic.
 
 | Metric | Role | Best direction | Perfect value |
 |---|---|---|---|

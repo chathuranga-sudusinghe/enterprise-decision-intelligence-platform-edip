@@ -15,12 +15,12 @@
 
 This document records the redesigned canonical four-fold temporal validation design for Favorita forecasting. It defines the approved windows, the `2017-01-01` modeling-target boundary, expanding training histories, leakage prevention, and limitations that must accompany later model results. It replaces both the earlier eight-fold paired-season design and the superseded four-fold schedule that began on `2016-01-01`.
 
-The fold boundaries remain a research design contract. All four canonical Contextual and Time-Aware LightGBM folds completed successfully, and SCRUM-19 subsequently completed the protected final-holdout evaluation. Time-Aware LightGBM is the selected forecasting approach.
+The fold boundaries remain an evaluation design contract. All four canonical Contextual and Time-Aware LightGBM folds completed successfully, and SCRUM-19 subsequently completed the protected final-holdout evaluation. Time-Aware LightGBM is the selected forecasting approach.
 
 Related authorities:
 
 - [Favorita Dataset Source and Governance](../../governance/FAVORITA_DATASET_SOURCE_AND_GOVERNANCE.md);
-- [Favorita Research Hypothesis and Experiment Design](FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md);
+- [Favorita Forecasting Experiment Design](FAVORITA_FORECASTING_EXPERIMENT_DESIGN.md);
 - [Favorita Temporal Validation Contract](FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md);
 - [Favorita Forecasting Evaluation Metric Contract](FAVORITA_FORECASTING_EVALUATION_METRICS.md); and
 - [EDIP Architecture Plan](../../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md).
@@ -128,7 +128,7 @@ The previous eight-fold schedule, its resource-constrained subset `(1, 3, 6, 8)`
 
 The active root is `artifacts/features/favorita_2017_four_fold/`; manifests bind artifacts to the redesigned execution scope, and incompatible historical roots remain rejected.
 
-## 10. Research rationale and limitations
+## 10. Evaluation rationale and limitations
 
 The design provides 64 predeclared validation calendar days across four expanding folds within the `2017-01-01` through `2017-07-30` modeling/evaluation scope. Fold-specific metrics and row counts must be reported; robustness beyond these four windows is not claimed.
 
@@ -141,6 +141,6 @@ The Contextual-versus-Time-Aware comparison, shared Trial 0 configuration, and S
 - optional sensitivity or uncertainty analysis;
 - compute, temporary storage, durable artifact, and retention budgets.
 
-Separate approval is still required for uncertainty reporting, optional sensitivity designs, Kaggle submission, model packaging, and deployment.
+The offline uncertainty implementation and synthetic checks are documented in [Favorita Forecast Uncertainty](FAVORITA_FORECAST_UNCERTAINTY.md); real-data execution and empirical interval results remain unproduced for Issue #128. Separate approval is required for real-data uncertainty reporting, optional sensitivity execution, Kaggle submission, new model packaging or publication, and deployment. Recorded local packaging and serving validation does not authorize regeneration or promotion.
 
 The four approved folds, the `2017-01-01` modeling target start, the `2017-07-30` evaluation end, the 16-day horizon, expanding-window boundary, and protected final holdout are canonical. The canonical artifact and result roots are implemented and protected from historical reuse.

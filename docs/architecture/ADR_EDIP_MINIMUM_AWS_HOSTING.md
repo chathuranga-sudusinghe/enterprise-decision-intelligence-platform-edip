@@ -1,7 +1,11 @@
 # ADR: Minimum EDIP backend hosting
 
-Status: accepted for implementation by the project owner in this task, 2026-09-15.
-Scope: independent EDIP MSc research project plus its one shared Vora DNS name; no unrelated Vora resource changes.
+Status: accepted for implementation, 2026-09-15.
+Scope: bounded EDIP backend demonstration hosting plus its one shared Vora DNS name; no unrelated Vora resource changes.
+
+Documentation framing was updated under Issue #133. The original decision date,
+hosting controls, resource limits, and technical decisions are preserved; this edit
+does not establish deployment status or authorize infrastructure changes.
 
 ## Decision
 
@@ -44,9 +48,9 @@ Terraform also owns a compact CloudWatch operations dashboard and three alarms.
 The dashboard covers ECS CPU/memory plus ALB traffic, latency, 5xx responses and
 target health. Alarms cover sustained 80% ECS CPU, sustained 80% ECS memory and
 unhealthy ALB targets; they intentionally have no notification actions during
-the MSc research phase. These metrics and seven-day container logs support
+the bounded demonstration phase. These metrics and seven-day container logs support
 operational diagnosis. They do not replace the authoritative EDIP decision audit
-trail for model identity, research inputs, outputs and decision provenance.
+trail for model identity, evaluation inputs, outputs and decision provenance.
 
 Existing protected Terraform plan/apply remains first. A protected reusable
 application workflow builds and pushes to the existing ECR, rolls out ECS,
@@ -59,7 +63,7 @@ fail when ECS falls back to an older revision.
 ## Identity and infrastructure ownership
 
 Reuse the existing exact-subject GitHub OIDC release role. Repository variables
-provide role/environment/region; no personal owner or long-lived AWS credentials.
+provide role/environment/region; no personal-account or long-lived AWS credentials.
 Execution role: ECR pull and one log group. Task role: two exact versioned S3
 objects. Release role: this service, task family and two PassRole targets.
 Bootstrap IAM must be reviewed/applied separately before the hosting root.
@@ -76,7 +80,7 @@ One task is not highly available. Logs expire after seven days. Model memory,
 startup time and rollback behavior require real deployment evidence.
 No model publication, ECR push, Terraform apply or Git push is authorized by
 implementation alone. The first external deployment remains a separate action.
-The temporary HTTP endpoint is research/demo hosting, not secure forecasting.
+The temporary HTTP endpoint is demonstration hosting, not secure public forecasting.
 
 Alternatives: two services add cost and the UI calls an unimplemented endpoint;
 CloudFront is unnecessary for this explicitly accepted HTTP demo; private tasks

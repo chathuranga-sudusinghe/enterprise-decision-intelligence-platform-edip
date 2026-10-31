@@ -9,20 +9,20 @@
 | Verified local raw path | `data/raw/favorita-grocery-sales-forecasting/` |
 | Local verification date | 2026-08-02 |
 | Raw data tracked in Git | No |
-| Research status | Governed source foundation; downstream claims remain evidence-gated |
+| Governance status | Governed source foundation; downstream claims remain evidence-gated |
 
 ## 1. Purpose and evidence boundary
 
-This record is the authority for Favorita source identity, access classification, local raw-file evidence, preservation, redistribution, provenance, and research-use boundaries in EDIP.
+This record is the authority for Favorita source identity, access classification, local raw-file evidence, preservation, redistribution, provenance, and permitted-use boundaries in EDIP.
 
 It consolidates the original source/governance record and post-download verification. It proves the directly inspected extracted file set and recorded checksums. It does not prove the exact Kaggle access timestamp, archive identity, dataset revision, competition-rules snapshot, institutional approval, research readiness, or production readiness.
 
 Related current records:
 
 - [EDIP Architecture Plan](../architecture/EDIP_V2_FLAGSHIP_ARCHITECTURE_PLAN.md);
-- [Favorita Research Hypothesis and Experiment Design](../research/favorita/FAVORITA_RESEARCH_HYPOTHESIS_AND_EXPERIMENT_DESIGN.md);
-- [Favorita Temporal Validation Design](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md); and
-- [Favorita Temporal Validation Contract](../research/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
+- [Favorita Forecasting Experiment Design](../forecasting/favorita/FAVORITA_FORECASTING_EXPERIMENT_DESIGN.md);
+- [Favorita Temporal Validation Design](../forecasting/favorita/FAVORITA_TEMPORAL_VALIDATION_DESIGN.md); and
+- [Favorita Temporal Validation Contract](../forecasting/favorita/FAVORITA_TEMPORAL_VALIDATION_CONTRACT.md).
 
 ## 2. Official source and access classification
 
@@ -38,14 +38,14 @@ Public discoverability does not establish an open-data licence or redistribution
 
 ## 3. Permitted EDIP use
 
-Subject to verified competition rules and research governance, the dataset is intended for:
+Subject to verified competition rules and applicable governance, the dataset is intended for:
 
-- MSc research on demand forecasting and trustworthy decision intelligence;
+- controlled demand-forecasting evaluation and evidence-grounded decision-intelligence development;
 - reproducible training, validation, and testing;
 - EDIP engineering and governance evidence; and
-- preparation for future research into forecasting, uncertainty, evidence sufficiency, and Human-in-the-Loop decision support.
+- separately approved investigation of forecasting, uncertainty, evidence sufficiency, and Human-in-the-Loop decision support.
 
-This record grants no new usage right. Institutional, supervisor, ethics, privacy, retention, or data-owner approvals must be obtained where required.
+This documentation reframing grants no new usage right and does not establish permission for commercial or production data use. Institutional, supervisor, ethics, privacy, retention, or data-owner approvals must be obtained where required.
 
 ## 4. Raw-data preservation and redistribution
 
@@ -138,7 +138,7 @@ The current forecast target is `unit_sales`. Labelled history ends on `2017-08-1
 
 EDIP therefore uses an approved maximum direct forecast horizon of 16 days. The redesigned temporal methodology uses four expanding-window validation folds across modeling and evaluation targets from `2017-01-01` through `2017-07-30`. It protects the final labelled holdout with origin `2017-07-30` and dates `2017-07-31` through `2017-08-15`. Earlier eight-fold and superseded four-fold schedules are historical context only.
 
-The model-comparison and hypothesis logic are governed by the linked research hypothesis and experiment design; model-feature definitions are maintained in their dedicated feature and experiment authorities rather than duplicated here. The exact leakage, fold, horizon, and holdout rules are defined in the linked temporal design and contract. Kaggle `test.csv` has no `unit_sales` and is not local metric evidence.
+The model-comparison and hypothesis logic are governed by the linked forecasting experiment design; model-feature definitions are maintained in their dedicated feature and experiment authorities rather than duplicated here. The exact leakage, fold, horizon, and holdout rules are defined in the linked temporal design and contract. Kaggle `test.csv` has no `unit_sales` and is not local metric evidence.
 
 ## 10. Provenance and governance gaps
 
