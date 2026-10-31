@@ -31,12 +31,6 @@ as historical context rather than the primary product identity. Remove this
 paragraph after the affected repository documentation has been correctly updated
 and the transition has been verified complete.
 
-GitHub Issues is the active execution-management system. Legacy Jira and SCRUM
-identifiers are historical provenance. Remove this legacy-system clarification
-after active planning references have been reconciled and verified; the permanent
-issue-first workflow below remains applicable. Historical experiment identifiers
-must not be rewritten merely to remove their original provenance.
-
 ## Issue-first workflow and approval
 
 The default workflow is:
@@ -163,7 +157,7 @@ Mark unknown estimates honestly. Approval for a completed run does not authorize
 another run unless repetition was included in the approved scope.
 
 For the offline uncertainty baseline, follow the separate execution boundaries in
-[the uncertainty documentation](docs/research/favorita/FAVORITA_FORECAST_UNCERTAINTY.md).
+[the uncertainty documentation](docs/forecasting/favorita/FAVORITA_FORECAST_UNCERTAINTY.md).
 Synthetic validation does not establish empirical coverage or interval-width results.
 
 Do not apply/destroy Terraform, deploy services, publish images, change cloud
