@@ -74,7 +74,40 @@ Terraform static jobs require no cloud role. Cloud planning retains `AWS_TERRAFO
 
 When cloud planning is enabled, existing AWS S3 IAM refresh failures can still fail an infrastructure PR. They are neither suppressed nor repaired here. Passing static checks on a disabled/fork plan is not evidence of a successful AWS plan.
 
-There is no application deployment, image publishing, `workflow_run`, `pull_request_target`, or duplicate push CI trigger. The sole remaining `push` trigger is the unchanged production Terraform apply workflow on `main` with its existing paths and environment protection.
+PR CI does not deploy applications or publish images, and it has no `workflow_run`, `pull_request_target`, or duplicate push CI trigger. Production release selection is separate: `.github/workflows/release-orchestrator.yml` handles matching pushes to `main` and calls the reusable Terraform/app deployment workflows under their existing controls. Its path boundary is described below.
+
+## Production release trigger boundary — Issue #144
+
+The PR workflows above validate changes; production release selection is defined
+separately in `.github/workflows/release-orchestrator.yml` for pushes to `main`.
+Deployment documentation under `docs/deployment/**` has been removed from that
+release path filter. Changes confined to `docs/**`, root `README.md`, `AGENTS.md`,
+or `LICENSE` do not match the configured release paths. Mixed changes still match
+when a deployable input is included.
+
+Application code, the runtime-path helper, load-only bundle inference, Docker inputs,
+`pyproject.toml`, release workflow/script files, and the existing AWS infrastructure
+roots remain covered. Documentation inside a retained deployable prefix, such as
+`app/**` or an infrastructure root, still matches that prefix. Development-only edits
+to `pyproject.toml` also still match; separating those from runtime dependency changes
+requires a separately reviewed content-aware policy.
+
+`.github/scripts/test_release_policy.py` reads the actual workflow trigger and checks
+documentation-only, deployable, mixed, non-main, and offline-only scenarios. It uses
+the standard library and deliberately supports only the current exact-file and
+`directory/**` trigger form; unsupported syntax requires an explicit test update.
+The existing `changes` job discovers it with every `test_*.py` policy module before
+path classification, including on documentation-only PRs:
+
+```bash
+python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
+```
+
+The path-filter behavior is defined by [GitHub workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushpull_requestpull_request_targetpathspaths-ignore).
+These are local/static policy checks, not proof of a hosted release or deployment.
+Release jobs, permissions, concurrency, environment bindings, and release gates
+remain unchanged. External execution blocks and cloud resources are outside this
+repository-only change; no workflow execution is authorized by this documentation.
 
 ## Before and after
 
