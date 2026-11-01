@@ -6,9 +6,11 @@ import tempfile
 from bisect import bisect_right
 from collections.abc import Mapping, Sequence
 from math import isfinite
+from mmap import mmap
 from numbers import Integral
 from pathlib import Path
 from types import MappingProxyType
+from typing import cast
 
 import lightgbm as lgb
 import numpy as np
@@ -31,6 +33,7 @@ from pipelines.features.favorita_model_ready import (
     TARGET_COLUMN,
     TIME_AWARE_FEATURE_COLUMNS,
     TIME_AWARE_FEATURE_PROFILE,
+    FavoritaFeatureProfile,
     resolve_feature_profile,
 )
 
@@ -187,12 +190,8 @@ class _ParquetFeatureSequence(lgb.Sequence):
         self._categorical_levels = categorical_levels
         self._row_group_starts = [0]
         for row_group_index in range(self._parquet_file.metadata.num_row_groups):
-            row_count = self._parquet_file.metadata.row_group(
-                row_group_index
-            ).num_rows
-            self._row_group_starts.append(
-                self._row_group_starts[-1] + row_count
-            )
+            row_count = self._parquet_file.metadata.row_group(row_group_index).num_rows
+            self._row_group_starts.append(self._row_group_starts[-1] + row_count)
         self._cached_row_group_index: int | None = None
         self._cached_values: np.ndarray | None = None
 
@@ -240,18 +239,19 @@ class _ParquetFeatureSequence(lgb.Sequence):
         blocks: list[np.ndarray] = []
         cursor = start
         while cursor < stop:
-            row_group_index = bisect_right(
-                self._row_group_starts,
-                cursor,
-            ) - 1
+            row_group_index = (
+                bisect_right(
+                    self._row_group_starts,
+                    cursor,
+                )
+                - 1
+            )
             row_group_start = self._row_group_starts[row_group_index]
             row_group_stop = self._row_group_starts[row_group_index + 1]
             local_start = cursor - row_group_start
             local_stop = min(stop, row_group_stop) - row_group_start
             blocks.append(
-                self._row_group_values(row_group_index)[
-                    local_start:local_stop
-                ]
+                self._row_group_values(row_group_index)[local_start:local_stop]
             )
             cursor = min(stop, row_group_stop)
         return blocks[0] if len(blocks) == 1 else np.concatenate(blocks)
@@ -273,8 +273,7 @@ class _ParquetFeatureSequence(lgb.Sequence):
         if isinstance(index, list):
             return np.stack([self[item] for item in index])
         raise TypeError(
-            f"Sequence index must be integer, slice or list, got "
-            f"{type(index).__name__}"
+            f"Sequence index must be integer, slice or list, got {type(index).__name__}"
         )
 
 
@@ -302,7 +301,8 @@ class _LabelMemmapContext:
     def __exit__(self, *args: object) -> None:
         if self._labels is not None:
             self._labels.flush()
-            memory_map = self._labels._mmap
+            # NumPy exposes the backing mmap at runtime but omits it from its stubs.
+            memory_map = cast(mmap | None, getattr(self._labels, "_mmap"))
             self._labels = None
             if memory_map is not None:
                 memory_map.close()
@@ -339,12 +339,14 @@ class FavoritaLightGBMAdapter:
         self._model_parameters: Mapping[str, object] = MappingProxyType(
             effective_parameters
         )
-        self._num_boost_round = int(num_boost_round)
-        self._candidate_feature_columns = _validate_feature_contract(feature_columns)
-        self._feature_contract_name = feature_contract_name(
+        self._num_boost_round: int = int(num_boost_round)
+        self._candidate_feature_columns: tuple[str, ...] = _validate_feature_contract(
+            feature_columns
+        )
+        self._feature_contract_name: str = feature_contract_name(
             self._candidate_feature_columns
         )
-        self._feature_profile = resolve_feature_profile(
+        self._feature_profile: FavoritaFeatureProfile = resolve_feature_profile(
             self._feature_contract_name
         )
         self._booster: lgb.Booster | None = None
@@ -424,9 +426,7 @@ class FavoritaLightGBMAdapter:
 
     def _validate_model_ready_frame(self, frame: pd.DataFrame) -> None:
         if tuple(frame.columns) != self._feature_profile.output_columns:
-            raise ValueError(
-                "Model-ready frame must match the ordered training schema"
-            )
+            raise ValueError("Model-ready frame must match the ordered training schema")
         if frame.empty:
             raise ValueError("Model-ready frame must not be empty")
         if not frame["forecast_horizon"].isin(FORECAST_HORIZONS).all():
@@ -441,7 +441,7 @@ class FavoritaLightGBMAdapter:
         categorical: tuple[str, ...],
         levels: Mapping[str, tuple[object, ...]],
     ) -> pd.DataFrame:
-        prepared = frame.loc[:, fitted].copy()
+        prepared = frame.loc[:, list(fitted)].copy()
         for column in categorical:
             values = prepared[column]
             known_or_missing = values.isna() | values.isin(levels[column])
@@ -539,9 +539,7 @@ class FavoritaLightGBMAdapter:
             raise FileNotFoundError(training_path)
         parquet_file = pq.ParquetFile(training_path)
         try:
-            if not parquet_file.schema_arrow.equals(
-                self._feature_profile.arrow_schema
-            ):
+            if not parquet_file.schema_arrow.equals(self._feature_profile.arrow_schema):
                 raise ValueError(
                     "Parquet must match the ordered training schema "
                     f"for profile {self._feature_contract_name}"
@@ -552,9 +550,7 @@ class FavoritaLightGBMAdapter:
         finally:
             parquet_file.close()
 
-        missing_counts = {
-            column: 0 for column in self._candidate_feature_columns
-        }
+        missing_counts = {column: 0 for column in self._candidate_feature_columns}
         category_values: dict[str, set[object]] = {
             column: set()
             for column in CATEGORICAL_FEATURE_CANDIDATES
@@ -575,9 +571,7 @@ class FavoritaLightGBMAdapter:
                     frame = batch.to_pandas()
                     batch_rows = len(frame)
                     for column in self._candidate_feature_columns:
-                        missing_counts[column] += int(
-                            frame[column].isna().sum()
-                        )
+                        missing_counts[column] += int(frame[column].isna().sum())
                     for column in category_values:
                         category_values[column].update(
                             frame[column].dropna().unique().tolist()
@@ -619,9 +613,7 @@ class FavoritaLightGBMAdapter:
                     "No usable training features remain after null inspection"
                 )
             categorical = tuple(
-                column
-                for column in CATEGORICAL_FEATURE_CANDIDATES
-                if column in fitted
+                column for column in CATEGORICAL_FEATURE_CANDIDATES if column in fitted
             )
             levels = {
                 column: tuple(
@@ -661,9 +653,7 @@ class FavoritaLightGBMAdapter:
                 excluded=excluded,
                 categorical=categorical,
                 levels=levels,
-                missing_counts={
-                    column: missing_counts[column] for column in fitted
-                },
+                missing_counts={column: missing_counts[column] for column in fitted},
             )
 
     def _predict_frame_values(self, frame: pd.DataFrame) -> np.ndarray:

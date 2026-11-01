@@ -7,7 +7,7 @@ import json
 import re
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -172,11 +172,11 @@ def run_uncertainty(*, input_dir: Path, output_dir: Path) -> Path:
     del frame
     overall = _metrics(intervals)
     folds = [
-        {"fold_id": int(key), **_metrics(rows)}
+        {"fold_id": int(cast(int, key)), **_metrics(rows)}
         for key, rows in intervals.groupby("fold_id", sort=True)
     ]
     horizons = [
-        {"forecast_horizon": int(key), **_metrics(rows)}
+        {"forecast_horizon": int(cast(int, key)), **_metrics(rows)}
         for key, rows in intervals.groupby("forecast_horizon", sort=True)
     ]
     output_dir.parent.mkdir(parents=True, exist_ok=True)

@@ -89,7 +89,10 @@ def test_runner_executes_six_paired_trials_and_writes_complete_evidence(
     assert paths.markdown.is_file()
     markdown = paths.markdown.read_text(encoding="utf-8")
     assert "## Protected Holdout" in markdown
-    assert "| Trial | Arm | MAE | RMSE | WAPE | Bias | RMSLE | NWRMSLE | Shared MAE |" in markdown
+    assert (
+        "| Trial | Arm | MAE | RMSE | WAPE | Bias | RMSLE | NWRMSLE | Shared MAE |"
+        in markdown
+    )
     assert markdown.count("| Contextual |") == 6
     assert markdown.count("| Time-Aware |") == 6
 

@@ -37,9 +37,7 @@ from pipelines.runtime_paths import (
     resolve_cli_path,
 )
 
-DEFAULT_SOURCE_PATH = Path(
-    "data/processed/favorita_cleaned/favorita_cleaned.parquet"
-)
+DEFAULT_SOURCE_PATH = Path("data/processed/favorita_cleaned/favorita_cleaned.parquet")
 CONTEXTUAL_OUTPUT_DIR = FEATURE_PROFILES["contextual"].canonical_artifact_root
 TIME_AWARE_OUTPUT_DIR = FEATURE_PROFILES["time-aware"].canonical_artifact_root
 DEFAULT_OUTPUT_DIR = TIME_AWARE_OUTPUT_DIR
@@ -265,9 +263,7 @@ def _entity_sets(path: Path) -> tuple[set[int], set[int]]:
     return stores, items
 
 
-def _artifact_footer_validation(
-    path: Path, *, feature_profile: str
-) -> dict[str, Any]:
+def _artifact_footer_validation(path: Path, *, feature_profile: str) -> dict[str, Any]:
     """Validate reusable artifact structure from Parquet footer metadata only."""
 
     profile = resolve_feature_profile(feature_profile)
@@ -386,10 +382,8 @@ def _manifest_matches_reusable_fold(
             ),
             manifest.get("canonical_validation_design") == CANONICAL_VALIDATION_DESIGN,
             manifest.get("training_origin_count") == len(training_origins),
-            manifest.get("training_origin_start")
-            == training_origins[0].isoformat(),
-            manifest.get("training_origin_end")
-            == training_origins[-1].isoformat(),
+            manifest.get("training_origin_start") == training_origins[0].isoformat(),
+            manifest.get("training_origin_end") == training_origins[-1].isoformat(),
             manifest.get("configured_store_count") == len(configured_stores),
             manifest.get("max_items_per_store") is None,
             manifest.get("configured_stores") == list(configured_stores),
@@ -436,8 +430,7 @@ def _validate_fold_artifact_boundaries(
 ) -> None:
     if training_validation["forecast_date_min"] != MODELING_TARGET_START.isoformat():
         raise AssertionError(
-            "Training labels do not start at "
-            f"{MODELING_TARGET_START.isoformat()}"
+            f"Training labels do not start at {MODELING_TARGET_START.isoformat()}"
         )
     if training_validation["forecast_date_max"] != fold.forecast_origin.isoformat():
         raise AssertionError("Training labels do not end at the fold origin")
@@ -536,9 +529,7 @@ def fold_manifest_payload(
         "training_row_key_target_digest_version": training_validation[
             "row_key_target_digest_version"
         ],
-        "training_row_key_target_sha256": training_validation[
-            "row_key_target_sha256"
-        ],
+        "training_row_key_target_sha256": training_validation["row_key_target_sha256"],
         "validation_row_key_target_digest_version": validation_validation[
             "row_key_target_digest_version"
         ],
@@ -566,9 +557,7 @@ def fold_manifest_payload(
 
 
 def _counterpart_manifest_path(feature_profile: str, fold_id: int) -> Path:
-    counterpart_name = (
-        "time-aware" if feature_profile == "contextual" else "contextual"
-    )
+    counterpart_name = "time-aware" if feature_profile == "contextual" else "contextual"
     return (
         resolve_feature_profile(counterpart_name).canonical_artifact_root
         / f"fold_{fold_id:02d}"
@@ -579,9 +568,7 @@ def _counterpart_manifest_path(feature_profile: str, fold_id: int) -> Path:
 def _record_cross_arm_equivalence(
     manifest: dict[str, Any], *, fold_id: int, feature_profile: str
 ) -> None:
-    counterpart_name = (
-        "time-aware" if feature_profile == "contextual" else "contextual"
-    )
+    counterpart_name = "time-aware" if feature_profile == "contextual" else "contextual"
     counterpart_path = _counterpart_manifest_path(feature_profile, fold_id)
     if not counterpart_path.is_file():
         manifest["cross_arm_row_equivalence"] = {
@@ -614,8 +601,7 @@ def _record_cross_arm_equivalence(
     ]
     if mismatched:
         raise ValueError(
-            f"Fold {fold_id} cross-arm row equivalence failed: "
-            + ", ".join(mismatched)
+            f"Fold {fold_id} cross-arm row equivalence failed: " + ", ".join(mismatched)
         )
     manifest["cross_arm_row_equivalence"] = {
         "status": "verified",
@@ -757,9 +743,7 @@ def build_one_fold_dataset(
                 training_validation=training_validation,
                 validation_validation=validation_validation,
             ):
-                previous_cross_arm = existing_manifest.get(
-                    "cross_arm_row_equivalence"
-                )
+                previous_cross_arm = existing_manifest.get("cross_arm_row_equivalence")
                 _record_cross_arm_equivalence(
                     existing_manifest,
                     fold_id=fold.fold_id,
@@ -867,8 +851,8 @@ def build_one_fold_dataset(
 
     training_stores, training_items = _entity_sets(paths.training)
     validation_stores, validation_items = _entity_sets(paths.validation)
-    observed_stores = training_stores | validation_stores
-    if not observed_stores.issubset(configured_store_set):
+    observed_store_set = training_stores | validation_stores
+    if not observed_store_set.issubset(configured_store_set):
         raise AssertionError("Fold artifacts contain an unconfigured store")
     source_after = _source_state(config.source_path)
     if source_after != source_before:
@@ -881,7 +865,7 @@ def build_one_fold_dataset(
         training_origins=training_origins,
         experiment_subset=experiment_subset,
         configured_stores=configured_stores,
-        observed_stores=observed_stores,
+        observed_stores=observed_store_set,
         item_count=len(training_items | validation_items),
         training_validation=training_validation,
         validation_validation=validation_validation,
@@ -981,9 +965,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             feature_profile=args.feature_profile,
             source_path=args.source_path,
             output_dir=artifact_path(
-                FEATURE_PROFILES[args.feature_profile].canonical_artifact_root.relative_to(
-                    "artifacts"
-                )
+                FEATURE_PROFILES[
+                    args.feature_profile
+                ].canonical_artifact_root.relative_to("artifacts")
             ),
             overwrite=args.overwrite,
         ),

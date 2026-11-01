@@ -44,9 +44,7 @@ from pipelines.models.favorita_lightgbm import (
     FavoritaLightGBMAdapter,
 )
 
-DEFAULT_SOURCE_PATH = Path(
-    "data/processed/favorita_cleaned/favorita_cleaned.parquet"
-)
+DEFAULT_SOURCE_PATH = Path("data/processed/favorita_cleaned/favorita_cleaned.parquet")
 SMALL_OUTPUT_DIR = Path("artifacts/integration/favorita_scrum15_bounded")
 MEDIUM_OUTPUT_DIR = Path("artifacts/integration/favorita_scrum15_medium")
 LARGE_OUTPUT_DIR = Path("artifacts/integration/favorita_scrum15_large")
@@ -168,15 +166,11 @@ def integration_config_for_profile(
     try:
         definition = INTEGRATION_PROFILES[profile]
     except KeyError as exc:
-        raise ValueError(
-            f"profile must be one of {', '.join(PROFILE_NAMES)}"
-        ) from exc
+        raise ValueError(f"profile must be one of {', '.join(PROFILE_NAMES)}") from exc
     return BoundedIntegrationConfig(
         profile=definition.name,
         source_path=source_path,
-        output_dir=(
-            output_dir if output_dir is not None else definition.output_dir
-        ),
+        output_dir=(output_dir if output_dir is not None else definition.output_dir),
         stores=definition.stores,
         item_cap=definition.item_cap,
         training_origins=definition.training_origins,
@@ -225,15 +219,14 @@ def validate_integration_config(config: BoundedIntegrationConfig) -> None:
         raise ValueError("Bounded integration requires explicit training origins")
     if tuple(sorted(set(config.training_origins))) != config.training_origins:
         raise ValueError("Training origins must be unique and sorted")
-    if config.training_origins[-1] + timedelta(
-        days=max(FORECAST_HORIZONS)
-    ) > config.validation_origin:
+    if (
+        config.training_origins[-1] + timedelta(days=max(FORECAST_HORIZONS))
+        > config.validation_origin
+    ):
         raise ValueError(
             "Every bounded training label must be available by validation origin"
         )
-    validation_start, validation_end = derive_target_window(
-        config.validation_origin
-    )
+    validation_start, validation_end = derive_target_window(config.validation_origin)
     if (
         config.validation_origin == FINAL_HOLDOUT.forecast_origin
         or validation_start >= FINAL_HOLDOUT.holdout_start
@@ -247,9 +240,7 @@ def validate_integration_config(config: BoundedIntegrationConfig) -> None:
         or config.training_origins != definition.training_origins
         or config.validation_origin != definition.validation_origin
     ):
-        raise ValueError(
-            "Bounded integration values must match the selected profile"
-        )
+        raise ValueError("Bounded integration values must match the selected profile")
     if config.validation_batch_size <= 0:
         raise ValueError("validation_batch_size must be positive")
     for official_path in (
@@ -379,9 +370,7 @@ def run_bounded_integration(
         )
     )
     stage_paths = _artifact_paths(stage_dir)
-    validation_start, validation_end = derive_target_window(
-        config.validation_origin
-    )
+    validation_start, validation_end = derive_target_window(config.validation_origin)
     fold = TemporalValidationFold(
         fold_id=0,
         forecast_origin=config.validation_origin,

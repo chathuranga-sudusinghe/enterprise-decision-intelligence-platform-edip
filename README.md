@@ -150,7 +150,7 @@ python -m pip install -e ".[dev]"
 uvicorn app.main:app --reload
 ```
 
-Runtime-only installations use `python -m pip install .`; non-editable development installations use `python -m pip install ".[dev]"`. Python metadata, pinned dependencies, and tool configuration live in `pyproject.toml`. Ruff supplies linting, import sorting, and formatting; Black and isort are not required. MyPy targets `app` and `pipelines`; this newly documented scope still has existing type errors. Formatting also has existing failures, so these checks are not yet CI gates.
+Runtime-only installations use `python -m pip install .`; non-editable development installations use `python -m pip install ".[dev]"`. Python metadata, pinned dependencies, and tool configuration live in `pyproject.toml`. Ruff supplies linting, import sorting, and formatting; Black and isort are not required. MyPy targets `app`, `pipelines`, and `tests`; recursive checks exclude generated build copies, data, and retained artifacts. Development-only pandas/AWS stubs provide external typing support. PyArrow remains an explicitly documented untyped external boundary. Formatting and typing have a clean local baseline under Issue #141; MyPy remains advisory in CI and no formatting gate has been added.
 
 Use editable installation for local pipeline work so repository-relative data and artifact defaults retain their meaning. For an installed wheel outside the checkout, configure absolute runtime paths (`EDIP_FAVORITA_SOURCE_PATH`, `EDIP_ARTIFACT_ROOT`, and `EDIP_FAVORITA_MODEL_BUNDLE_PATH`) as needed.
 

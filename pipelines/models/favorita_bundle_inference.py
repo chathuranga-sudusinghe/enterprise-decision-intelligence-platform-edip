@@ -188,7 +188,7 @@ class FavoritaBundlePredictor:
                 ["unexpected=" + ",".join(unexpected)] if unexpected else []
             )
             raise FeatureSchemaError("Incompatible feature schema: " + "; ".join(parts))
-        frame = features.loc[:, expected].copy()
+        frame = features.loc[:, list(expected)].copy()
         categorical = set(self.categorical_feature_columns)
         for column in expected:
             if column in categorical:

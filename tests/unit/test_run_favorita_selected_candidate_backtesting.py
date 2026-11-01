@@ -20,9 +20,9 @@ def test_runner_passes_only_frozen_configuration_and_retains_provenance(
     output = tmp_path / "result"
     checked = Mock()
     monkeypatch.setattr(runner, "validate_evaluation_config", checked)
-    calls = []
+    calls: list[runner.FavoritaEvaluationRunConfig] = []
 
-    def evaluate(config: object) -> SimpleNamespace:
+    def evaluate(config: runner.FavoritaEvaluationRunConfig) -> SimpleNamespace:
         calls.append(config)
         predictions = output / "predictions.parquet"
         predictions.write_bytes(b"retained selected predictions")

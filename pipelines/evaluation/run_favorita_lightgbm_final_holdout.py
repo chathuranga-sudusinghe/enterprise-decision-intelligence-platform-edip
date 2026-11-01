@@ -59,9 +59,7 @@ from pipelines.runtime_paths import (
 JIRA_ID = "SCRUM-19"
 EXPERIMENT_NAME = "Final forecasting research evidence"
 PARAMETER_SOURCE = "SCRUM-59 Trial 0 frozen configuration"
-DEFAULT_OUTPUT_DIR = Path(
-    "artifacts/evaluation/favorita_scrum_19_final_holdout"
-)
+DEFAULT_OUTPUT_DIR = Path("artifacts/evaluation/favorita_scrum_19_final_holdout")
 JSON_FILENAME = "scrum_19_final_holdout.json"
 MARKDOWN_FILENAME = "scrum_19_final_holdout.md"
 ARMS: tuple[str, ...] = ("contextual", "time-aware")
@@ -150,12 +148,16 @@ def validate_final_holdout_config(config: FinalHoldoutRunConfig) -> None:
         raise ValueError("SCRUM-19 holdout must end on 2017-08-15")
     if FORECAST_HORIZONS != tuple(range(1, 17)):
         raise ValueError("SCRUM-19 horizons must be exactly 1 through 16")
-    if tuple(FROZEN_MODEL_PARAMETERS) != (
-        "learning_rate",
-        "num_leaves",
-        "min_data_in_leaf",
-        "feature_fraction",
-    ) or FROZEN_NUM_BOOST_ROUND != 150:
+    if (
+        tuple(FROZEN_MODEL_PARAMETERS)
+        != (
+            "learning_rate",
+            "num_leaves",
+            "min_data_in_leaf",
+            "feature_fraction",
+        )
+        or FROZEN_NUM_BOOST_ROUND != 150
+    ):
         raise ValueError("SCRUM-19 frozen Trial 0 parameters changed")
     if not config.overwrite:
         for path in asdict(_artifact_paths(config.output_dir)).values():
@@ -289,9 +291,7 @@ def _validate_materialized_boundaries(evidence: Mapping[str, Any]) -> None:
 
 def _verify_cross_arm_rows(dataset_evidence: Mapping[str, Mapping[str, Any]]) -> str:
     digests = {
-        arm: evidence["validation"]["artifact_validation"][
-            "row_key_target_sha256"
-        ]
+        arm: evidence["validation"]["artifact_validation"]["row_key_target_sha256"]
         for arm, evidence in dataset_evidence.items()
     }
     if len(set(digests.values())) != 1:
@@ -339,9 +339,7 @@ def _evaluate_arm(
     model.fit_parquet(paths.training)
     writer = _StreamingPredictionWriter(root / arm / "predictions.parquet")
     overall = FavoritaMetricAccumulator()
-    horizons = {
-        horizon: FavoritaMetricAccumulator() for horizon in FORECAST_HORIZONS
-    }
+    horizons = {horizon: FavoritaMetricAccumulator() for horizon in FORECAST_HORIZONS}
     try:
         result = stream_evaluator(
             fold=FINAL_HOLDOUT_WINDOW,
@@ -514,12 +512,10 @@ def run_final_holdout(
             for arm in ARMS
         }
         effective_parameters = {
-            arm: arm_results[arm]["model_evidence"]["model_parameters"]
-            for arm in ARMS
+            arm: arm_results[arm]["model_evidence"]["model_parameters"] for arm in ARMS
         }
         effective_rounds = {
-            arm: arm_results[arm]["model_evidence"]["num_boost_round"]
-            for arm in ARMS
+            arm: arm_results[arm]["model_evidence"]["num_boost_round"] for arm in ARMS
         }
         expected_effective_parameters = dict(LIGHTGBM_PARAMETERS)
         expected_effective_parameters.update(FROZEN_MODEL_PARAMETERS)

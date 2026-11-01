@@ -247,7 +247,10 @@ def validate_evaluation_config(config: FavoritaEvaluationRunConfig) -> None:
     resolve_feature_contract(config.feature_contract)
     profile = resolve_feature_profile(config.feature_contract)
     validate_evaluation_fold_output_dir(config.fold_output_dir)
-    if config.fold_output_dir in (CONTEXTUAL_FOLD_OUTPUT_DIR, TIME_AWARE_FOLD_OUTPUT_DIR):
+    if config.fold_output_dir in (
+        CONTEXTUAL_FOLD_OUTPUT_DIR,
+        TIME_AWARE_FOLD_OUTPUT_DIR,
+    ):
         if config.fold_output_dir != profile.canonical_artifact_root:
             raise ValueError("Feature contract and canonical fold artifact root differ")
     validate_evaluation_result_output_dir(config.output_dir)
@@ -270,7 +273,7 @@ def validate_evaluation_config(config: FavoritaEvaluationRunConfig) -> None:
         )
 
 
-def _python_value(value: object) -> object:
+def _python_value(value: Any) -> object:
     return None if pd.isna(value) else value
 
 
@@ -312,9 +315,7 @@ def load_backtest_examples(feature_path: Path) -> tuple[BacktestExample, ...]:
             batch_size=131_072,
             columns=list(TRAINING_OUTPUT_COLUMNS),
         ):
-            materialized.extend(
-                feature_frame_to_backtest_examples(batch.to_pandas())
-            )
+            materialized.extend(feature_frame_to_backtest_examples(batch.to_pandas()))
     finally:
         parquet_file.close()
     examples = tuple(materialized)
@@ -352,9 +353,7 @@ def iter_model_ready_validation_batches(
     parquet_file = pq.ParquetFile(feature_path)
     if not parquet_file.schema_arrow.equals(profile.arrow_schema):
         parquet_file.close()
-        raise ValueError(
-            "Validation Parquet must match the ordered training schema"
-        )
+        raise ValueError("Validation Parquet must match the ordered training schema")
     yielded_rows = 0
     try:
         for batch in parquet_file.iter_batches(
@@ -489,9 +488,7 @@ def _validate_direct_horizon_batch(
         fold.validation_start,
         fold.validation_end,
     ).all():
-        raise ValueError(
-            f"Fold {fold.fold_id} validation rows are outside O+1..O+16"
-        )
+        raise ValueError(f"Fold {fold.fold_id} validation rows are outside O+1..O+16")
     actual = frame["unit_sales"].to_numpy(dtype="float64", copy=False)
     if not np.isfinite(actual).all():
         raise ValueError("Validation unit_sales must contain only finite values")
@@ -621,9 +618,7 @@ def _fold_result_from_frame(
         fold.validation_start,
         fold.validation_end,
     ).all():
-        raise ValueError(
-            f"Fold {fold.fold_id} validation rows are outside O+1..O+16"
-        )
+        raise ValueError(f"Fold {fold.fold_id} validation rows are outside O+1..O+16")
     if tuple(sorted(horizons.unique())) != FORECAST_HORIZONS:
         raise ValueError(
             f"Fold {fold.fold_id} validation must cover horizons 1 through 16"
@@ -876,8 +871,7 @@ def _manifest(
     effective_model_parameters = dict(LIGHTGBM_PARAMETERS)
     effective_model_parameters.update(config.model_parameters or {})
     custom_model_configuration = (
-        config.model_parameters is not None
-        or config.num_boost_round != NUM_BOOST_ROUND
+        config.model_parameters is not None or config.num_boost_round != NUM_BOOST_ROUND
     )
     return {
         "namespace": {
@@ -1073,9 +1067,7 @@ def _validate_existing_fold_parquet(
                 for index in range(parquet_file.metadata.num_row_groups)
             ]
             if any(
-                value is None
-                or not value.has_min_max
-                or value.null_count
+                value is None or not value.has_min_max or value.null_count
                 for value in statistics
             ):
                 raise ValueError(
@@ -1085,6 +1077,7 @@ def _validate_existing_fold_parquet(
                 min(value.min for value in statistics),
                 max(value.max for value in statistics),
             )
+
         def as_date(value: Any) -> Any:
             return value.date() if hasattr(value, "date") else value
 
@@ -1094,7 +1087,10 @@ def _validate_existing_fold_parquet(
         if (horizon_min, horizon_max) != (1, len(FORECAST_HORIZONS)):
             raise ValueError(f"{partition} Parquet horizons must span 1 through 16")
         if partition == "Training":
-            if (target_min, target_max) != (MODELING_TARGET_START, fold.forecast_origin):
+            if (target_min, target_max) != (
+                MODELING_TARGET_START,
+                fold.forecast_origin,
+            ):
                 raise ValueError("Training Parquet target dates are not canonical")
             if origin_max >= fold.forecast_origin:
                 raise ValueError("Training Parquet origins must precede fold origin")
@@ -1132,9 +1128,7 @@ def _read_existing_fold_evidence(
         try:
             manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            raise ValueError(
-                f"Fold {fold.fold_id} manifest is not valid JSON"
-            ) from exc
+            raise ValueError(f"Fold {fold.fold_id} manifest is not valid JSON") from exc
         if not isinstance(manifest, dict):
             raise ValueError(f"Fold {fold.fold_id} manifest must be a JSON object")
         expected = {
@@ -1187,9 +1181,10 @@ def _read_existing_fold_evidence(
             )
 
         for partition in ("training", "validation"):
-            if manifest.get(
-                f"{partition}_row_key_target_digest_version"
-            ) != ROW_KEY_TARGET_DIGEST_VERSION:
+            if (
+                manifest.get(f"{partition}_row_key_target_digest_version")
+                != ROW_KEY_TARGET_DIGEST_VERSION
+            ):
                 raise ValueError(
                     f"Fold {fold.fold_id} manifest {partition} digest version is invalid"
                 )
@@ -1197,9 +1192,7 @@ def _read_existing_fold_evidence(
             if (
                 not isinstance(digest, str)
                 or len(digest) != 64
-                or any(
-                    character not in "0123456789abcdef" for character in digest
-                )
+                or any(character not in "0123456789abcdef" for character in digest)
             ):
                 raise ValueError(
                     f"Fold {fold.fold_id} manifest {partition} digest is invalid"
@@ -1280,9 +1273,7 @@ def run_evaluation(
                     config.model_parameters is None
                     and config.num_boost_round == NUM_BOOST_ROUND
                 ):
-                    model = FavoritaLightGBMAdapter(
-                        feature_columns=feature_columns
-                    )
+                    model = FavoritaLightGBMAdapter(feature_columns=feature_columns)
                 else:
                     model = FavoritaLightGBMAdapter(
                         feature_columns=feature_columns,
@@ -1342,7 +1333,7 @@ def run_evaluation(
         completed_at = datetime.now(timezone.utc)
         if _source_state(config.source_path) != source_state:
             raise AssertionError("Cleaned source changed during evaluation")
-        artifact_evidence = {
+        consumed_fold_evidence = {
             "mode": "consumption-only",
             "output_dir": config.fold_output_dir.as_posix(),
             "fold_count": len(fold_evidence),
@@ -1353,7 +1344,7 @@ def run_evaluation(
         manifest = _manifest(
             config=config,
             paths=paths,
-            fold_artifact_evidence=artifact_evidence,
+            fold_artifact_evidence=consumed_fold_evidence,
             result=result,
             started_at=started_at,
             completed_at=completed_at,
@@ -1377,9 +1368,7 @@ def run_evaluation(
 
 def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=(
-            "Run the approved serial Favorita four-fold LightGBM evaluation."
-        )
+        description=("Run the approved serial Favorita four-fold LightGBM evaluation.")
     )
     parser.add_argument(
         "--source-path", type=resolve_cli_path, default=favorita_source_path()
@@ -1399,7 +1388,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         FavoritaEvaluationRunConfig(
             source_path=args.source_path,
             output_dir=artifact_path(
-                FEATURE_CONTRACT_OUTPUT_DIRS[args.feature_contract].relative_to("artifacts")
+                FEATURE_CONTRACT_OUTPUT_DIRS[args.feature_contract].relative_to(
+                    "artifacts"
+                )
             ),
             feature_contract=args.feature_contract,
             fold_output_dir=artifact_path(

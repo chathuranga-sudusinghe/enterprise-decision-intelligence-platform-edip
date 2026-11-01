@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import ast
 import json
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -108,7 +110,10 @@ def _fake_stream(**kwargs):
     horizons = kwargs["horizon_accumulators"]
     for horizon in runner.FORECAST_HORIZONS:
         actual = [float(horizon)]
-        prediction = [float(horizon) + (0.5 if model.feature_contract_name == "contextual" else 0.25)]
+        prediction = [
+            float(horizon)
+            + (0.5 if model.feature_contract_name == "contextual" else 0.25)
+        ]
         perishable = [horizon % 2]
         overall.update(actual, prediction, perishable)
         horizons[horizon].update(actual, prediction, perishable)
@@ -123,7 +128,9 @@ def _fake_stream(**kwargs):
     )
 
 
-def _fake_materializer(calls: list[tuple[object, dict[str, object]]], digest="a" * 64):
+def _fake_materializer(
+    calls: list[tuple[runner.FeatureBuildConfig, dict[str, object]]], digest="a" * 64
+):
     def materialize(config, **kwargs):
         calls.append((config, kwargs))
         config.output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -145,7 +152,7 @@ def test_final_holdout_runner_enforces_contract_and_publishes_evidence(
     source = tmp_path / "source.parquet"
     _source(source)
     output = tmp_path / "evidence"
-    calls: list[tuple[object, dict[str, object]]] = []
+    calls: list[tuple[runner.FeatureBuildConfig, dict[str, object]]] = []
     FakeAdapter.instances = []
     FakeWriter.created_paths = []
     monkeypatch.setattr(runner, "_StreamingPredictionWriter", FakeWriter)
@@ -154,7 +161,9 @@ def test_final_holdout_runner_enforces_contract_and_publishes_evidence(
         runner.FinalHoldoutRunConfig(source_path=source, output_dir=output),
         materializer=_fake_materializer(calls),
         boundary_reader=_footer_boundaries,
-        adapter_factory=FakeAdapter,
+        adapter_factory=cast(
+            Callable[..., runner.FavoritaLightGBMAdapter], FakeAdapter
+        ),
         stream_evaluator=_fake_stream,
     )
 
@@ -166,9 +175,7 @@ def test_final_holdout_runner_enforces_contract_and_publishes_evidence(
         "holdout_end": "2017-08-15",
         "horizons": list(range(1, 17)),
     }
-    assert evidence["parameter_source"] == (
-        "SCRUM-59 Trial 0 frozen configuration"
-    )
+    assert evidence["parameter_source"] == ("SCRUM-59 Trial 0 frozen configuration")
     assert evidence["frozen_model_configuration"] == {
         "model_parameters": {
             "learning_rate": 0.02757359293934948,
@@ -184,14 +191,29 @@ def test_final_holdout_runner_enforces_contract_and_publishes_evidence(
     assert evidence["same_effective_model_parameters_verified"] is True
     assert evidence["same_num_boost_round_verified"] is True
     assert evidence["cross_arm_validation_row_target_digest_verified"] is True
-    assert "forecast_origin_max" not in evidence["dataset_evidence"]["contextual"]["training"]["artifact_validation"]
-    assert evidence["dataset_evidence"]["contextual"]["training"]["footer_boundaries"]["forecast_origin_max"] == "2017-07-29"
+    assert (
+        "forecast_origin_max"
+        not in evidence["dataset_evidence"]["contextual"]["training"][
+            "artifact_validation"
+        ]
+    )
+    assert (
+        evidence["dataset_evidence"]["contextual"]["training"]["footer_boundaries"][
+            "forecast_origin_max"
+        ]
+        == "2017-07-29"
+    )
     assert evidence["source_integrity"]["unchanged"] is True
-    assert evidence["source_integrity"]["before"] == evidence["source_integrity"]["after"]
+    assert (
+        evidence["source_integrity"]["before"] == evidence["source_integrity"]["after"]
+    )
     assert evidence["hypothesis_conclusion"] is None
     assert set(evidence["metric_comparison"]) == set(runner.METRIC_NAMES)
     assert len(FakeAdapter.instances) == 2
-    assert FakeAdapter.instances[0].model_parameters == FakeAdapter.instances[1].model_parameters
+    assert (
+        FakeAdapter.instances[0].model_parameters
+        == FakeAdapter.instances[1].model_parameters
+    )
     assert all(model.num_boost_round == 150 for model in FakeAdapter.instances)
     assert all(
         set(result["overall_metrics"]) == set(runner.METRIC_NAMES)
@@ -203,11 +225,22 @@ def test_final_holdout_runner_enforces_contract_and_publishes_evidence(
     training_calls = [call for call in calls if len(call[0].forecast_origins) > 1]
     holdout_calls = [call for call in calls if len(call[0].forecast_origins) == 1]
     assert len(training_calls) == len(holdout_calls) == 2
-    assert all(max(call[0].forecast_origins) < runner.FINAL_HOLDOUT.forecast_origin for call in training_calls)
-    assert all(call[1]["forecast_date_cutoff"] == runner.FINAL_HOLDOUT.forecast_origin for call in training_calls)
-    assert all(call[0].forecast_origins == (runner.FINAL_HOLDOUT.forecast_origin,) for call in holdout_calls)
+    assert all(
+        max(call[0].forecast_origins) < runner.FINAL_HOLDOUT.forecast_origin
+        for call in training_calls
+    )
+    assert all(
+        call[1]["forecast_date_cutoff"] == runner.FINAL_HOLDOUT.forecast_origin
+        for call in training_calls
+    )
+    assert all(
+        call[0].forecast_origins == (runner.FINAL_HOLDOUT.forecast_origin,)
+        for call in holdout_calls
+    )
     assert paths.markdown.is_file()
-    assert "does not automatically conclude H0 or H1" in paths.markdown.read_text(encoding="utf-8")
+    assert "does not automatically conclude H0 or H1" in paths.markdown.read_text(
+        encoding="utf-8"
+    )
     assert not list(output.rglob("*.parquet"))
     assert all(not path.exists() for path in FakeWriter.created_paths)
 
@@ -241,7 +274,9 @@ def test_digest_mismatch_fails_before_scoring_and_cleans_temp(
             runner.FinalHoldoutRunConfig(source_path=source, output_dir=output),
             materializer=materialize,
             boundary_reader=_footer_boundaries,
-            adapter_factory=FakeAdapter,
+            adapter_factory=cast(
+                Callable[..., runner.FavoritaLightGBMAdapter], FakeAdapter
+            ),
             stream_evaluator=_fake_stream,
         )
 
@@ -258,7 +293,7 @@ def test_scoring_failure_cleans_temporary_artifacts(
     source = tmp_path / "source.parquet"
     _source(source)
     output = tmp_path / "evidence"
-    calls: list[tuple[object, dict[str, object]]] = []
+    calls: list[tuple[runner.FeatureBuildConfig, dict[str, object]]] = []
     FakeAdapter.instances = []
     FakeWriter.created_paths = []
     monkeypatch.setattr(runner, "_StreamingPredictionWriter", FakeWriter)
@@ -271,7 +306,9 @@ def test_scoring_failure_cleans_temporary_artifacts(
             runner.FinalHoldoutRunConfig(source_path=source, output_dir=output),
             materializer=_fake_materializer(calls),
             boundary_reader=_footer_boundaries,
-            adapter_factory=FakeAdapter,
+            adapter_factory=cast(
+                Callable[..., runner.FavoritaLightGBMAdapter], FakeAdapter
+            ),
             stream_evaluator=fail_stream,
         )
 

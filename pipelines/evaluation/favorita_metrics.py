@@ -40,8 +40,8 @@ class FavoritaMetricAccumulator:
 
     def update(
         self,
-        actual: Iterable[Real],
-        prediction: Iterable[Real],
+        actual: Iterable[Real | float],
+        prediction: Iterable[Real | float],
         perishable: Iterable[object],
     ) -> None:
         """Accumulate one bounded batch without retaining its row values."""
@@ -103,13 +103,11 @@ class FavoritaMetricAccumulator:
             wape=self.sum_abs_clipped_error / self.sum_clipped_actual,
             bias=self.sum_error / self.count,
             rmsle=sqrt(self.sum_squared_log_error / self.count),
-            nwrmsle=sqrt(
-                self.sum_weighted_squared_log_error / self.sum_weights
-            ),
+            nwrmsle=sqrt(self.sum_weighted_squared_log_error / self.sum_weights),
         )
 
 
-def _finite_values(values: Iterable[Real], name: str) -> tuple[float, ...]:
+def _finite_values(values: Iterable[Real | float], name: str) -> tuple[float, ...]:
     try:
         materialized = tuple(values)
     except TypeError as exc:
@@ -130,8 +128,8 @@ def _finite_values(values: Iterable[Real], name: str) -> tuple[float, ...]:
 
 
 def _paired_values(
-    actual: Iterable[Real],
-    prediction: Iterable[Real],
+    actual: Iterable[Real | float],
+    prediction: Iterable[Real | float],
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     actual_values = _finite_values(actual, "actual")
     prediction_values = _finite_values(prediction, "prediction")
@@ -141,8 +139,8 @@ def _paired_values(
 
 
 def _non_negative_pairs(
-    actual: Iterable[Real],
-    prediction: Iterable[Real],
+    actual: Iterable[Real | float],
+    prediction: Iterable[Real | float],
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     actual_values, prediction_values = _paired_values(actual, prediction)
     return (
@@ -152,8 +150,8 @@ def _non_negative_pairs(
 
 
 def mean_absolute_error(
-    actual: Iterable[Real],
-    prediction: Iterable[Real],
+    actual: Iterable[Real | float],
+    prediction: Iterable[Real | float],
 ) -> float:
     """Return MAE on the original target and prediction values."""
 
@@ -165,8 +163,8 @@ def mean_absolute_error(
 
 
 def root_mean_squared_error(
-    actual: Iterable[Real],
-    prediction: Iterable[Real],
+    actual: Iterable[Real | float],
+    prediction: Iterable[Real | float],
 ) -> float:
     """Return RMSE on the original target and prediction values."""
 
@@ -179,8 +177,8 @@ def root_mean_squared_error(
 
 
 def mean_forecast_error(
-    actual: Iterable[Real],
-    prediction: Iterable[Real],
+    actual: Iterable[Real | float],
+    prediction: Iterable[Real | float],
 ) -> float:
     """Return Bias as mean(prediction - actual) on original values."""
 
@@ -192,8 +190,8 @@ def mean_forecast_error(
 
 
 def weighted_absolute_percentage_error(
-    actual: Iterable[Real],
-    prediction: Iterable[Real],
+    actual: Iterable[Real | float],
+    prediction: Iterable[Real | float],
 ) -> float:
     """Return WAPE as a ratio after evaluation-only non-negative clipping.
 
@@ -201,9 +199,7 @@ def weighted_absolute_percentage_error(
     Percentage reporting multiplies the returned ratio by 100.
     """
 
-    evaluation_target, evaluation_prediction = _non_negative_pairs(
-        actual, prediction
-    )
+    evaluation_target, evaluation_prediction = _non_negative_pairs(actual, prediction)
     denominator = fsum(evaluation_target)
     if denominator == 0.0:
         raise ValueError("WAPE is undefined when total evaluation target is zero")
@@ -218,14 +214,12 @@ def weighted_absolute_percentage_error(
 
 
 def root_mean_squared_logarithmic_error(
-    actual: Iterable[Real],
-    prediction: Iterable[Real],
+    actual: Iterable[Real | float],
+    prediction: Iterable[Real | float],
 ) -> float:
     """Return RMSLE after evaluation-only non-negative clipping."""
 
-    evaluation_target, evaluation_prediction = _non_negative_pairs(
-        actual, prediction
-    )
+    evaluation_target, evaluation_prediction = _non_negative_pairs(actual, prediction)
     mean_squared_log_error = fsum(
         (log1p(predicted) - log1p(observed)) ** 2
         for observed, predicted in zip(
@@ -237,8 +231,8 @@ def root_mean_squared_logarithmic_error(
 
 
 def normalized_weighted_root_mean_squared_logarithmic_error(
-    actual: Iterable[Real],
-    prediction: Iterable[Real],
+    actual: Iterable[Real | float],
+    prediction: Iterable[Real | float],
     perishable: Iterable[object],
 ) -> float:
     """Return NWRMSLE using Favorita perishability weights.
@@ -247,9 +241,7 @@ def normalized_weighted_root_mean_squared_logarithmic_error(
     The weighted squared log errors are normalized by the sum of row weights.
     """
 
-    evaluation_target, evaluation_prediction = _non_negative_pairs(
-        actual, prediction
-    )
+    evaluation_target, evaluation_prediction = _non_negative_pairs(actual, prediction)
     try:
         perishable_values = tuple(perishable)
     except TypeError as exc:
@@ -277,8 +269,8 @@ def normalized_weighted_root_mean_squared_logarithmic_error(
 
 
 def evaluate_favorita_forecasts(
-    actual: Iterable[Real],
-    prediction: Iterable[Real],
+    actual: Iterable[Real | float],
+    prediction: Iterable[Real | float],
     perishable: Iterable[object],
 ) -> ForecastMetricResults:
     """Return the complete SCRUM-17 metric set for one evaluation slice."""
@@ -290,9 +282,7 @@ def evaluate_favorita_forecasts(
         rmse=root_mean_squared_error(actual_values, prediction_values),
         wape=weighted_absolute_percentage_error(actual_values, prediction_values),
         bias=mean_forecast_error(actual_values, prediction_values),
-        rmsle=root_mean_squared_logarithmic_error(
-            actual_values, prediction_values
-        ),
+        rmsle=root_mean_squared_logarithmic_error(actual_values, prediction_values),
         nwrmsle=normalized_weighted_root_mean_squared_logarithmic_error(
             actual_values,
             prediction_values,
